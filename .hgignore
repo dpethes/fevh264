@@ -1,0 +1,7 @@
+syntax: glob
+*.exe
+*.o
+*.ppu
+*.a
+*.compiled
+*.lps
