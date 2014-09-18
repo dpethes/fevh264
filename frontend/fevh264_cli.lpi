@@ -1,0 +1,264 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <ProjectOptions>
+    <Version Value="9"/>
+    <PathDelim Value="\"/>
+    <General>
+      <Flags>
+        <MainUnitHasUsesSectionForAllUnits Value="False"/>
+        <MainUnitHasCreateFormStatements Value="False"/>
+        <MainUnitHasTitleStatement Value="False"/>
+        <LRSInOutputDirectory Value="False"/>
+      </Flags>
+      <SessionStorage Value="InProjectDir"/>
+      <MainUnit Value="0"/>
+      <UseAppBundle Value="False"/>
+    </General>
+    <VersionInfo>
+      <StringTable ProductVersion=""/>
+    </VersionInfo>
+    <BuildModes Count="2">
+      <Item1 Name="default" Default="True"/>
+      <Item2 Name="asm ext">
+        <CompilerOptions>
+          <Version Value="11"/>
+          <PathDelim Value="\"/>
+          <Target>
+            <Filename Value="fevh264_cli"/>
+          </Target>
+          <SearchPaths>
+            <OtherUnitFiles Value="..\core"/>
+            <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+          </SearchPaths>
+          <Parsing>
+            <SyntaxOptions>
+              <IncludeAssertionCode Value="True"/>
+            </SyntaxOptions>
+          </Parsing>
+          <CodeGeneration>
+            <TargetProcessor Value="pentiumm"/>
+            <Optimizations>
+              <OptimizationLevel Value="3"/>
+            </Optimizations>
+          </CodeGeneration>
+          <Linking>
+            <Debugging>
+              <GenerateDebugInfo Value="False"/>
+              <UseLineInfoUnit Value="False"/>
+            </Debugging>
+          </Linking>
+          <Other>
+            <Verbosity>
+              <ShowSummary Value="True"/>
+            </Verbosity>
+            <CompilerMessages>
+              <UseMsgFile Value="True"/>
+            </CompilerMessages>
+            <CustomOptions Value="-CpPENTIUMM -al -Anasmwin32"/>
+            <CompilerPath Value="$(CompPath)"/>
+            <ExecuteBefore>
+              <Command Value="build_asm.bat"/>
+              <CompileReasons Compile="False" Run="False"/>
+            </ExecuteBefore>
+          </Other>
+        </CompilerOptions>
+      </Item2>
+    </BuildModes>
+    <PublishOptions>
+      <Version Value="2"/>
+      <IncludeFileFilter Value="*.(pas|pp|inc|lfm|lpr|lrs|lpi|lpk|sh|xml)"/>
+      <ExcludeFileFilter Value="*.(bak|ppu|ppw|o|so);*~;backup"/>
+    </PublishOptions>
+    <RunParams>
+      <local>
+        <FormatVersion Value="1"/>
+        <CommandLineParams Value="-f 200 -q 22 -a 3 -l d:\david\video\tests\e3.y4m"/>
+        <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
+      </local>
+    </RunParams>
+    <Units Count="29">
+      <Unit0>
+        <Filename Value="fevh264_cli.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="fevh264_cli"/>
+      </Unit0>
+      <Unit1>
+        <Filename Value="..\core\pgm.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="pgm"/>
+      </Unit1>
+      <Unit2>
+        <Filename Value="..\core\common.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="common"/>
+      </Unit2>
+      <Unit3>
+        <Filename Value="..\core\stdint.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="stdint"/>
+      </Unit3>
+      <Unit4>
+        <Filename Value="..\core\bitstream.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="bitstream"/>
+      </Unit4>
+      <Unit5>
+        <Filename Value="..\core\vlc.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="vlc"/>
+      </Unit5>
+      <Unit6>
+        <Filename Value="..\core\encoder.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="encoder"/>
+      </Unit6>
+      <Unit7>
+        <Filename Value="..\core\macroblock.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="macroblock"/>
+      </Unit7>
+      <Unit8>
+        <Filename Value="..\core\intra_pred.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="intra_pred"/>
+      </Unit8>
+      <Unit9>
+        <Filename Value="..\core\pixel.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="pixel"/>
+      </Unit9>
+      <Unit10>
+        <Filename Value="..\core\transquant.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="transquant"/>
+      </Unit10>
+      <Unit11>
+        <Filename Value="..\core\h264stream.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="h264stream"/>
+      </Unit11>
+      <Unit12>
+        <Filename Value="..\core\h264tables.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="h264tables"/>
+      </Unit12>
+      <Unit13>
+        <Filename Value="..\core\frame.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="frame"/>
+      </Unit13>
+      <Unit14>
+        <Filename Value="..\core\util.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="util"/>
+      </Unit14>
+      <Unit15>
+        <Filename Value="yuv4mpeg.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="yuv4mpeg"/>
+      </Unit15>
+      <Unit16>
+        <Filename Value="..\core\motion_comp.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="motion_comp"/>
+      </Unit16>
+      <Unit17>
+        <Filename Value="..\core\motion_est.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="motion_est"/>
+      </Unit17>
+      <Unit18>
+        <Filename Value="..\core\bench.inc"/>
+        <IsPartOfProject Value="True"/>
+      </Unit18>
+      <Unit19>
+        <Filename Value="..\core\ratecontrol.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="ratecontrol"/>
+      </Unit19>
+      <Unit20>
+        <Filename Value="..\core\image.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="image"/>
+      </Unit20>
+      <Unit21>
+        <Filename Value="..\core\inter_pred.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="inter_pred"/>
+      </Unit21>
+      <Unit22>
+        <Filename Value="..\core\mb_encoder.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="mb_encoder"/>
+      </Unit22>
+      <Unit23>
+        <Filename Value="..\core\stats.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="stats"/>
+      </Unit23>
+      <Unit24>
+        <Filename Value="..\core\loopfilter.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="loopfilter"/>
+      </Unit24>
+      <Unit25>
+        <Filename Value="..\core\parameters.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="parameters"/>
+      </Unit25>
+      <Unit26>
+        <Filename Value="cliparamhandler.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="CliParamHandler"/>
+      </Unit26>
+      <Unit27>
+        <Filename Value="..\core\motion_est_search.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="motion_est_search"/>
+      </Unit27>
+      <Unit28>
+        <Filename Value="vfw.pas"/>
+        <IsPartOfProject Value="True"/>
+        <UnitName Value="vfw"/>
+      </Unit28>
+    </Units>
+  </ProjectOptions>
+  <CompilerOptions>
+    <Version Value="11"/>
+    <PathDelim Value="\"/>
+    <Target>
+      <Filename Value="fevh264_cli"/>
+    </Target>
+    <SearchPaths>
+      <OtherUnitFiles Value="..\core"/>
+      <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+    </SearchPaths>
+    <Parsing>
+      <SyntaxOptions>
+        <IncludeAssertionCode Value="True"/>
+        <AllowLabel Value="False"/>
+      </SyntaxOptions>
+    </Parsing>
+    <CodeGeneration>
+      <TargetProcessor Value="pentiumm"/>
+      <Optimizations>
+        <OptimizationLevel Value="3"/>
+      </Optimizations>
+    </CodeGeneration>
+    <Other>
+      <Verbosity>
+        <ShowSummary Value="True"/>
+      </Verbosity>
+      <CompilerMessages>
+        <UseMsgFile Value="True"/>
+      </CompilerMessages>
+      <CustomOptions Value="-CpPENTIUMM"/>
+      <CompilerPath Value="$(CompPath)"/>
+      <ExecuteBefore>
+        <Command Value="build_asm.bat"/>
+        <ShowAllMessages Value="True"/>
+        <CompileReasons Compile="False" Run="False"/>
+      </ExecuteBefore>
+    </Other>
+  </CompilerOptions>
+</CONFIG>
