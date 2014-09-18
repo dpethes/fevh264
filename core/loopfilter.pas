@@ -27,11 +27,31 @@ uses
   common, util, classes, sysutils, syncobjs;
 
 type
-
   IDeblocker = class
       procedure MBRowFinished; virtual; abstract;
       procedure FrameFinished; virtual; abstract;
   end;
+
+  { TDeblockerFactory }
+
+  TDeblockerFactory = class
+    private
+      _type: TClass;
+      _nullDeblocker: IDeblocker;
+    public
+      constructor Create(const loopfilter_enabled, threading_enabled: boolean);
+      destructor Free;
+      function GetInstance(const for_frame: frame_t; const cqp: boolean = true): IDeblocker;
+      procedure ReleaseInstance(deblocker: IDeblocker);
+  end;
+
+procedure CalculateBStrength (const mb: macroblock_p);
+
+(*******************************************************************************
+*******************************************************************************)
+implementation
+
+type
 
   { TDeblockThread }
 
@@ -98,23 +118,6 @@ type
       procedure MBRowFinished; override;
   end;
 
-  { TDeblockerFactory }
-
-  TDeblockerFactory = class
-    private
-      _type: TClass;
-      nullDeblocker: TNullDeblocker;
-    public
-      constructor Create(const loopfilter_enabled, threading_enabled: boolean);
-      destructor Free;
-      function GetInstance(const for_frame: frame_t; const cqp: boolean = true): IDeblocker;
-      procedure ReclaimInstance(deblocker: IDeblocker);
-  end;
-
-procedure CalculateBStrength (const mb: macroblock_p);
-
-
-implementation
 
 const
 //Table 8-14 – Derivation of indexA and indexB from offset dependent threshold variables α and β
@@ -704,12 +707,10 @@ end;
 
 procedure TNullDeblocker.FrameFinished;
 begin
-
 end;
 
 procedure TNullDeblocker.MBRowFinished;
 begin
-
 end;
 
 { TDeblockerFactory }
@@ -723,27 +724,26 @@ begin
           _type := TSimpleDeblocker
   else begin
       _type := TNullDeblocker;
-      nullDeblocker := TNullDeblocker.Create;
+      _nullDeblocker := TNullDeblocker.Create;
   end;
 end;
 
 destructor TDeblockerFactory.Free;
 begin
   if _type = TNullDeblocker then
-      nullDeblocker.Free;
+      _nullDeblocker.Free;
 end;
 
 function TDeblockerFactory.GetInstance(const for_frame: frame_t; const cqp: boolean): IDeblocker;
 begin
-  if _type = TNullDeblocker then
-      result := nullDeblocker
-  else if _type = TSimpleDeblocker then
+  result := _nullDeblocker;
+  if _type = TSimpleDeblocker then
       result := TSimpleDeblocker.Create(for_frame, cqp)
   else if _type = TThreadedDeblocker then
       result := TThreadedDeblocker.Create(for_frame, cqp);
 end;
 
-procedure TDeblockerFactory.ReclaimInstance(deblocker: IDeblocker);
+procedure TDeblockerFactory.ReleaseInstance(deblocker: IDeblocker);
 begin
   if not (_type = TNullDeblocker) then
       deblocker.Free;

@@ -267,7 +267,7 @@ begin
 
   //finish frame processing
   deblocker.FrameFinished;
-  deblockerFactory.ReclaimInstance(deblocker);
+  deblockerFactory.ReleaseInstance(deblocker);
   if result and _param.LoopFilterEnabled then
       GetFrameSSD;
 end;
