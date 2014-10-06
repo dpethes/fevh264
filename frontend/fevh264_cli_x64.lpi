@@ -50,11 +50,6 @@
             <Verbosity>
               <ShowSummary Value="True"/>
             </Verbosity>
-            <CompilerMessages>
-              <UseMsgFile Value="True"/>
-            </CompilerMessages>
-            <CustomOptions Value="-al -Aas"/>
-            <CompilerPath Value="$(CompPath)"/>
             <ExecuteBefore>
               <Command Value="build_asm_x64.bat"/>
               <CompileReasons Compile="False" Run="False"/>
@@ -84,7 +79,6 @@
       <Unit1>
         <Filename Value="..\core\pgm.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="pgm"/>
       </Unit1>
       <Unit2>
         <Filename Value="..\core\common.pas"/>
@@ -94,17 +88,14 @@
       <Unit3>
         <Filename Value="..\core\stdint.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="stdint"/>
       </Unit3>
       <Unit4>
         <Filename Value="..\core\bitstream.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="bitstream"/>
       </Unit4>
       <Unit5>
         <Filename Value="..\core\vlc.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="vlc"/>
       </Unit5>
       <Unit6>
         <Filename Value="..\core\encoder.pas"/>
@@ -119,7 +110,6 @@
       <Unit8>
         <Filename Value="..\core\intra_pred.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="intra_pred"/>
       </Unit8>
       <Unit9>
         <Filename Value="..\core\pixel.pas"/>
@@ -129,17 +119,14 @@
       <Unit10>
         <Filename Value="..\core\transquant.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="transquant"/>
       </Unit10>
       <Unit11>
         <Filename Value="..\core\h264stream.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="h264stream"/>
       </Unit11>
       <Unit12>
         <Filename Value="..\core\h264tables.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="h264tables"/>
       </Unit12>
       <Unit13>
         <Filename Value="..\core\frame.pas"/>
@@ -154,7 +141,6 @@
       <Unit15>
         <Filename Value="yuv4mpeg.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="yuv4mpeg"/>
       </Unit15>
       <Unit16>
         <Filename Value="..\core\motion_comp.pas"/>
@@ -164,7 +150,6 @@
       <Unit17>
         <Filename Value="..\core\motion_est.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="motion_est"/>
       </Unit17>
       <Unit18>
         <Filename Value="..\core\bench.inc"/>
@@ -173,17 +158,14 @@
       <Unit19>
         <Filename Value="..\core\ratecontrol.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="ratecontrol"/>
       </Unit19>
       <Unit20>
         <Filename Value="..\core\image.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="image"/>
       </Unit20>
       <Unit21>
         <Filename Value="..\core\inter_pred.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="inter_pred"/>
       </Unit21>
       <Unit22>
         <Filename Value="..\core\mb_encoder.pas"/>
@@ -193,7 +175,6 @@
       <Unit23>
         <Filename Value="..\core\stats.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="stats"/>
       </Unit23>
       <Unit24>
         <Filename Value="..\core\loopfilter.pas"/>
@@ -203,7 +184,6 @@
       <Unit25>
         <Filename Value="..\core\parameters.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="parameters"/>
       </Unit25>
       <Unit26>
         <Filename Value="cliparamhandler.pas"/>
@@ -213,12 +193,10 @@
       <Unit27>
         <Filename Value="..\core\motion_est_search.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="motion_est_search"/>
       </Unit27>
       <Unit28>
         <Filename Value="vfw.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="vfw"/>
       </Unit28>
     </Units>
   </ProjectOptions>
@@ -248,10 +226,6 @@
       <Verbosity>
         <ShowSummary Value="True"/>
       </Verbosity>
-      <CompilerMessages>
-        <UseMsgFile Value="True"/>
-      </CompilerMessages>
-      <CompilerPath Value="$(CompPath)"/>
       <ExecuteBefore>
         <Command Value="build_asm_x64.bat"/>
         <ShowAllMessages Value="True"/>
