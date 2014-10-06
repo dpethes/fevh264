@@ -5,3 +5,6 @@ syntax: glob
 *.a
 *.compiled
 *.lps
+*.s
+*.res
+*.bat
