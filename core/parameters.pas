@@ -213,11 +213,13 @@ begin
 end;
 
 function TEncodingParameters.ToString: string;
+  function b2s(b: boolean): char;
+      begin if b then result := '1' else result := '0' end;
 begin
-  Result := format('%dx%d keyint:%d qp:%d subme:%d analyse: %d ref:%d aq:%s '
-                    + 'chroma_qp_offset: %d loopfilter:%s (threaded: %s)',
-                  [ width, height, key_interval, qp, subme, analyse, ref, BoolToStr(aq),
-                    chroma_qp_offset, BoolToStr(loopfilter), BoolToStr(filter_thread) ]
+  Result := format('%dx%d keyint:%d qp:%d subme:%d analyse:%d ref:%d aq:%s '
+                    + 'chroma_qp_offset:%d loopfilter:%s (threaded:%s)',
+                  [ width, height, key_interval, qp, subme, analyse, ref, b2s(aq),
+                    chroma_qp_offset, b2s(loopfilter), b2s(filter_thread) ]
                   );
 end;
 
