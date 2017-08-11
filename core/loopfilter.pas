@@ -32,19 +32,7 @@ type
       procedure FrameFinished; virtual; abstract;
   end;
 
-  { TDeblockerFactory }
-
-  TDeblockerFactory = class
-    private
-      _type: TClass;
-      _nullDeblocker: IDeblocker;
-    public
-      constructor Create(const loopfilter_enabled, threading_enabled: boolean);
-      destructor Free;
-      function GetInstance(const for_frame: frame_t; const cqp: boolean = true): IDeblocker;
-      procedure ReleaseInstance(deblocker: IDeblocker);
-  end;
-
+function GetNewDeblocker(const frame: frame_t; const constant_qp, threading_enabled: boolean): IDeblocker;
 procedure CalculateBStrength (const mb: macroblock_p);
 
 (*******************************************************************************
@@ -54,7 +42,6 @@ implementation
 type
 
   { TDeblockThread }
-
   TDeblockThread = class(TThread)
     private
       _encoded_mb_rows: integer;
@@ -82,8 +69,9 @@ type
       procedure AbortProcessing;
   end;
 
-  { TThreadedDeblocker }
-  //Deblocks in paralell with encoding; running a few macroblock rows behind the encoding thread
+  { TThreadedDeblocker
+    Deblocks in paralell with encoding; running a few macroblock rows behind the encoding thread
+  }
   TThreadedDeblocker = class(IDeblocker)
     private
       dthread: TDeblockThread;
@@ -97,8 +85,9 @@ type
       procedure FrameFinished; override;
   end;
 
-  { TSimpleDeblocker }
-  //Deblocks after the whole frame is encoded
+  { TSimpleDeblocker
+    Deblocks after the whole frame is encoded
+  }
   TSimpleDeblocker = class(IDeblocker)
     private
       f: frame_p;
@@ -110,14 +99,14 @@ type
       procedure MBRowFinished; override;
   end;
 
-  { TNullDeblocker }
-  //No deblocking at all
-  TNullDeblocker = class(IDeblocker)
-    public
-      procedure FrameFinished; override;
-      procedure MBRowFinished; override;
-  end;
 
+function GetNewDeblocker(const frame: frame_t; const constant_qp, threading_enabled: boolean): IDeblocker;
+begin
+    if threading_enabled then
+        result := TThreadedDeblocker.Create(frame, constant_qp)
+    else
+        result := TSimpleDeblocker.Create(frame, constant_qp);
+end;
 
 const
 //Table 8-14 – Derivation of indexA and indexB from offset dependent threshold variables α and β
@@ -703,51 +692,6 @@ begin
   scheduled_mbrows += 1;
 end;
 
-{ TNullDeblocker }
-
-procedure TNullDeblocker.FrameFinished;
-begin
-end;
-
-procedure TNullDeblocker.MBRowFinished;
-begin
-end;
-
-{ TDeblockerFactory }
-
-constructor TDeblockerFactory.Create(const loopfilter_enabled, threading_enabled: boolean);
-begin
-  if loopfilter_enabled then
-      if threading_enabled then
-          _type := TThreadedDeblocker
-      else
-          _type := TSimpleDeblocker
-  else begin
-      _type := TNullDeblocker;
-      _nullDeblocker := TNullDeblocker.Create;
-  end;
-end;
-
-destructor TDeblockerFactory.Free;
-begin
-  if _type = TNullDeblocker then
-      _nullDeblocker.Free;
-end;
-
-function TDeblockerFactory.GetInstance(const for_frame: frame_t; const cqp: boolean): IDeblocker;
-begin
-  result := _nullDeblocker;
-  if _type = TSimpleDeblocker then
-      result := TSimpleDeblocker.Create(for_frame, cqp)
-  else if _type = TThreadedDeblocker then
-      result := TThreadedDeblocker.Create(for_frame, cqp);
-end;
-
-procedure TDeblockerFactory.ReleaseInstance(deblocker: IDeblocker);
-begin
-  if not (_type = TNullDeblocker) then
-      deblocker.Free;
-end;
 
 end.
 
