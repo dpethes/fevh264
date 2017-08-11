@@ -333,10 +333,9 @@ begin
 end;
 
 
-function UseFilter(const bs, alpha, beta: integer): boolean; inline;
+function UseFilter(alpha, beta: integer): boolean; inline;
 begin
-  result := (bs > 0)
-            and (Abs( p[0] - q[0] ) < alpha)
+  result := (Abs( p[0] - q[0] ) < alpha)
             and (Abs( p[1] - p[0] ) < beta)
             and (Abs( q[1] - q[0] ) < beta);
 end;
@@ -371,7 +370,7 @@ begin
               for i := 0 to 3 do q[i] := pix[i];
               for i := 0 to 3 do p[i] := pix[-(i+1)];
 
-              if UseFilter(bs, alpha, beta) then begin
+              if UseFilter(alpha, beta) then begin
                   FilterSamplesLuma(bs, indexA, alpha, beta);
                   for i := 0 to 2 do pix[i] := q[i];
                   for i := 0 to 2 do pix[-(i+1)] := p[i];
@@ -401,7 +400,7 @@ begin
               for i := 0 to 3 do q[i] := pix[i      * stride];
               for i := 0 to 3 do p[i] := pix[-(i+1) * stride];
 
-              if UseFilter(bs, alpha, beta) then begin
+              if UseFilter(alpha, beta) then begin
                   FilterSamplesLuma(bs, indexA, alpha, beta);
                   for i := 0 to 2 do pix[i      * stride] := q[i];
                   for i := 0 to 2 do pix[-(i+1) * stride] := p[i];
@@ -439,7 +438,7 @@ begin
               for i := 0 to 1 do p[i] := pix[-(i+1)];
               bs := bS_vertical[edge, blk * 2 + samples div 2];
 
-              if UseFilter(bs, alpha_c, beta_c) then begin
+              if (bs > 0) and UseFilter(alpha_c, beta_c) then begin
                   FilterSamplesChroma(bs, indexA_c);
                   pix[ 0] := q[0];
                   pix[-1] := p[0];
@@ -464,7 +463,7 @@ begin
               for i := 0 to 1 do p[i] := pix[-(i+1) * stride];
               bs := bS_horizontal[blk * 2 + samples div 2, edge];
 
-              if UseFilter(bs, alpha_c, beta_c) then begin
+              if (bs > 0) and UseFilter(alpha_c, beta_c) then begin
                   FilterSamplesChroma(bs, indexA_c);
                   pix[      0] := q[0];
                   pix[-stride] := p[0];
