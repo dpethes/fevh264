@@ -55,6 +55,8 @@ type
       destructor Free;
   end;
 
+procedure frame_new(var frame: frame_t; const mb_width, mb_height: integer);
+procedure frame_free(var frame: frame_t);
 
 (*******************************************************************************
 *******************************************************************************)
