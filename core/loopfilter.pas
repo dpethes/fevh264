@@ -145,41 +145,40 @@ mixedModeEdgeFlag = 0 (prog)
 }
 procedure CalculateBStrength (const mb: macroblock_p);
 
-  function coef_test_mbedge(const a, b: macroblock_p; na, nb: integer): integer;
+  //test p/q non-zero coeffs
+  function inner_bs(const a: macroblock_p; na, nb: integer): integer; inline;
   begin
-    if a^.nz_coef_cnt[na] + b^.nz_coef_cnt[nb] > 0 then  //p/q non-zero coeffs
-        result := 2
-    else if (a^.ref <> b^.ref)        //different ref, mv delta >= 4, diff. partitions
-        or (( abs(a^.mv.x - b^.mv.x) >= 4 ) or ( abs(a^.mv.y - b^.mv.y) >= 4 ))
-    then
-       result := 1
-    else
-       result := 0;
+    result := 0;
+    if a^.nz_coef_cnt[na] + a^.nz_coef_cnt[nb] > 0 then result := 2;
   end;
 
-  function coef_test(const a: macroblock_p; na, nb: integer): integer; inline;
+  function edge_bs(const a, b: macroblock_p; na, nb: integer; bS_min: integer): integer; inline;
   begin
-    if a^.nz_coef_cnt[na] + a^.nz_coef_cnt[nb] > 0 then result := 2
-    else result := 0;
+    result := bS_min;
+    if a^.nz_coef_cnt[na] + b^.nz_coef_cnt[nb] > 0 then result := 2;
   end;
+
+  //different ref, mv delta >= 4, diff. partitions
+  function mb_bs(const a, b: macroblock_p): integer; inline;
+  begin
+    result := 0;
+    if (a^.ref <> b^.ref) or
+        (( abs(a^.mv.x - b^.mv.x) >= 4 ) or ( abs(a^.mv.y - b^.mv.y) >= 4 ))
+    then
+        result := 1;
+  end;
+
+  procedure zero16bytes(p: pint64); inline;
+      begin p^ := 0; (p+1)^ := 0; end;
 
 const
-  intra_bs_vert: TBSarray = (
-    (4, 4, 4, 4),
-    (3, 3, 3, 3),
-    (3, 3, 3, 3),
-    (3, 3, 3, 3)
-  );
-  intra_bs_horiz: TBSarray = (
-    (4, 3, 3, 3),
-    (4, 3, 3, 3),
-    (4, 3, 3, 3),
-    (4, 3, 3, 3)
-  );
+  intra_bs_vert:  TBSarray = ( (4, 4, 4, 4), (3, 3, 3, 3), (3, 3, 3, 3), (3, 3, 3, 3) );
+  intra_bs_horiz: TBSarray = ( (4, 3, 3, 3), (4, 3, 3, 3), (4, 3, 3, 3), (4, 3, 3, 3) );
 
 var
   i, j: integer;
   mba, mbb: macroblock_p;
+  bS_min: integer;
 
 begin
   if is_intra(mb^.mbtype) then begin
@@ -190,43 +189,44 @@ begin
 
   //internal edges
   if (mb^.mbtype = MB_P_SKIP) or (mb^.cbp = 0) then begin
-      FillQWord(mb^.bS_vertical, 2, 0);
-      FillQWord(mb^.bS_horizontal, 2, 0);
+      zero16bytes(@mb^.bS_vertical);
+      zero16bytes(@mb^.bS_horizontal);
   end else begin
       for i := 1 to 3 do
           for j := 0 to 3 do
-              mb^.bS_vertical[i, j] := coef_test(mb, XY2IDX[i, j], XY2IDX[i-1, j]);
+              mb^.bS_vertical[i, j] := inner_bs(mb, XY2IDX[i, j], XY2IDX[i-1, j]);
       for i := 0 to 3 do
           for j := 1 to 3 do
-              mb^.bS_horizontal[i, j] := coef_test(mb, XY2IDX[i, j], XY2IDX[i, j-1]);
+              mb^.bS_horizontal[i, j] := inner_bs(mb, XY2IDX[i, j], XY2IDX[i, j-1]);
   end;
-
 
   //vertical edges - left edge
   if mb^.x > 0 then begin
       mba := mb^.mba;
-      if is_intra(mba^.mbtype) then begin
+      if is_intra(mba^.mbtype) then begin  //edge shared with intra block
           for i := 0 to 3 do
-              mb^.bS_vertical[0, i] := 4;  //edge with intra
+              mb^.bS_vertical[0, i] := 4;
       end else begin
-          mb^.bS_vertical[0, 0] := coef_test_mbedge(mb, mba, 0,  5);
-          mb^.bS_vertical[0, 1] := coef_test_mbedge(mb, mba, 2,  7);
-          mb^.bS_vertical[0, 2] := coef_test_mbedge(mb, mba, 8, 13);
-          mb^.bS_vertical[0, 3] := coef_test_mbedge(mb, mba,10, 15);
+          bS_min := mb_bs(mb, mba);
+          mb^.bS_vertical[0, 0] := edge_bs(mb, mba, 0,  5, bS_min);
+          mb^.bS_vertical[0, 1] := edge_bs(mb, mba, 2,  7, bS_min);
+          mb^.bS_vertical[0, 2] := edge_bs(mb, mba, 8, 13, bS_min);
+          mb^.bS_vertical[0, 3] := edge_bs(mb, mba,10, 15, bS_min);
       end;
   end;
 
   //horizontal edges - top edge
   if mb^.y > 0 then begin
       mbb := mb^.mbb;
-      if is_intra(mbb^.mbtype) then begin
+      if is_intra(mbb^.mbtype) then begin  //edge shared with intra block
           for i := 0 to 3 do
               mb^.bS_horizontal[i, 0] := 4;
       end else begin
-          mb^.bS_horizontal[0, 0] := coef_test_mbedge(mb, mbb, 0, 10);
-          mb^.bS_horizontal[1, 0] := coef_test_mbedge(mb, mbb, 1, 11);
-          mb^.bS_horizontal[2, 0] := coef_test_mbedge(mb, mbb, 4, 14);
-          mb^.bS_horizontal[3, 0] := coef_test_mbedge(mb, mbb, 5, 15);
+          bS_min := mb_bs(mb, mbb);
+          mb^.bS_horizontal[0, 0] := edge_bs(mb, mbb, 0, 10, bS_min);
+          mb^.bS_horizontal[1, 0] := edge_bs(mb, mbb, 1, 11, bS_min);
+          mb^.bS_horizontal[2, 0] := edge_bs(mb, mbb, 4, 14, bS_min);
+          mb^.bS_horizontal[3, 0] := edge_bs(mb, mbb, 5, 15, bS_min);
       end;
   end;
 end;
