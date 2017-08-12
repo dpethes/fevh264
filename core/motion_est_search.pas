@@ -1,6 +1,6 @@
 (*******************************************************************************
 motion_est_search.pas
-Copyright (c) 2012 David Pethes
+Copyright (c) 2012-2017 David Pethes
 
 This file is part of Fev.
 

@@ -1,6 +1,6 @@
 (*******************************************************************************
 stats.pas
-Copyright (c) 2011 David Pethes
+Copyright (c) 2011-2017 David Pethes
 
 This file is part of Fev.
 

@@ -1,6 +1,6 @@
 (*******************************************************************************
 loopfilter.pas
-Copyright (c) 2011-2012 David Pethes
+Copyright (c) 2011-2017 David Pethes
 
 This file is part of Fev.
 

@@ -1,6 +1,6 @@
 (*******************************************************************************
 motion_comp.pas
-Copyright (c) 2010 David Pethes
+Copyright (c) 2010-2017 David Pethes
 
 This file is part of Fev.
 

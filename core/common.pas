@@ -1,6 +1,6 @@
 (*******************************************************************************
 common.pas
-Copyright (c) 2010-2013 David Pethes
+Copyright (c) 2010-2017 David Pethes
 
 This file is part of Fev.
 
