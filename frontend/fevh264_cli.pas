@@ -21,7 +21,6 @@ along with Fev.  If not, see <http://www.gnu.org/licenses/>.
 
 program fevh264_cli;
 {$mode objfpc}{$H+}
-{$optimization off}
 
 uses
   sysutils, Classes, CliParamHandler, math,

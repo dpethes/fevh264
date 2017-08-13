@@ -64,6 +64,8 @@ DEFAULT REL
   %define r2 rdx
   %define r3 r8
   %define r4 r9
+  %define xmm6 xmm8  ; don't use xmm6/7 on win64, they need to be preserved
+  %define xmm7 xmm9
 %else
   %define r1 rdi
   %define r2 rsi
