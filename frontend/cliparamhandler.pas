@@ -158,16 +158,15 @@ function TCliOptionHandler.IsSet(const longOptName: string): boolean;
 var
   option: TCliOption;
 begin
-  if Length(longOptName) < 2 then
-      raise EParserError.Create('Not a longOpt: ' + longOptName);
+  result := false;
+  Assert(Length(longOptName) > 1, 'LongOpt must have two chars at least!');
   for option in setOptions do begin
       if option.LongName = longOptName then begin
           result := true;
           lastOption := option;
-          exit;
+          //exit; //exit or break causes crashes when assembled with yasm
       end;
   end;
-  result := false;
 end;
 
 function TCliOptionHandler.HasShortOption(const shortName: char): boolean;
