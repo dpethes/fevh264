@@ -28,6 +28,8 @@ uses
   stdint, common, util, pixel;
 
 type
+  TPredict4x4Func = procedure (src, dst: uint8_p; stride: integer);
+  TPredict16x16Func = procedure (src, dst: uint8_p); {$ifdef CPUI386} cdecl; {$endif}
 
   { TIntraPredictor }
 
@@ -67,7 +69,7 @@ type
 var
   predict_top16,
   predict_left16,
-  predict_plane16: procedure (src, dst: uint8_p); {$ifdef CPUI386} cdecl; {$endif}
+  predict_plane16: TPredict16x16Func;
 
 procedure intra_pred_init(const flags: TDsp_init_flags);
 
@@ -577,6 +579,18 @@ begin
 end;
 
 
+const
+  Predict4x4Funcs: array[INTRA_PRED_TOP..INTRA_PRED_HU] of TPredict4x4Func = (
+      @predict_top4,
+      @predict_left4,
+      nil, //INTRA_PRED_DC is different
+      @predict_ddl4,
+      @predict_ddr4,
+      @predict_vr4,
+      @predict_hd4,
+      @predict_vl4,
+      @predict_hu4
+  );
 
 { TIntraPredictor }
 
@@ -607,28 +621,11 @@ end;
 
 procedure TIntraPredictor.Predict_4x4(mode: integer; ref: pbyte; mbx, mby, n: integer);
 begin
-  case mode of
-      INTRA_PRED_DC:
-          predict_dc4  (ref, prediction + block_offset4[n], frame_stride, mbx, mby, n);
-      INTRA_PRED_TOP:
-          predict_top4 (ref, prediction + block_offset4[n], frame_stride);
-      INTRA_PRED_LEFT:
-          predict_left4(ref, prediction + block_offset4[n], frame_stride);
-      INTRA_PRED_DDL:
-          predict_ddl4 (ref, prediction + block_offset4[n], frame_stride);
-      INTRA_PRED_DDR:
-          predict_ddr4 (ref, prediction + block_offset4[n], frame_stride);
-      INTRA_PRED_VR:
-          predict_vr4  (ref, prediction + block_offset4[n], frame_stride);
-      INTRA_PRED_HD:
-          predict_hd4  (ref, prediction + block_offset4[n], frame_stride);
-      INTRA_PRED_VL:
-          predict_vl4  (ref, prediction + block_offset4[n], frame_stride);
-      INTRA_PRED_HU:
-          predict_hu4  (ref, prediction + block_offset4[n], frame_stride);
+  Assert(mode <= 8, 'unknown predict mode');
+  if mode = INTRA_PRED_DC then
+      predict_dc4(ref, prediction + block_offset4[n], frame_stride, mbx, mby, n)
   else
-      writeln('mb_intra_pred_4 error: unknown predict mode');
-  end;
+      Predict4x4Funcs[mode](ref, prediction + block_offset4[n], frame_stride);
 end;
 
 
@@ -677,56 +674,52 @@ end;
 function TIntraPredictor.Analyse_4x4(const ref: pbyte; const mbx, mby, n: integer): integer;
 var
   pix: pbyte;
-  min_score: integer;
-
-procedure GetScore(const mode: integer); inline;
-var
-  score: integer;
-begin
-  score := mbcmp_4x4(pix, pred4_cache[mode], I4x4CACHE_STRIDE);
-  if score < min_score then begin
-      min_score := score;
-      result := mode;
-  end;
-end;
+  modes, mode: integer;
+  score, min_score: integer;
 
 begin
   pix := pixels + block_offset4[n];
-  min_score := MaxInt;
 
   //dc
-  predict_dc4( ref, pred4_cache[INTRA_PRED_DC], frame_stride, mbx, mby, n );
-  GetScore(INTRA_PRED_DC);
+  predict_dc4 (ref, pred4_cache[INTRA_PRED_DC], frame_stride, mbx, mby, n);
+  min_score := mbcmp_4x4(pix, pred4_cache[INTRA_PRED_DC], I4x4CACHE_STRIDE);
+  result := INTRA_PRED_DC;
+  modes := 0;
+
   //top - vertical
   if (mby > 0) or not(n in [0, 1, 4, 5]) then begin
-      predict_top4( ref, pred4_cache[INTRA_PRED_TOP], frame_stride );
-      GetScore(INTRA_PRED_TOP);
+      modes := modes or (1 << INTRA_PRED_TOP);
   end;
   //left - horizontal
   if (mbx > 0) or not(n in [0, 2, 8, 10]) then begin
-      predict_left4( ref, pred4_cache[INTRA_PRED_LEFT], frame_stride );
-      predict_hu4  ( ref, pred4_cache[INTRA_PRED_HU], frame_stride );
-      GetScore(INTRA_PRED_LEFT);
-      GetScore(INTRA_PRED_HU);
+      modes := modes or (1 << INTRA_PRED_LEFT) or (1 << INTRA_PRED_HU);
   end;
   //top & left pixels
   if ((mbx > 0) and (mby > 0)) or (n in [3, 6, 7, 9, 11, 12, 13, 14, 15]) then begin
-      predict_ddr4( ref, pred4_cache[INTRA_PRED_DDR], frame_stride );
-      predict_vr4 ( ref, pred4_cache[INTRA_PRED_VR], frame_stride );
-      predict_hd4 ( ref, pred4_cache[INTRA_PRED_HD], frame_stride );
-      GetScore(INTRA_PRED_DDR);
-      GetScore(INTRA_PRED_VR);
-      GetScore(INTRA_PRED_HD);
+      modes := modes or (1 << INTRA_PRED_DDR) or (1 << INTRA_PRED_VR) or (1 << INTRA_PRED_HD);
   end;
   //top & top-right pixels
-  if (mby > 0) and (mbx < mb_width - 1) and not(n in [3, 7, 11, 13, 15]) then begin
-      predict_ddl4( ref, pred4_cache[INTRA_PRED_DDL], frame_stride );
-      GetScore(INTRA_PRED_DDL);
+  if ((mby > 0) and (mbx < mb_width - 1) and not(n in [3, 7, 11, 13, 15]))
+    or (n in [2, 6, 8, 9, 10, 12, 14])
+  then begin
+      modes := modes or (1 << INTRA_PRED_DDL);
+  end;
+  //left, top & top-right pixels
+  if ((mby > 0) and (mbx > 0) and (mbx < mb_width - 1) and not(n in [3, 7, 11, 13, 15]))
+    or (n in [6, 9, 12, 14])
+  then begin
+      modes := modes or (1 << INTRA_PRED_VL);
+  end;
 
-      //left, top & top-right pixels
-      if mbx > 0 then begin
-          predict_vl4( ref, pred4_cache[INTRA_PRED_VL], frame_stride );
-          GetScore(INTRA_PRED_VL);
+  //run all enabled modes
+  for mode := 0 to 8 do begin
+      if ((1 << mode) and modes) > 0 then begin
+          Predict4x4Funcs[mode](ref, pred4_cache[mode], frame_stride);
+          score := mbcmp_4x4(pix, pred4_cache[mode], I4x4CACHE_STRIDE);
+          if score < min_score then begin
+              min_score := score;
+              result := mode;
+          end;
       end;
   end;
 
