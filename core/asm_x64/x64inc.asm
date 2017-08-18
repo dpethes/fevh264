@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; x64inc.asm
-; Copyright (c) 2013 David Pethes
+; Copyright (c) 2013-2017 David Pethes
 ;
 ; This file is part of Fev.
 ;

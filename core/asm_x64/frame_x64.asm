@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; frame_x64.asm
-; Copyright (c) 2013 David Pethes
+; Copyright (c) 2013-2017 David Pethes
 ;
 ; This file is part of Fev.
 ;
@@ -54,9 +54,9 @@ cglobal filter_hvtemp_line_sse2.loop
 ; filter macros
 
 ; param: 6x 16bit pixels in xmm reg
-; in: out: xmm3; tmp: xmm1
+; in/out: xmm3
+; tmp: xmm1
 ; xmm6 - filter coefs
-; xmm7 - 0
 %macro filter_horiz_w 1
     pmaddwd   %1, xmm6
     psrldq    xmm3, 4
@@ -67,7 +67,7 @@ cglobal filter_hvtemp_line_sse2.loop
 
 
 ; param: add vector xmm reg, shift bits
-; in: xmm3; out: xmm3;
+; in/out: xmm3
 ; xmm7 - 0
 %macro filter_scale_tmp 2
     paddd     xmm3, [%1]  ; rounding

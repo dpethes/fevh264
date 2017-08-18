@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; pixel_x64.asm
-; Copyright (c) 2013-2014 David Pethes
+; Copyright (c) 2013-2017 David Pethes
 ;
 ; This file is part of Fev.
 ;
@@ -59,7 +59,7 @@ cglobal satd_16x16_sse2.loop
 
 
 ; SAD
-; function sad_16x16_mmx(pix1, pix2: pbyte; stride: integer): integer;
+; function sad_16x16_sse2(pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 sad_16x16_sse2:
     pxor  xmm5, xmm5
