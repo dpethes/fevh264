@@ -160,7 +160,7 @@ var
   range: integer;
   pixel_range: integer;
 
-procedure check_pattern(const pattern: array of TXYOffs);
+procedure check_pattern(const pattern: array of TXYOffs); inline;
 var
   i: integer;
   nx, ny: integer;
@@ -329,7 +329,7 @@ begin
   result += dsp.satd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
 end;
 
-procedure check_pattern_qpel;
+procedure check_pattern_qpel; inline;
 var
   i: integer;
   nx, ny,
