@@ -672,44 +672,53 @@ end;
 
 
 function TIntraPredictor.Analyse_4x4(const ref: pbyte; const mbx, mby, n: integer): integer;
+const
+  TopMask        = %1111111111001100;  //!(n in [0, 1, 4, 5])
+  LeftMask       = %1111101011111010;  //!(n in [0, 2, 8, 10])
+  TopLeftMask    = %1111101011001000;  //n in [3, 6, 7, 9, 11, 12, 13, 14, 15]
+  InsideTTRMask  = %0101011101000100;  //top/topright,      n in [2, 6, 8, 9, 10, 12, 14]
+  InsideLTTRMask = %0101001001000000;  //left/top/topright, n in [6, 9, 12, 14]
+  OutsideTTRMask = %0101011101110111;  //top/topright,      !(n in [3, 7, 11, 13, 15])
 var
   pix: pbyte;
   modes, mode: integer;
   score, min_score: integer;
-
+  mask: integer;
+  has_top, has_left, has_tl, has_inside_ttr, has_inside_lttr, has_outside_ttr: Boolean;
 begin
   pix := pixels + block_offset4[n];
 
-  //dc
+  //always run dc
   predict_dc4 (ref, pred4_cache[INTRA_PRED_DC], frame_stride, mbx, mby, n);
   min_score := mbcmp_4x4(pix, pred4_cache[INTRA_PRED_DC], I4x4CACHE_STRIDE);
   result := INTRA_PRED_DC;
   modes := 0;
 
-  //top - vertical
-  if (mby > 0) or not(n in [0, 1, 4, 5]) then begin
+  //rules based on the 4x4 block position inside 16x16 macroblock
+  mask := 1 << n;
+  has_top  := (TopMask     and mask) > 0;
+  has_left := (LeftMask    and mask) > 0;
+  has_tl   := (TopLeftMask and mask) > 0;
+  has_inside_ttr  := (InsideTTRMask  and mask) > 0;
+  has_inside_lttr := (InsideLTTRMask and mask) > 0;
+  has_outside_ttr := (OutsideTTRMask and mask) > 0;
+
+  //enable modes that need:
+  //top pixels
+  if (mby > 0) or has_top then
       modes := modes or (1 << INTRA_PRED_TOP);
-  end;
-  //left - horizontal
-  if (mbx > 0) or not(n in [0, 2, 8, 10]) then begin
+  //left pixels
+  if (mbx > 0) or has_left then
       modes := modes or (1 << INTRA_PRED_LEFT) or (1 << INTRA_PRED_HU);
-  end;
   //top & left pixels
-  if ((mbx > 0) and (mby > 0)) or (n in [3, 6, 7, 9, 11, 12, 13, 14, 15]) then begin
+  if ((mbx > 0) and (mby > 0)) or has_tl then
       modes := modes or (1 << INTRA_PRED_DDR) or (1 << INTRA_PRED_VR) or (1 << INTRA_PRED_HD);
-  end;
   //top & top-right pixels
-  if ((mby > 0) and (mbx < mb_width - 1) and not(n in [3, 7, 11, 13, 15]))
-    or (n in [2, 6, 8, 9, 10, 12, 14])
-  then begin
+  if ((mby > 0) and (mbx < mb_width - 1) and has_outside_ttr) or has_inside_ttr then
       modes := modes or (1 << INTRA_PRED_DDL);
-  end;
   //left, top & top-right pixels
-  if ((mby > 0) and (mbx > 0) and (mbx < mb_width - 1) and not(n in [3, 7, 11, 13, 15]))
-    or (n in [6, 9, 12, 14])
-  then begin
+  if ((mby > 0) and (mbx > 0) and (mbx < mb_width - 1) and has_outside_ttr) or has_inside_lttr then
       modes := modes or (1 << INTRA_PRED_VL);
-  end;
 
   //run all enabled modes
   for mode := 0 to 8 do begin
@@ -723,7 +732,7 @@ begin
       end;
   end;
 
-  //load from cache
+  //restore best mode's prediction from cache
   pixel_load_4x4(prediction + block_offset4[n], pred4_cache[result], I4x4CACHE_STRIDE);
 end;
 
