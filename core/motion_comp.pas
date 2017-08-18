@@ -28,11 +28,15 @@ uses
   common, util, frame;
 
 type
+
+  { TMotionCompensation }
+
   TMotionCompensation = class
     public
       procedure Compensate       (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dst: pbyte);
       procedure CompensateQPelXY (const fref: frame_p; qx, qy: integer; dst: pbyte);
       procedure CompensateChroma (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte);
+      procedure CompensateChromaQpelXY(const fref: frame_p; qx, qy: integer; dstU, dstV: pbyte);
   end;
 
 
@@ -162,18 +166,31 @@ var
   coef: array[0..3] of byte;
   i, stride: integer;
 begin
-  x := mbx * 64 + mv.x + FRAME_PADDING_W * 4;  //qpel position
-  y := mby * 64 + mv.y + FRAME_PADDING_W * 4;
-  fx := SarLongint( x, 3 );
-  fy := SarLongint( y, 3 );
-  dx := x and 7;
-  dy := y and 7;
+  x := mbx * 64 + mv.x;  //qpel position
+  y := mby * 64 + mv.y;
+  CompensateChromaQpelXY(fref, x, y, dstU, dstV);
+end;
+
+procedure TMotionCompensation.CompensateChromaQpelXY
+  (const fref: frame_p; qx, qy: integer; dstU, dstV: pbyte);
+var
+  fx, fy: integer;  //chroma fullpel
+  dx, dy: integer;
+  coef: array[0..3] of byte;
+  i, stride: integer;
+begin
+  stride := fref^.stride_c;
+  qx += FRAME_PADDING_W * 4;  //qpel position
+  qy += FRAME_PADDING_W * 4;
+  fx := SarLongint( qx, 3 );
+  fy := SarLongint( qy, 3 );
+  dx := qx and 7;
+  dy := qy and 7;
 
   coef[0] := (8 - dx) * (8 - dy);
   coef[1] := dx * (8 - dy);
   coef[2] := (8 - dx) * dy;
   coef[3] := dx * dy;
-  stride := fref^.stride_c;
   i := fy * stride + fx - fref^.frame_mem_offset_cr;
 
   dsp.mc_chroma_8x8(fref^.plane_dec[1] + i, dstU, stride, @coef);

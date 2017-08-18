@@ -193,7 +193,7 @@ begin
   if _subme > 0 then
       mb.mv := SearchRegion.SearchHPel(mb, fref);
   if _subme > 1 then
-      mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2);
+      mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
 
   mb.mv := ClipMVRange(mb.mv, 512);
   MotionCompensator.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
@@ -259,7 +259,7 @@ begin
 
       InterCost.SetMVPredAndRefIdx(mb.mvp, mb.ref);
       mb.mv := SearchRegion.SearchHPel(mb, fref);
-      mb.mv := SearchRegion.SearchQPel(mb, fref, true);
+      mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
 
       score := SearchRegion.LastSearchScore;
       if score < best_score then begin

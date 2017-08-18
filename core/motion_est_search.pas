@@ -50,7 +50,7 @@ type
       procedure PickFPelStartingPoint(const fref: frame_p; const predicted_mv_list: TMotionVectorList);
       function SearchFPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchHPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
-      function SearchQPel(var mb: macroblock_t; const fref: frame_p; use_satd: boolean): motionvec_t;
+      function SearchQPel(var mb: macroblock_t; const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
  end;
 
 (*******************************************************************************
@@ -309,7 +309,8 @@ end;
   output
     h.mb.mv - best found vector in qpel units
 *)
-function TRegionSearch.SearchQPel(var mb: macroblock_t; const fref: frame_p; use_satd: boolean): motionvec_t;
+function TRegionSearch.SearchQPel
+  (var mb: macroblock_t; const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
 var
   mbcmp: mbcmp_func_t;
   max_x, max_y: integer;
@@ -321,6 +322,12 @@ var
   range: integer;
   iter: integer;
   check_bounds: boolean;
+
+function chroma_score: integer; inline;
+begin
+  result := dsp.satd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16);
+  result += dsp.satd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
+end;
 
 procedure check_pattern_qpel;
 var
@@ -339,6 +346,11 @@ begin
       score := mbcmp(cur, mb.mcomp, 16)
                + InterCostEval.BitCost(XYToMVec(nx - mbx, ny - mby));
 
+      if chroma_me then begin
+          MotionCompensator.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
+          score += chroma_score();
+      end;
+
       if score < min_score then begin
           min_score := score;
           mv := XYToMVec(nx - mbx, ny - mby);
@@ -353,7 +365,7 @@ begin
   mby    := _mby * 4;
   max_x  := _max_x_qpel;
   max_y  := _max_y_qpel;
-  if use_satd then
+  if satd then
       mbcmp := dsp.satd_16x16
   else
       mbcmp := dsp.sad_16x16;
@@ -376,6 +388,10 @@ begin
   if min_score = MaxInt then begin    //return valid score if no searches were done (rare cases at the padded edge of a frame)
       MotionCompensator.CompensateQPelXY(fref, x, y, mb.mcomp);
       min_score := mbcmp(cur, mb.mcomp, 16) + InterCostEval.BitCost(mv);
+      if chroma_me then begin
+          MotionCompensator.CompensateChromaQpelXY(fref, x, y, mb.mcomp_c[0], mb.mcomp_c[1]);
+          min_score += chroma_score();
+      end;
   end;
 
   _last_search_score := min_score;
