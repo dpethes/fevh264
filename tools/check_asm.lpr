@@ -99,7 +99,7 @@ procedure init_src;
 var
   i: integer;
 begin
-  for i := 0 to unalign_size - 1 do begin
+  for i := 0 to unalign_size - unaligned_offset - 1 do begin
       src1[i] := Random(256);
       src2[i] := Random(256);
   end;
@@ -374,10 +374,10 @@ var
   i: Integer;
 begin
   test('frame hpel');
+  dsp.FpuReset;
   frame_new(frame, 16, 8);
   init_noasm;
   frame_hpel_interpolate(frame);
-
   init_sse2;
 
   for i := 0 to FRAME_INTERPOLATION_ITERS - 1 do begin
@@ -386,6 +386,7 @@ begin
       stop_timer;
   end;
   bench_results();
+  frame_free(frame);
 end;
 
 
@@ -407,7 +408,6 @@ begin
     pcmpeqb xmm9, xmm9
   end;
 }
-
 
   //tests
   test_pixelcmp;
