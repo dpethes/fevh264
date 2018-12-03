@@ -96,10 +96,10 @@ begin
       AddOption('m', atInt,    'subme',  'subpixel ME refinement level [3]'
                                          + ' (0=none; 1=hpel; 2=qpel; 3=qpel SATD; 4=qpel chroma SATD)');
       AddOption('a', atInt,    'analyse','mb type decision quality [2]'
-                                         + ' (0=worst ... 3=best)');
+                                         + ' (0=worst; 3=best)');
       AddOption('r', atInt,    'ref',    'reference frame count [1]');
-      AddOption('l', atNone,   'loopfilter', 'enable in-loop filter');
-      AddOption('t', atNone,   'filterthread', 'use separate thread for in-loop filtering');
+      AddOption('l', atNone,   'loopfilter', 'enable in-loop deblocking filter');
+      AddOption('t', atNone,   'filterthread', 'use separate thread for deblocking filter');
       AddOption('n', atNone,   'no-chroma',  'ignore chroma');
       AddOption('s', atNone,   'stats',  'write statsfile');
       AddOption('S', atString, 'stats-name', 'name for statsfile');
