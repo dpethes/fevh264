@@ -38,9 +38,9 @@ cglobal var_16x16_sse2
 
 cglobal pixel_load_16x16_sse2
 cglobal pixel_loadu_16x16_sse2
-cglobal pixel_load_8x8_mmx
+cglobal pixel_load_8x8_sse2
 cglobal pixel_save_16x16_sse2
-cglobal pixel_save_8x8_mmx
+cglobal pixel_save_8x8_sse2
 
 cglobal pixel_sub_4x4_mmx
 cglobal pixel_add_4x4_mmx
@@ -242,9 +242,9 @@ pixel_loadu_16x16_sse2:
 %endrep
     ret
 
-; pixel_load_8x8_mmx
+; pixel_load_8x8_sse2
 ALIGN 16
-pixel_load_8x8_mmx:
+pixel_load_8x8_sse2:
 %rep 4
     movq  xmm0, [r2]
     movq  xmm1, [r2 + r3]
@@ -268,14 +268,14 @@ pixel_save_16x16_sse2:
 %endrep
     ret
 
-; pixel_save_8x8_mmx
+; pixel_save_8x8_sse2
 ALIGN 16
-pixel_save_8x8_mmx:
+pixel_save_8x8_sse2:
 %rep 4
     movq  xmm0, [r1]
     movq  xmm1, [r1+16]
-    add     r1, 32
-    movq  [r2],     xmm0
+    add   r1, 32
+    movq  [r2],    xmm0
     movq  [r2+r3], xmm1
     lea     r2, [r2+2*r3]
 %endrep

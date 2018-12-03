@@ -426,9 +426,9 @@ function var_16x16_sse2(pix: pbyte): uint32; external name 'var_16x16_sse2';
 
 procedure pixel_loadu_16x16_sse2(dest, src: uint8_p; stride: integer); external name 'pixel_loadu_16x16_sse2';
 procedure pixel_load_16x16_sse2 (dest, src: uint8_p; stride: integer); external name 'pixel_load_16x16_sse2';
-procedure pixel_load_8x8_mmx    (dest, src: uint8_p; stride: integer); external name 'pixel_load_8x8_mmx';
+procedure pixel_load_8x8_sse2   (dest, src: uint8_p; stride: integer); external name 'pixel_load_8x8_sse2';
 procedure pixel_save_16x16_sse2 (src, dest: uint8_p; stride: integer); external name 'pixel_save_16x16_sse2';
-procedure pixel_save_8x8_mmx    (src, dest: uint8_p; stride: integer); external name 'pixel_save_8x8_mmx';
+procedure pixel_save_8x8_sse2   (src, dest: uint8_p; stride: integer); external name 'pixel_save_8x8_sse2';
 
 procedure pixel_sub_4x4_mmx (pix1, pix2: pbyte; diff: int16_p); external name 'pixel_sub_4x4_mmx';
 procedure pixel_add_4x4_mmx (pix1, pix2: pbyte; diff: int16_p); external name 'pixel_add_4x4_mmx';
@@ -505,8 +505,8 @@ begin
       pixel_loadu_16x16 := @pixel_loadu_16x16_sse2;
       pixel_load_16x16 := @pixel_load_16x16_sse2;
       pixel_save_16x16 := @pixel_save_16x16_sse2;
-      pixel_load_8x8 := @pixel_load_8x8_mmx;
-      pixel_save_8x8 := @pixel_save_8x8_mmx;
+      pixel_load_8x8 := @pixel_load_8x8_sse2;
+      pixel_save_8x8 := @pixel_save_8x8_sse2;
 
       pixel_add_4x4  := @pixel_add_4x4_mmx;
       pixel_sub_4x4  := @pixel_sub_4x4_mmx;
