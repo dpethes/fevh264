@@ -48,7 +48,7 @@ DEFAULT REL
 ; 1 - mmreg src/dest, 2 - mmreg scratch
 %macro HADDQ 2
     movhlps %2, %1
-    paddd   %1, %2
+    paddq   %1, %2
 %endmacro
 
 %define MB_STRIDE 16

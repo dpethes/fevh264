@@ -286,6 +286,21 @@ begin
       end;
       bench_results();
   end;
+
+  test('var_16x16');
+  init_noasm;
+  res_noasm := var_16x16(src_mbalign);
+  init_sse2;
+  res_asm := var_16x16(src_mbalign);
+
+  if check_result(res_noasm, res_asm) then begin
+      for i := 0 to MBCMP_ITERS - 1 do begin
+          start_timer;
+          var_16x16(src_mbalign);
+          stop_timer;
+      end;
+      bench_results();
+  end;
 end;
 
 

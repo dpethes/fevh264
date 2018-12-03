@@ -138,19 +138,20 @@ variance 16x16
 function var_16x16_pas (pix: pbyte): uint32; {$ifdef CPUI386} cdecl; {$endif}
 var
   x, y: integer;
-  s: word;       //sum
-  ss: longword;  //sum squared
+  sum: longword;
+  sqr: longword;
 begin
-  s  := 0;
-  ss := 0;
+  sum := 0;
+  sqr := 0;
   for y := 0 to 15 do begin
       for x := 0 to 15 do begin
-          s  += pix[x];
-          ss += pix[x] * pix[x];
+          sum += pix[x];
+          sqr += pix[x] * pix[x];
       end;
       pix += 16;
   end;
-  result := ss - (s * s div 256);
+  sum := (sum * sum) >> 8;
+  result := sqr - sum;
 end;
 
 

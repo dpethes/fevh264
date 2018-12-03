@@ -205,16 +205,14 @@ var_16x16_sse2:
     paddd     xmm6, xmm3
     paddd     xmm6, xmm4
     jnz  .loop
-    movhlps   xmm0, xmm5
-    paddw     xmm5, xmm0
-    movd  r1, xmm5      ; sqr - sum * sum >> shift
-    mul   r1
+    HADDQ     xmm5, xmm0
+    movd  r0, xmm5      ; sqr - sum * sum >> shift
+    mul   r0
     HADDD     xmm6, xmm1
-    shr   r1, 8
-    mov   r2, r1
-    movd  r1, xmm6
-    sub   r1, r2
-    mov   r0, r1
+    shr   r0, 8
+    mov   r1, r0
+    movd  r0, xmm6
+    sub   r0, r1
     POP_XMM_REGS 2
     ret
 
