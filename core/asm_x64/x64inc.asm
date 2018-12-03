@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; x64inc.asm
-; Copyright (c) 2013-2017 David Pethes
+; Copyright (c) 2013-2018 David Pethes
 ;
 ; This file is part of Fev.
 ;
@@ -64,13 +64,39 @@ DEFAULT REL
   %define r2 rdx
   %define r3 r8
   %define r4 r9
-  %define xmm6 xmm8  ; don't use xmm6/7 on win64, they need to be preserved
-  %define xmm7 xmm9
+  ; xmm regs from xmm6 up aren't volatile on win64
+  %macro PUSH_XMM_REGS 1
+    movdqa [rsp +  8], xmm6
+    %if %1 > 1
+      movdqa [rsp + 24], xmm7
+    %endif
+    %if %1 > 2
+      %error cannot push more than 2 XMM regs
+    %endif
+    %define PUSHED_XMM_REGS %1
+  %endmacro
+  %macro POP_XMM_REGS 1
+    %ifnidn PUSHED_XMM_REGS, %1
+      %error number of pushed and popped XMM regs does not match
+    %endif
+    movdqa xmm6, [rsp +  8]
+    %if %1 > 1
+      movdqa xmm7, [rsp + 24]
+    %endif
+    %if %1 > 2
+      %error cannot pop more than 2 XMM regs
+    %endif
+    %undef PUSHED_XMM_REGS
+  %endmacro
 %else
   %define r1 rdi
   %define r2 rsi
   %define r3 rdx
   %define r4 rcx
+  %macro PUSH_XMM_REGS 1
+  %endmacro
+  %macro POP_XMM_REGS 1
+  %endmacro
 %endif
 
 ; bind function parameter to desired register
@@ -78,7 +104,7 @@ DEFAULT REL
 ; linux64 5th param in r8
 %macro bind_param_5 1
   %ifdef WIN64
-    mov  %1, [rsp + 5*8]
+    mov  %1, [rsp + 5*8]  ; skip 32B shadow space
   %else
     %define %1 r8
   %endif

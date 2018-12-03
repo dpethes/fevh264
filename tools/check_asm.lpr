@@ -10,6 +10,7 @@ const
   unaligned_offset = 3;
   TIMER_ITERS = 1 shl 24; //clock the cpu
   MBCMP_ITERS = 1 shl 16;
+  FRAME_INTERPOLATION_ITERS = 1 shl 8;
 
 var
   flags: TDsp_init_flags;
@@ -138,12 +139,9 @@ end;
 
 function check_result(const a, b: integer): boolean;
 begin
-  if a = b then begin
-      result := true;
-  end
-  else begin
+  result := a = b;
+  if not result then begin
       writeln('mismatch: ', a, ' - ', b);
-      result := false;
   end;
 end;
 
@@ -355,6 +353,26 @@ begin
   end;
 end;
 
+procedure test_frame_interpolation;
+var
+  frame: frame_t;
+  i: Integer;
+begin
+  test('frame hpel');
+  frame_new(frame, 16, 8);
+  init_noasm;
+  frame_hpel_interpolate(frame);
+
+  init_sse2;
+
+  for i := 0 to FRAME_INTERPOLATION_ITERS - 1 do begin
+      start_timer;
+      frame_hpel_interpolate(frame);
+      stop_timer;
+  end;
+  bench_results();
+end;
+
 
 begin
   //init
@@ -366,11 +384,21 @@ begin
   src2 += unaligned_offset;
   init_src;
   test_timer_overhead;
+{
+  asm
+    pcmpeqb xmm6, xmm6
+    pcmpeqb xmm7, xmm7
+    pcmpeqb xmm8, xmm8
+    pcmpeqb xmm9, xmm9
+  end;
+}
+
 
   //tests
   test_pixelcmp;
   test_transport;
   test_predict;
+  test_frame_interpolation;
 
   //cleanup
   src1 -= unaligned_offset;

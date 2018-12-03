@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; intra_pred_x64.asm
-; Copyright (c) 2013-2017 David Pethes
+; Copyright (c) 2013-2018 David Pethes
 ;
 ; This file is part of Fev.
 ;
@@ -129,6 +129,7 @@ predict_plane16_sse2:
     %define regA r4  ; A
     %define regB r10 ; B
     %define regC r11 ; C
+    PUSH_XMM_REGS 2
     pxor xmm7, xmm7
     movdqu xmm4, [vec_w_1_to_8]
     movdqu xmm5, [vec_w_8x1]
@@ -169,6 +170,5 @@ predict_plane16_sse2:
     add  r3, regC   ; + c
     dec  r0
     jnz  .loop
+    POP_XMM_REGS 2
     ret
-
-

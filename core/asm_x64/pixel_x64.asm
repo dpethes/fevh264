@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; pixel_x64.asm
-; Copyright (c) 2013-2017 David Pethes
+; Copyright (c) 2013-2018 David Pethes
 ;
 ; This file is part of Fev.
 ;
@@ -62,8 +62,8 @@ cglobal satd_16x16_sse2.loop
 ; function sad_16x16_sse2(pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 sad_16x16_sse2:
+    pxor  xmm4, xmm4
     pxor  xmm5, xmm5
-    pxor  xmm6, xmm6
 %rep 8
     movdqu  xmm0, [r2]
     psadbw  xmm0, [r1]
@@ -72,11 +72,11 @@ sad_16x16_sse2:
     add     r1, 32
     lea     r2, [r2 + 2 * r3]
     paddq   xmm5, xmm0
-    paddq   xmm6, xmm2
+    paddq   xmm4, xmm2
 %endrep
-    paddq   xmm6, xmm5
-    HADDQ   xmm6, xmm0
-    movd    r0, xmm6
+    paddq   xmm5, xmm4
+    HADDQ   xmm5, xmm0
+    movd    r0, xmm5
     ret
 
 ; function sad_8x8_mmx(pix1, pix2: pbyte; stride: integer): integer;
@@ -122,52 +122,52 @@ sad_4x4_mmx:
 ; function ssd_16x16_sse2(pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 ssd_16x16_sse2:
-    pxor  xmm6, xmm6    ; accum
-    pxor  xmm7, xmm7    ; zero
+    pxor  xmm4, xmm4    ; accum
+    pxor  xmm5, xmm5    ; zero
     mov   r4, 16       ; counter
 .loop:
     movdqa    xmm0, [r1]
     movdqa    xmm1, xmm0
     movdqu    xmm2, [r2]
     movdqa    xmm3, xmm2
-    punpcklbw xmm0, xmm7
-    punpckhbw xmm1, xmm7
-    punpcklbw xmm2, xmm7
-    punpckhbw xmm3, xmm7
+    punpcklbw xmm0, xmm5
+    punpckhbw xmm1, xmm5
+    punpcklbw xmm2, xmm5
+    punpckhbw xmm3, xmm5
     psubsw    xmm0, xmm2
     psubsw    xmm1, xmm3
     pmaddwd   xmm0, xmm0
     pmaddwd   xmm1, xmm1
-    paddd     xmm6, xmm0
-    paddd     xmm6, xmm1
+    paddd     xmm4, xmm0
+    paddd     xmm4, xmm1
     add   r1, 16
     add   r2, r3
     dec   r4
     jnz   .loop
-    HADDD xmm6, xmm0
-    movd  r0,  xmm6
+    HADDD xmm4, xmm0
+    movd  r0,  xmm4
     ret
 
 ; function ssd_8x8_sse2(pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 ssd_8x8_sse2:
-    pxor  xmm6, xmm6    ; accum
-    pxor  xmm7, xmm7    ; zero
+    pxor  xmm4, xmm4    ; accum
+    pxor  xmm5, xmm5    ; zero
     mov   r4, 8        ; counter
 .loop:
     movq      xmm0, [r1]
     movq      xmm2, [r2]
-    punpcklbw xmm0, xmm7
-    punpcklbw xmm2, xmm7
+    punpcklbw xmm0, xmm5
+    punpcklbw xmm2, xmm5
     psubsw    xmm0, xmm2
     pmaddwd   xmm0, xmm0
     add       r1, 16
     add       r2, r3
-    paddd     xmm6, xmm0
+    paddd     xmm4, xmm0
     dec       r4
     jnz .loop
-    HADDD     xmm6, xmm0
-    movd      r0, xmm6
+    HADDD     xmm4, xmm0
+    movd      r0, xmm4
     ret
     
 ; Variance
@@ -176,6 +176,7 @@ ALIGN 16
 var_16x16_sse2:
     mov   r2, 8
     pxor  xmm5, xmm5     ; sum
+    PUSH_XMM_REGS 2
     pxor  xmm6, xmm6     ; sum squared
     pxor  xmm7, xmm7     ; zero
 .loop:
@@ -214,6 +215,7 @@ var_16x16_sse2:
     movd  r1, xmm6
     sub   r1, r2
     mov   r0, r1
+    POP_XMM_REGS 2
     ret
 
 
@@ -286,12 +288,12 @@ pixel_save_8x8_mmx:
 ; procedure pixel_sub_8x8_sse2(pix1, pix2: pbyte; diff: int16_p);
 ALIGN 16
 pixel_sub_4x4_mmx:
-    pxor  mm7, mm7
+    pxor  mm5, mm5
 %rep 4
     movd      mm0, [r1]
     movd      mm1, [r2]
-    punpcklbw mm0, mm7
-    punpcklbw mm1, mm7
+    punpcklbw mm0, mm5
+    punpcklbw mm1, mm5
     psubw     mm0, mm1
     add   r1, 16
     add   r2, 16
@@ -304,15 +306,15 @@ pixel_sub_4x4_mmx:
 ; procedure pixel_add_8x8_sse2(pix1, pix2: pbyte; diff: int16_p);
 ALIGN 16
 pixel_add_4x4_mmx:
-    pxor  mm7, mm7
+    pxor  mm5, mm5
 %rep 4
     movd      mm0, [r2]
     movq      mm1, [r3]
-    punpcklbw mm0, mm7
+    punpcklbw mm0, mm5
     paddw     mm0, mm1
     add   r2, 16
     add   r3, 8
-    packuswb  mm0, mm7
+    packuswb  mm0, mm5
     movd      [r1], mm0
     add   r1, 16
 %endrep
@@ -501,12 +503,14 @@ pixel_avg_16x16_sse2:
 ; function satd_4x4_mmx  (pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 satd_4x4_mmx:
+    PUSH_XMM_REGS 2
     mSUB4x4 r1, r2, r3, 0
     mHADAMARD4
     mTRANSPOSE4
     mHADAMARD4
     mSUM
     SUM2DW mm0, r0
+    POP_XMM_REGS 2
     ret
 
 
@@ -515,6 +519,7 @@ ALIGN 16
 satd_8x8_mmx:
     mov   r4, 2
     pxor  mm4,mm4  ; sum
+    PUSH_XMM_REGS 2
 .loop:
     %assign i 0
     %rep 2
@@ -531,6 +536,7 @@ satd_8x8_mmx:
     dec   r4
     jnz   .loop
     SUM2DW mm4, r0
+    POP_XMM_REGS 2
     ret
 
 
@@ -550,6 +556,7 @@ ALIGN 16
 satd_16x16_sse2:
     mov   r4, 4
     pxor  mm4, mm4  ; sum
+    PUSH_XMM_REGS 2
 .loop:
     %assign i 0
     %rep 2
@@ -566,5 +573,6 @@ satd_16x16_sse2:
     dec   r4
     jnz   .loop
     SUM4DW mm4, r0
+    POP_XMM_REGS 2
     ret
 

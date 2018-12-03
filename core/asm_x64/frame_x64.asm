@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; frame_x64.asm
-; Copyright (c) 2013-2017 David Pethes
+; Copyright (c) 2013-2018 David Pethes
 ;
 ; This file is part of Fev.
 ;
@@ -82,6 +82,7 @@ ALIGN 16
 filter_horiz_line_sse2:
     sub   r1, 2
     shr   r3, 2
+    PUSH_XMM_REGS 2
     pxor      xmm7, xmm7  ; 0
     movdqa    xmm6, [filter_coefs]
 .loop:
@@ -105,6 +106,7 @@ filter_horiz_line_sse2:
     add       r2, 4
     dec       r3
     jnz .loop
+    POP_XMM_REGS 2
     ret
 
 
@@ -113,6 +115,7 @@ ALIGN 16
 filter_hvtemp_line_sse2:
     sub   r1, 4
     shr   r3, 2
+    PUSH_XMM_REGS 2
     pxor      xmm7, xmm7  ; 0
     movdqa    xmm6, [filter_coefs]
 .loop:
@@ -132,13 +135,16 @@ filter_hvtemp_line_sse2:
     add       r2, 4
     dec       r3
     jnz .loop
+    POP_XMM_REGS 2
     ret
 
 
-%macro madd_3bw 3  ; 1x20, 2x-5, 3x1
-    punpcklbw %1, xmm7
-    punpcklbw %2, xmm7
-    punpcklbw %3, xmm7
+; param: 3x input for multiplying by hpel interp constants 1x20, 2x-5, 3x1
+; xmm6 - 0
+%macro madd_3bw 3
+    punpcklbw %1, xmm6
+    punpcklbw %2, xmm6
+    punpcklbw %3, xmm6
     pmullw    %1, [vec_w_8x20]
     pmullw    %2, [vec_w_8x_5]
     pmullw    %3, [vec_w_8x1]
@@ -160,7 +166,8 @@ filter_vert_line_sse2:
     lea   r0, [r1 + r4]  ; positive offset source
     sub   r1, r4         ; negative offset source
     sub   r1, r4
-    pxor      xmm7, xmm7  ; 0
+    PUSH_XMM_REGS 1
+    pxor      xmm6, xmm6  ; 0
 
 .loop:
     ;0, -1, -2
@@ -182,13 +189,11 @@ filter_vert_line_sse2:
     
     paddw     xmm0, [vec_w_8x16]
     psraw     xmm0, 5
-    packuswb  xmm0, xmm7  ; clip
+    packuswb  xmm0, xmm6  ; clip
     movq      [r2], xmm0
     add       r2, 8
 ;endloop
     dec       r3
     jnz .loop
+    POP_XMM_REGS 1
     ret
-
-
-

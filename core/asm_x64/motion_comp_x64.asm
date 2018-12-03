@@ -1,6 +1,6 @@
 ; ******************************************************************************
 ; motion_comp_x64.asm
-; Copyright (c) 2013-2017 David Pethes
+; Copyright (c) 2013-2018 David Pethes
 ;
 ; This file is part of Fev.
 ;
@@ -60,6 +60,7 @@ cglobal mc_chroma_8x8_sse2.loop
 ALIGN 16
 mc_chroma_8x8_sse2:
     mov   r4, [r4]
+    PUSH_XMM_REGS 2
     pxor  xmm7, xmm7
     get_coef  xmm0, r4, 0, r0
     get_coef  xmm1, r4, 1, r0
@@ -69,7 +70,7 @@ mc_chroma_8x8_sse2:
     spread_coef xmm2, xmm3
     ; mc
     mov   r4, 8
-.loop
+.loop:
     ; A B
     movq      xmm4, [r1]    ; A
     movq      xmm5, [r1 +1] ; B
@@ -100,5 +101,5 @@ mc_chroma_8x8_sse2:
     add   r2, MB_STRIDE 
     dec   r4
     jnz   .loop
+    POP_XMM_REGS 2
     ret
-    
