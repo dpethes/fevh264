@@ -7,56 +7,55 @@ interface
 uses
   common, util;
 
-procedure mb_load_mvs
-  (var mb: macroblock_t; const frame: frame_t; const num_ref_frames: integer);
+procedure InterPredLoadMvs (var mb: macroblock_t; const frame: frame_t; const num_ref_frames: integer);
 
 
 implementation
 
-(*******************************************************************************
-calculate predicted mv, store some mvs as predictors for ME
-mb layout:
-  D B C
-  A X
-*)
-procedure mb_load_mvs
-  (var mb: macroblock_t; const frame: frame_t; const num_ref_frames: integer);
-
-  function is_avail(const mb: macroblock_p): boolean; inline;
-  begin
-    result := not( mb^.mbtype in [MB_I_4x4, MB_I_16x16] );
-  end;
 
 type
-  mb_info = record
+  mb_interpred_info = record
     avail: boolean;
     mv: motionvec_t;
     refidx: integer;
   end;
 
-var
-  mbs: array[0..2] of mb_info; //A, B, C (D)
-  t: macroblock_p;
-  i: integer;
-  num_avail: integer;
-  same_ref_n: integer;
-  same_ref_i: integer;
+(*******************************************************************************
+calculate predicted mv
+mb layout:
+  D B C
+  A X
+*)
+procedure InterPredLoadMvs (var mb: macroblock_t; const frame: frame_t; const num_ref_frames: integer);
 
-procedure assign_mb(var m: mb_info); inline;
+var
+  num_available: integer;
+
+procedure assign_mb_info(var m: mb_interpred_info; const idx: integer);
+var
+  t: macroblock_p;
 begin
-  m.avail  := is_avail(t);
+  t := @frame.mbs[idx];
+  m.avail  := is_inter(t^.mbtype);
   m.mv     := t^.mv;
   m.refidx := t^.ref;
   if m.avail then
-      num_avail += 1;
+      num_available += 1;
 end;
+
+var
+  mbs: array[0..2] of mb_interpred_info; //A, B, C (D)
+  i: integer;
+  same_ref_n: integer;
+  same_ref_i: integer;
+  top_idx: integer;
 
 begin
   if frame.ftype = SLICE_I then
       exit;
 
   mb.mv := ZERO_MV;
-  num_avail := 0;
+  num_available := 0;
   for i := 0 to 2 do begin
       mbs[i].avail := false;
       mbs[i].mv := ZERO_MV;
@@ -64,24 +63,21 @@ begin
   end;
 
   //left mb - A
-  if mb.x > 0 then begin
-      t := @frame.mbs[ mb.y * frame.mbw + mb.x - 1];
-      assign_mb(mbs[0]);
-  end;
+  if mb.x > 0 then
+      assign_mb_info(mbs[0], mb.y * frame.mbw + mb.x - 1);
 
   //top mbs - B, C/D
   if mb.y > 0 then begin
-      t := @frame.mbs[ (mb.y - 1) * frame.mbw + mb.x];
-      assign_mb(mbs[1]);
+      top_idx := (mb.y - 1) * frame.mbw + mb.x;
+      assign_mb_info(mbs[1], top_idx);
 
       if mb.x < frame.mbw - 1 then
-          t := @frame.mbs[ (mb.y - 1) * frame.mbw + mb.x + 1]  //C
+          assign_mb_info(mbs[2], top_idx + 1)  //C
       else
-          t := @frame.mbs[ (mb.y - 1) * frame.mbw + mb.x - 1]; //D
-      assign_mb(mbs[2]);
+          assign_mb_info(mbs[2], top_idx - 1); //D
   end;
 
-  case num_avail of
+  case num_available of
       0:
           mb.mvp := ZERO_MV;
 

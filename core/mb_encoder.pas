@@ -333,7 +333,7 @@ begin
       if (mb.ref <> 0) or (mb.mbtype <> MB_P_16x16) then begin
           mb.fref := frame.refs[0];
           mb.ref := 0;
-          mb_load_mvs(mb, frame, num_ref_frames);
+          InterPredLoadMvs(mb, frame, num_ref_frames);
       end;
       mb.mbtype := MB_P_SKIP;
       mb.mv     := mb.mv_skip;
@@ -449,7 +449,7 @@ var
   bits_i16, bits_intra, bits_inter: integer;
 begin
   mb.mbtype := MB_P_16x16;
-  mb_load_mvs(mb, frame, num_ref_frames);
+  InterPredLoadMvs(mb, frame, num_ref_frames);
 
   //early PSkip
   if TrySkip then begin
@@ -558,7 +558,7 @@ begin
   //encode
   if frame.ftype = SLICE_P then begin
       mb.mbtype := MB_P_16x16;
-      mb_load_mvs(mb, frame, num_ref_frames);
+      InterPredLoadMvs(mb, frame, num_ref_frames);
 
       //skip
       if TrySkip then begin
@@ -626,7 +626,7 @@ begin
   //encode
   if frame.ftype = SLICE_P then begin
       mb.mbtype := MB_P_16x16;
-      mb_load_mvs(mb, frame, num_ref_frames);
+      InterPredLoadMvs(mb, frame, num_ref_frames);
 
       //skip
       if TrySkip(true) then begin
@@ -684,7 +684,7 @@ begin
 
   if frame.ftype = SLICE_P then begin
       mb.mbtype := MB_P_16x16;
-      mb_load_mvs(mb, frame, num_ref_frames);
+      InterPredLoadMvs(mb, frame, num_ref_frames);
       //skip
       if TrySkip(false) then begin
           mb.mbtype := MB_P_SKIP;

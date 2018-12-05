@@ -272,7 +272,7 @@ begin
   fref := fenc.refs[best_refidx];
   mb.ref := best_refidx;
   mb.fref := fref;
-  mb_load_mvs(mb, fenc, ref_count);
+  InterPredLoadMvs(mb, fenc, ref_count);
 
   mb.mv := ClipMVRange(mv, 512);
   MotionCompensator.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
