@@ -21,6 +21,7 @@ along with Fev.  If not, see <http://www.gnu.org/licenses/>.
 
 unit common;
 {$mode objfpc}
+{$ModeSwitch advancedrecords}
 //linked libs list
 {$ifdef CPUI386}
   {$L asm/pixel_x86.o}
@@ -38,7 +39,7 @@ unit common;
 interface
 
 uses
-  stdint, stats, GenericStructList;
+  stdint, stats;
   
 const
   SLICE_P = 5;
@@ -115,7 +116,20 @@ type
       x, y: int16;
   end;
   motionvec_p = ^motionvec_t;
-  TMotionVectorList = specialize TGenericStructList<motionvec_t>;
+
+  { TMotionVectorList }
+
+  TMotionVectorList = record
+    private
+      mvs: array[0..7] of motionvec_t;
+      function GetItem(i: byte): motionvec_t; inline;
+    public
+      Count: integer;
+      procedure Add(const mv: motionvec_t);
+      procedure Clear;
+      property Items[i: byte]: motionvec_t read GetItem; Default;
+  end;
+  PMotionVectorList = ^TMotionVectorList;
 
   operator = (const a, b: motionvec_t): boolean; inline;
   operator / (const a: motionvec_t; const divisor: integer): motionvec_t; inline;
@@ -308,6 +322,26 @@ end;
 function is_inter(const m: integer): boolean; inline;
 begin
   result := m in [MB_P_16x16, MB_P_SKIP];
+end;
+
+{ TMotionVectorList }
+
+function TMotionVectorList.GetItem(i: byte): motionvec_t;
+begin
+  Assert(i < Count);
+  result := mvs[i];
+end;
+
+procedure TMotionVectorList.Add(const mv: motionvec_t);
+begin
+  Assert(Count <= High(mvs));
+  mvs[Count] := mv;
+  Count += 1;
+end;
+
+procedure TMotionVectorList.Clear;
+begin
+  Count := 0;
 end;
 
 end.

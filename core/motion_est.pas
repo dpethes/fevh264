@@ -144,7 +144,7 @@ begin
   fillbyte(mv_field^, size, 0);
   SetNumReferences(1);
 
-  predicted_mv_list := TMotionVectorList.Create;
+  predicted_mv_list.Clear;
 
   InterCost := inter_cost;
   MotionCompensator := mc;
@@ -156,7 +156,6 @@ destructor TMotionEstimator.Free;
 begin
   freemem(mv_field);
   scoreList := nil;
-  predicted_mv_list.Free;
   SearchRegion.Free;
 end;
 
