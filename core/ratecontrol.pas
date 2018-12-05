@@ -68,11 +68,13 @@ end;
 
 TRcGopList = specialize TFPGList<TRcGop>;
 
+TRateControlMode = (tRcConstQP = 0, tRc2passAvg = 1); //0 - cqp, 1 - 2nd pass avg. bitrate
+
 { TRatecontrol }
 
 TRatecontrol = class
   private
-    mode: byte;  //0 - cqp, 1 - 2nd pass avg. bitrate
+    mode: TRateControlMode;
     qp_const: byte;
     intra_bonus: byte;
     nframes: integer;
@@ -526,7 +528,7 @@ var
   gop: TRcGop;
 begin
   frames := nil;
-  if mode = 1 then begin
+  if mode = tRc2passAvg then begin
       writeln(stderr, 'rc: avg.qp: ', encoded_qp_avg / nframes:4:2);
       writeln(stderr, 'stddev: ', sqrt(ssd / nframes):10:2);
   end;
@@ -538,7 +540,7 @@ end;
 procedure TRatecontrol.SetConstQP(const ConstQP: byte);
 begin
   qp_const := clip3(0, ConstQP, 51);
-  mode := 0;
+  mode := tRcConstQP;
 end;
 
 procedure TRatecontrol.Set2pass(const TargetBitrate, FrameCount: integer; const FramesPS: single; const Statsfile: string);
@@ -547,7 +549,7 @@ begin
   desired_bitrate := TargetBitrate;
   nframes := FrameCount;
   fps := FramesPS;
-  mode := 1;
+  mode := tRc2passAvg;
   //read stats
   SetLength(frames, nframes);
   ReadStatsFile(Statsfile);
@@ -556,13 +558,13 @@ end;
 
 function TRatecontrol.GetQP(const FrameNum: integer; const FrameType: byte): byte;
 begin
+  result := qp_const;
   case mode of
-    0: begin
-        result := qp_const;
+    tRcConstQP: begin
         if FrameType = SLICE_I then
             result := max(result - intra_bonus, 0);
     end;
-    1: begin
+    tRc2passAvg: begin
         result := clip3 (0, frames[FrameNum].qp + qp_comp, 51);
     end;
   end;
@@ -574,7 +576,7 @@ end;
 function TRatecontrol.GetFrameType(const FrameNum: integer): byte;
 begin
   result := SLICE_P;
-  if mode = 1 then
+  if mode = tRc2passAvg then
       result := frames[FrameNum].frame_type;
 end;
 
@@ -588,7 +590,8 @@ var
   estimated_framebits: integer;
   bits_delta: int64;
 begin
-  if mode = 0 then exit;
+  if mode = tRcConstQP then
+      exit;
   dsp.FpuReset;
 
   estimated_framebits := frames[FrameNum].bitsize;
