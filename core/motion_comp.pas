@@ -113,6 +113,7 @@ var
   fx, fy: integer;   //fullpel
   dx, dy: shortint;  //delta: qpelx/y - fpelx/y * 4
   p1, p2: pbyte;
+  plane_idx: pbyte;
   i: integer;
 
 begin
@@ -123,9 +124,10 @@ begin
   fy := qy shr 2;
   dx := qx and 3;
   dy := qy and 3;
+  plane_idx := @qpel_plane_idx[dy, dx, 0];
   i := fy * stride + fx - fref^.frame_mem_offset;
-  p1 := fref^.luma_mc_qpel[ qpel_plane_idx[dy, dx, 0] ];
-  p2 := fref^.luma_mc_qpel[ qpel_plane_idx[dy, dx, 1] ];
+  p1 := fref^.luma_mc_qpel[ plane_idx[0] ];
+  p2 := fref^.luma_mc_qpel[ plane_idx[1] ];
   if p1 = p2 then
       dsp.pixel_loadu_16x16 (dst, p1 + i, stride)
   else
