@@ -70,8 +70,10 @@ const
   MIN_XY_QPEL = MIN_XY * 4;
   pt_dia_small: array[0..3] of TXYOffs =
       ( (0, -1), (0, 1), (-1, 0), (1, 0) );
+  {
   pt_dia_large: array[0..7] of TXYOffs =
       ( (0, -2), (0, 2), (-2, 0), (2, 0), (-1, -1), (-1, 1), (1, -1), (1, 1) );
+      }
   pt_dia_large_sparse: array[0..3] of TXYOffs =
       ( (0, -2), (0, 2), (-2, 0), (2, 0) );
   pt_square: array[0..7] of TXYOffs =

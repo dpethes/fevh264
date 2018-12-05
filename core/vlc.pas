@@ -49,14 +49,6 @@ function  ue_code_len(const n: integer): integer;
 *******************************************************************************)
 implementation
 
-const
-//zigzag index position table
-zigzag_pos: array [0..15] of byte = (
-   0,  1,  4,  8,
-   5,  2,  3,  6,
-   9, 12, 13, 10,
-   7, 11, 14, 15
-);
 { zigzag16 pattern
 0:    1  2  6  7
 4:    3  5  8 13

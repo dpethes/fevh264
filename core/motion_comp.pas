@@ -160,11 +160,7 @@ end;
 procedure TMotionCompensation.CompensateChroma
   (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte);
 var
-  x, y,
-  fx, fy: integer;  //chroma fullpel
-  dx, dy: integer;
-  coef: array[0..3] of byte;
-  i, stride: integer;
+  x, y: integer;
 begin
   x := mbx * 64 + mv.x;  //qpel position
   y := mby * 64 + mv.y;
