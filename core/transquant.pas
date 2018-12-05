@@ -107,6 +107,17 @@ begin
   end;
 end;
 
+procedure copy_block32(src, dst: pointer); inline;
+var
+  i: Integer;
+begin
+  for i := 3 downto 0 do begin
+      PUInt64(dst)^ := PUInt64(src)^;
+      PByte(dst) += 8;
+      PByte(src) += 8;
+  end;
+end;
+
 
 //Z = (|W| . MF + f) >> qbits
 procedure quant(a: psmallint; const qp: byte; const intra: boolean; const sidx: byte);
@@ -146,7 +157,7 @@ var
   e, f, g, h: array[0..3] of smallint;
   i: integer;
 begin
-  move(block^, m, 16*2);
+  copy_block32(block, @m);
 
   { aaaa
     bbbb
@@ -186,7 +197,7 @@ begin
       m[i][3] :=     f[i] - h[i] * 2;
   end;
 
-  move(m, block^, 16*2);
+  copy_block32(@m, block);
 end;
 
 
@@ -225,7 +236,7 @@ var
   e, f, g, h: array[0..3] of smallint;
   i: integer;
 begin
-  move(block^, m, 16*2);
+  copy_block32(block, @m);
 
   for i := 0 to 3 do begin
       e[i] := m[i][0] + m[i][2];
@@ -253,7 +264,7 @@ begin
       m[3][i] := SarSmallint( e[i] - g[i] + 32, 6 );
   end;
 
-  move(m, block^, 16*2);
+  copy_block32(@m, block);
 end;
 
 
@@ -359,7 +370,7 @@ var
   e, f, g, h: array[0..3] of smallint;
   i: integer;
 begin
-  move(block^, m, 16*2);
+  copy_block32(block, @m);
 
   for i := 0 to 3 do begin
       e[i] := m[0][i] + m[3][i];  //a + d
@@ -389,7 +400,7 @@ begin
       m[i][3] := f[i] - h[i];
   end;
 
-  move(m, block^, 16*2);
+  copy_block32(@m, block);
 end;
 
 
