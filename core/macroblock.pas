@@ -252,7 +252,7 @@ begin
           block_use_zero(mb.block[i]);
 
       mb.nz_coef_cnt[i] := mb.block[i].nlevel;
-      cbp[i div 4] += mb.nz_coef_cnt[i];
+      cbp[i shr 2] += mb.nz_coef_cnt[i];
 
       //decode block
       if mb.nz_coef_cnt[i] > 0 then begin
@@ -358,7 +358,7 @@ begin
           block_use_zero(mb.block[i]);
 
       mb.nz_coef_cnt[i] := mb.block[i].nlevel;
-      cbp[i div 4] += mb.nz_coef_cnt[i];
+      cbp[i shr 2] += mb.nz_coef_cnt[i];
   end;
 
   mb.cbp := 0;

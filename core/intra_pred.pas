@@ -205,7 +205,7 @@ begin
       for y := 0 to 3 do begin
           z := 2 * x - y;
           if z >= 0 then begin
-              i := x - (y div 2) - stride;
+              i := x - (y shr 1) - stride;
               if (z and 1) = 0 then
                   dst[x+y*I4x4CACHE_STRIDE] := (src[i - 1]
                                 + src[i] + 1) div 2
@@ -231,13 +231,13 @@ begin
   for x := 0 to 3 do
       for y := 0 to 3 do
           if (y and 1) = 1 then
-              dst[x+y*I4x4CACHE_STRIDE] := (src[x + (y div 2)     - stride]
-                            + src[x + (y div 2) + 1 - stride] * 2
-                            + src[x + (y div 2) + 2 - stride] + 2) div 4
+              dst[x+y*I4x4CACHE_STRIDE] := (src[x + (y shr 1)     - stride]
+                            + src[x + (y shr 1) + 1 - stride] * 2
+                            + src[x + (y shr 1) + 2 - stride] + 2) div 4
               //P[x,y] = (S[x+(y/2),-1] + 2 * S[x+(y/2)+1,-1] + S[x+(y/2)+2,-1] + 2) / 4
           else
-              dst[x+y*I4x4CACHE_STRIDE] := (src[x + (y div 2)     - stride]
-                            + src[x + (y div 2) + 1 - stride] + 1) div 2;
+              dst[x+y*I4x4CACHE_STRIDE] := (src[x + (y shr 1)     - stride]
+                            + src[x + (y shr 1) + 1 - stride] + 1) div 2;
               //P[x,y] = (S[x+(y/2),-1] + S[x+(y/2)+1,-1] + 1) / 2
 end;
 
@@ -251,7 +251,7 @@ begin
       for y := 0 to 3 do begin
           z := 2 * y - x;
           if z >= 0 then begin
-              i := y - (x div 2);
+              i := y - (x shr 1);
               if (z and 1) = 0 then
                   dst[x+y*I4x4CACHE_STRIDE] := (src[-1 + (i - 1) * stride]
                                 + src[-1 + i       * stride] + 1) div 2
@@ -294,7 +294,7 @@ begin
       for y := 0 to 3 do begin
           z := x + 2 * y;
           if (z >= 0) and (z < 5) then begin
-              i := y + (x div 2);
+              i := y + (x shr 1);
               if (z and 1) = 0 then
                   dst[x+y*I4x4CACHE_STRIDE] := (src[-1 + i * stride]
                                 + src[-1 + (i + 1) * stride] + 1) shr 1
