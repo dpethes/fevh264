@@ -301,12 +301,13 @@ begin
   //coef_token
   if res <> RES_DC then begin
       case res of
-          RES_LUMA, RES_LUMA_AC, RES_LUMA_DC:
-              tab := predict_nz_count_to_tab(mb.nz_coef_cnt, blk_idx);
           RES_AC_U:
               tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[0], blk_idx, true);
           RES_AC_V:
               tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[1], blk_idx, true);
+          //RES_LUMA, RES_LUMA_AC, RES_LUMA_DC:
+          else
+              tab := predict_nz_count_to_tab(mb.nz_coef_cnt, blk_idx);
       end;
       bs.Write(tab_coef_num[tab, nz, t1][0], tab_coef_num[tab, nz, t1][1])
   end else
@@ -429,12 +430,12 @@ begin
   //coef_token
   if res <> RES_DC then begin
       case res of
-          RES_LUMA, RES_LUMA_AC, RES_LUMA_DC:
-              tab := predict_nz_count_to_tab(mb.nz_coef_cnt, blk_idx);
           RES_AC_U:
               tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[0], blk_idx, true);
           RES_AC_V:
               tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[1], blk_idx, true);
+          else  //RES_LUMA, RES_LUMA_AC, RES_LUMA_DC:
+              tab := predict_nz_count_to_tab(mb.nz_coef_cnt, blk_idx);
       end;
       result += tab_coef_num[tab, nz, t1][1];
   end else
