@@ -514,7 +514,9 @@ var
   p: array[0..15] of int16_t;
   coef: integer;
   count_t1: boolean;
+  empty_dct_check: Int64;
 begin
+  empty_dct_check := pint64(dct_coefs)^;
   block.t0 := 0;
   block.t1 := 0;
   block.nlevel := 0;
@@ -522,9 +524,14 @@ begin
 
   //zigzag16
   if ncoef = 4 then begin
+      if empty_dct_check = 0
+          then exit;
       pint64(@p)^ := pint64(dct_coefs)^;
-      if pint64(@p)^ = 0 then exit;
   end else begin
+      empty_dct_check := empty_dct_check or pint64(dct_coefs+4)^ or pint64(dct_coefs+8)^ or pint64(dct_coefs+12)^;
+      if empty_dct_check = 0 then
+          exit;
+
       if ncoef = 16 then
           zigzag16(p, dct_coefs)
       else

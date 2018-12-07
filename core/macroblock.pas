@@ -287,6 +287,7 @@ begin
       transqt(block, mb.qp, true, 1);
 
       mb.dct[24][ block_dc_order[i] ] := block[0];
+      block[0] := 0;
 
       cavlc_analyse_block(mb.block[i], block, 15);
       mb.nz_coef_cnt[i] := mb.block[i].nlevel;
@@ -430,6 +431,7 @@ begin
               dsp.pixel_sub_4x4(mb.pixels_c[j] + block_offset_chroma[i], pred + block_offset_chroma[i], block);
               transqt(block, mb.qpc, false, 1);
               mb.chroma_dc[j, i] := block[0];
+              block[0] := 0;
               cavlc_analyse_block(mb.block[n], block, 15);
           end else begin
               block_use_zero(mb.block[n]);
