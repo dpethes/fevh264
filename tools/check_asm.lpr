@@ -1,9 +1,10 @@
 program check_asm;
 
 {$mode objfpc}{$H+}
+{$macro on}
 
 uses
-  util, common, pixel, motion_comp, frame, intra_pred;
+  util, common, pixel, motion_comp, frame, intra_pred, transquant;
 
 const
   unaligned_stride = 17;  //min = 16
@@ -62,28 +63,48 @@ begin
   tskip_count := 0;
 end;
 
-procedure bench_results();
+procedure bench_results(tcount_mult: integer = 1);
 var
   id: string;
+  ttimer: int64;
 begin
   id := test_name;
   if flags.sse2 then
-      id += '_sse2';
-  writeln(tsum * 10 div tcount - timer_overhead, ' dezicycles in ', id, ', ', tcount, ' runs, ', tskip_count, ' skips');
+      id += '_sse2'
+  else if flags.mmx then
+      id += '_mmx'
+  else
+      id += '_pas';
+  if tcount_mult > 1 then begin
+      ttimer := tcount * timer_overhead;
+      tcount *= tcount_mult;
+      writeln((tsum * 10 + ttimer) div tcount:4, ' dezicycles in ', id, ', ', tcount, ' runs, ', tskip_count, ' skips');
+  end else begin
+      writeln(tsum * 10 div tcount - timer_overhead:4, ' dezicycles in ', id, ', ', tcount, ' runs, ', tskip_count, ' skips');
+  end;
 end;
 
 
 procedure init_units;
 begin
+  //todo switch to dsp init?
   pixel_init(flags);
   motion_compensate_init(flags);
   frame_init(flags);
   intra_pred_init(flags);
+  transquant_init(flags);
 end;
 
 procedure init_noasm;
 begin
   flags.mmx:=false;
+  flags.sse2:=false;
+  init_units;
+end;
+
+procedure init_mmx;
+begin
+  flags.mmx:=true;
   flags.sse2:=false;
   init_units;
 end;
@@ -117,6 +138,8 @@ begin
 end;
 
 
+//todo this is not really precise, might as well use a fixed value for a given CPU arch
+//replace with multiple fn calls (like x264 does)
 procedure test_timer_overhead;
 var
   i: integer;
@@ -135,6 +158,9 @@ begin
   timer_overhead := tsum * 10 div tcount;
   writeln('timer: ', timer_overhead);
   reset_timer;
+
+  //sad_4x4_mmx is about 23-26 ticks on Piledriver, so tune for that result
+  timer_overhead := 200;
 end;
 
 function check_result(const a, b: integer): boolean;
@@ -176,10 +202,11 @@ begin
       //benchmark
       for i := 0 to MBCMP_ITERS - 1 do begin
           start_timer;
-          sad_16x16(src_mbalign, src1, unaligned_stride);
+          {$define FUNC:=sad_16x16(src_mbalign, src1, unaligned_stride)}
+          FUNC;FUNC;FUNC;FUNC;
           stop_timer;
       end;
-      bench_results();
+      bench_results(4);
   end;
 
   test('sad_8x8');
@@ -191,10 +218,11 @@ begin
   if check_result(res_noasm, res_asm) then begin
       for i := 0 to MBCMP_ITERS - 1 do begin
           start_timer;
-          sad_8x8(src_mbalign, src1, unaligned_stride);
+          {$define FUNC:=sad_8x8(src_mbalign, src1, unaligned_stride)}
+          FUNC;FUNC;FUNC;FUNC;
           stop_timer;
       end;
-      bench_results();
+      bench_results(4);
   end;
 
   test('sad_4x4');
@@ -206,10 +234,11 @@ begin
   if check_result(res_noasm, res_asm) then begin
       for i := 0 to MBCMP_ITERS - 1 do begin
           start_timer;
-          sad_4x4(src_mbalign, src1, unaligned_stride);
+          {$define FUNC:=sad_4x4(src_mbalign, src1, unaligned_stride)}
+          FUNC;FUNC;FUNC;FUNC;
           stop_timer;
       end;
-      bench_results();
+      bench_results(4);
   end;
 
   test('ssd_16x16');
@@ -343,7 +372,6 @@ begin
 end;
 
 
-
 procedure test_predict;
 var
   buf_byte: array [0..255] of byte;
@@ -367,6 +395,90 @@ begin
       bench_results();
   end;
 end;
+
+
+procedure test_transform;
+var
+  residual: array [0..15] of int16 = (
+      5, 11, 8, 10,
+      9,  8, 4, 12,
+      1, 10, 11, 4,
+      19, 6, 15, 7
+  );
+  decoded_residual: array [0..15] of int16;
+  coefficients: array [0..15] of int16;
+  xform_buffer: array [0..16 * 4] of int16;
+  i: integer;
+
+procedure PrintXform;
+var
+  i: integer;
+begin
+  for i := 0 to 15 do begin
+      write(xform_buffer[i]:3, ',');
+      if (i+1) mod 4 = 0 then writeln;
+  end;
+  writeln;
+end;
+
+begin
+  test('core_4x4');
+  begin
+      init_noasm;
+      move(residual, xform_buffer, 2*16);
+      core_4x4(@xform_buffer);
+      move(xform_buffer, coefficients, 2*16);
+
+      //init_mmx;
+      move(residual, xform_buffer, 2*16);
+      core_4x4(@xform_buffer);
+
+      if check_arrays(@xform_buffer, @coefficients, 2*16) then begin
+          for i := 0 to MBCMP_ITERS - 1 do begin
+              move(residual, xform_buffer, 2*16);
+              move(residual, xform_buffer[16], 2*16);
+              move(residual, xform_buffer[32], 2*16);
+              move(residual, xform_buffer[48], 2*16);
+              start_timer;
+              core_4x4(@xform_buffer);
+              core_4x4(@xform_buffer[16]);
+              core_4x4(@xform_buffer[32]);
+              core_4x4(@xform_buffer[48]);
+              stop_timer;
+          end;
+          bench_results(4);
+      end;
+  end;
+
+  test('icore_4x4');
+  begin
+      init_noasm;
+      move(coefficients, xform_buffer, 2*16);
+      icore_4x4(@xform_buffer);
+      move(xform_buffer, decoded_residual, 2*16);
+
+      //init_mmx;
+      move(coefficients, xform_buffer, 2*16);
+      icore_4x4(@xform_buffer);
+
+      if check_arrays(@xform_buffer, @decoded_residual, 2*16) then begin
+          for i := 0 to MBCMP_ITERS - 1 do begin
+              move(coefficients, xform_buffer, 2*16);
+              move(coefficients, xform_buffer[16], 2*16);
+              move(coefficients, xform_buffer[32], 2*16);
+              move(coefficients, xform_buffer[48], 2*16);
+              start_timer;
+              icore_4x4(@xform_buffer);
+              icore_4x4(@xform_buffer[16]);
+              icore_4x4(@xform_buffer[32]);
+              icore_4x4(@xform_buffer[48]);
+              stop_timer;
+          end;
+          bench_results(4);
+      end;
+  end;
+end;
+
 
 procedure test_frame_interpolation;
 var
@@ -413,6 +525,7 @@ begin
   test_pixelcmp;
   test_transport;
   test_predict;
+  test_transform;
   test_frame_interpolation;
 
   //cleanup
