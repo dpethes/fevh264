@@ -34,6 +34,7 @@ unit common;
   {$L asm_x64/motion_comp_x64.o}
   {$L asm_x64/frame_x64.o}
   {$L asm_x64/intra_pred_x64.o}
+  {$L asm_x64/transquant_x64.o}
 {$endif}
 
 interface

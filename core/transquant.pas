@@ -22,8 +22,10 @@ along with Fev.  If not, see <http://www.gnu.org/licenses/>.
 unit transquant;
 {$mode objfpc}{$H+}
 
-
 interface
+
+uses
+  util;
 
 procedure transqt (block: psmallint; const qp: byte; const intra: boolean; const quant_start_idx: byte = 0);
 procedure itransqt(block: psmallint; const qp: byte; const quant_start_idx: byte = 0);
@@ -35,6 +37,11 @@ procedure transqt_dc_4x4 (block: psmallint; const qp: byte);
 procedure itransqt_dc_4x4(block: psmallint; const qp: byte);
 
 procedure itrans_dc  (block: psmallint);
+
+var
+  core_4x4, icore_4x4: core_xform_func_t;
+
+procedure transquant_init(const flags: TDsp_init_flags);
 
 
 (*******************************************************************************
@@ -151,7 +158,7 @@ end;
 
 
 
-procedure core_4x4(block: psmallint);
+procedure core_4x4_pas(block: pInt16);{$ifdef CPUI386} cdecl; {$endif}
 var
   m: matrix_t;
   e, f, g, h: array[0..3] of smallint;
@@ -230,7 +237,7 @@ begin
 end;
 
 
-procedure icore_4x4(block: psmallint);
+procedure icore_4x4_pas(block: pInt16);{$ifdef CPUI386} cdecl; {$endif}
 var
   m: matrix_t;
   e, f, g, h: array[0..3] of smallint;
@@ -467,8 +474,27 @@ begin
 end;
 
 
+
 (*******************************************************************************
-*******************************************************************************)
+ASM init
+*)
+{$ifdef CPUX86_64}
+procedure core_4x4_mmx(block: pInt16); external name 'core_4x4_mmx';
+procedure icore_4x4_mmx(block: pInt16); external name 'icore_4x4_mmx';
+{$endif}
+
+procedure transquant_init(const flags: TDsp_init_flags);
+begin
+  core_4x4  := @core_4x4_pas;
+  icore_4x4 := @icore_4x4_pas;
+  {$ifdef CPUX86_64}
+  if flags.mmx then begin
+      core_4x4 := @core_4x4_mmx;
+      icore_4x4 := @icore_4x4_mmx;
+  end;
+  {$endif}
+end;
+
 initialization
 init_tables;
 

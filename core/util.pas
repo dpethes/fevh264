@@ -46,6 +46,7 @@ pixmove_func_t = procedure (pix1, pix2: pbyte; stride: integer); {$ifdef CPUI386
 pixoper_func_t = procedure (pix1, pix2: pbyte; diff: int16_p); {$ifdef CPUI386} cdecl; {$endif}
 pixavg_func_t = procedure (src1, src2, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 mc_chroma_func_t = procedure (src, dst: pbyte; const stride: integer; coef: pbyte); {$ifdef CPUI386} cdecl; {$endif}
+core_xform_func_t = procedure (block: pInt16); {$ifdef CPUI386} cdecl; {$endif}
 
 TDsp_init_flags = record
     mmx: boolean;
@@ -75,6 +76,7 @@ TDsp = class
 
     pixel_loadu_16x16: pixmove_func_t; //unaligned memory load
     mc_chroma_8x8: mc_chroma_func_t;
+
     constructor Create(flags: TDsp_init_flags);
     procedure FpuReset;
 end;
@@ -87,7 +89,7 @@ var dsp: TDsp;
 implementation
 
 uses
-  pixel, motion_comp;
+  pixel, motion_comp, transquant;
 
 
 (*******************************************************************************
@@ -162,6 +164,7 @@ constructor TDsp.Create(flags: TDsp_init_flags);
 begin
   pixel_init(flags);
   motion_compensate_init(flags);
+  transquant_init(flags);
 
   sad_16x16 := pixel.sad_16x16;
   sad_8x8   := pixel.sad_8x8;
