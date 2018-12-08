@@ -492,13 +492,6 @@ var
   t: array[-2..3] of integer;
   edge_offset: integer;
 
-  function clip(i: integer): byte; inline;
-  begin
-    if i > 255 then i := 255
-    else if i < 0 then i := 0;
-    result := byte(i);
-  end;
-
 begin
   width  := frame.w;
   height := frame.h;

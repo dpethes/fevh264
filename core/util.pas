@@ -36,6 +36,7 @@ function max(const a, b: integer): integer; inline;
 function clip3(const a, b, c: integer): integer; inline;  //lower bound, value, upper bound
 function median(const x, y, z: integer): int16;
 function num2log2(n: integer): byte;
+function clip(i: integer): byte;  //don't inline yet, as fpc seems to be unable to inline it in other units
 
 procedure swap_ptr(var a, b: pointer);
 
@@ -147,6 +148,11 @@ begin
   result := ceil( log2(n) );
 end;
 
+function clip(i: integer): byte;
+begin
+  if word(i) > 255 then result := byte(not(i >> 16))
+  else result := byte(i);
+end;
 
 procedure swap_ptr(var a, b: pointer);
 var

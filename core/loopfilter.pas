@@ -134,9 +134,8 @@ XY2IDX: array[0..3, 0..3] of byte = (
 
 function clip(i: integer): byte; inline;
 begin
-  if i > 255 then i := 255
-  else if i < 0 then i := 0;
-  result := byte(i);
+  if word(i) > 255 then result := byte(not(i >> 16))
+  else result := byte(i);
 end;
 
 

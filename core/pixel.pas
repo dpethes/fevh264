@@ -257,16 +257,6 @@ pixel_add_8x8_pas
 addition of two 8x8 blocks, return clipped byte-sized results
 *)
 procedure pixel_add_4x4_pas (pix1, pix2: pbyte; diff: int16_p); {$ifdef CPUI386} cdecl; {$endif}
-
-function clip (c: integer): byte; inline;
-begin
-    result := byte (c);
-    if c > 255 then
-        Result := 255
-    else
-        if c < 0 then result := 0;
-end;
-
 var
   y, x: integer;
 begin
