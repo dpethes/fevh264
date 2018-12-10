@@ -38,6 +38,7 @@ procedure cavlc_encode
 function cavlc_block_bits
   (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t): integer;
 procedure cavlc_analyse_block (var block: block_t; dct_coefs: int16_p; const ncoef: integer);
+procedure cavlc_analyse_block_2x2(var block: block_t; dct_coefs: int16_p);
 
 procedure write_se_code(var bs: TBitstreamWriter; n: integer);
 procedure write_ue_code(var bs: TBitstreamWriter; const n: integer);
@@ -283,9 +284,8 @@ var
   i: integer;
   coef: integer;
   run_before, zeros_left, total_zeros: integer;
-  nz,                   //TotalCoeff( coeff_token )
-  t0, t1: integer;      //trailing 0, TrailingOnes( coeff_token )
-  t1_signs: integer;
+  nz,               //TotalCoeff( coeff_token )
+  t1: integer;      //TrailingOnes( coeff_token )
 
   tab: byte;
   suffix_length: byte;
@@ -293,10 +293,8 @@ var
 
 
 begin
-  t0 := blok.t0;
-  t1 := blok.t1;
-  t1_signs := blok.t1_signs;
   nz := blok.nlevel;
+  t1 := blok.t1;
 
   //coef_token
   if res <> RES_DC then begin
@@ -312,11 +310,13 @@ begin
       bs.Write(tab_coef_num[tab, nz, t1][0], tab_coef_num[tab, nz, t1][1])
   end else
       bs.Write(tab_coef_num_chroma_dc[nz, t1][0], tab_coef_num_chroma_dc[nz, t1][1]);
-  if nz = 0 then exit;  //no coefs
+
+  if nz = 0 then //nothing more to write about
+      exit;
 
   //trailing 1s signs
   for i := 0 to t1 - 1 do
-      bs.Write((t1_signs shr i) and 1);
+      bs.Write((blok.t1_signs shr i) and 1);
 
   { 9.2.2 Parsing process for level information }
   //levels (nonzero coefs)
@@ -341,7 +341,7 @@ begin
   end;
 
   //total number of zeros in runs
-  total_zeros := blok.ncoef - nz - t0;
+  total_zeros := blok.ncoef - nz - blok.t0;
   if nz < blok.ncoef then begin
       if res <> RES_DC then begin
           if nz < 8 then
@@ -503,55 +503,39 @@ end;
 //******************************************************************************
 procedure cavlc_analyse_block (var block: block_t; dct_coefs: int16_p; const ncoef: integer);
 var
-  i, t0, zeros, n: integer;
+  i, first_nz_index, zeros, n: integer;
   p: array[0..15] of int16_t;
   coef: integer;
   count_t1: boolean;
-  empty_dct_check: Int64;
 begin
-  empty_dct_check := pint64(dct_coefs)^;
-  block.t0 := 0;
-  block.t1 := 0;
-  block.nlevel := 0;
   block.ncoef := ncoef;
+  block.nlevel := 0;
+  block.t1 := 0;
 
-  //zigzag16
-  if ncoef = 4 then begin
-      if empty_dct_check = 0
-          then exit;
-      pint64(@p)^ := pint64(dct_coefs)^;
-  end else begin
-      empty_dct_check := empty_dct_check or pint64(dct_coefs+4)^ or pint64(dct_coefs+8)^ or pint64(dct_coefs+12)^;
-      if empty_dct_check = 0 then
-          exit;
-
-      if ncoef = 16 then
-          zigzag16(p, dct_coefs)
-      else
-          zigzag15(p, dct_coefs + 1);
-  end;
-
-  //trailing 0s
-  t0 := 0;
-  for i := ncoef - 1 downto 0 do
-      if p[i] = 0 then
-          t0 += 1
-      else
-          break;
-  if t0 = ncoef then
+  //skip empty residual
+  if pint64(dct_coefs)^ or pint64(dct_coefs+4)^ or pint64(dct_coefs+8)^ or pint64(dct_coefs+12)^ = 0 then
       exit;
-  block.t0 := t0;
 
-  //levels, run_before
-  n := 0;
-  zeros := 0;
+  if ncoef = 16 then
+      zigzag16(p, dct_coefs)
+  else
+      zigzag15(p, dct_coefs + 1);
+
+  first_nz_index := ncoef - 1;
+  while p[first_nz_index] = 0 do
+      first_nz_index -= 1;
+
+  block.t0 := ncoef - (first_nz_index+1);
   block.t1_signs := 0;
+
+  n := 0;      //index for nonzero values
+  zeros := 0;  //length of zero runs before nonzero
   count_t1 := true;
 
-  for i := i downto 0 do begin
+  for i := first_nz_index downto 0 do begin
       coef := p[i];
       if coef = 0 then begin
-          zeros += 1;                //increase run_before
+          zeros += 1;
       end else begin
           block.level[n] := coef;   //store coef, if it's a t1, then store the sign separately
 
@@ -565,6 +549,56 @@ begin
 
           if n > 0 then
               block.run_before[n-1] := zeros;  //save run_before
+          zeros := 0;
+          n += 1;
+      end;
+  end;
+  if n < 16 then
+      block.run_before[n-1] := zeros;
+  block.nlevel := n;
+end;
+
+
+procedure cavlc_analyse_block_2x2(var block: block_t; dct_coefs: int16_p);
+var
+  p: array[0..3] of int16_t;
+  i, zeros, n: integer;
+  coef: integer;
+  count_t1: boolean;
+begin
+  pint64(@p)^ := pint64(dct_coefs)^;
+  block.ncoef := 4;
+  block.nlevel := 0;
+  block.t1 := 0;
+
+  if pint64(@p)^ = 0 then
+      exit;
+
+  block.t1_signs := 0;
+
+  n := 0;      //index for nonzero values
+  zeros := 0;  //length of zero runs before nonzero
+  count_t1 := true;
+
+  for i := 3 downto 0 do begin
+      coef := p[i];
+      if coef = 0 then begin
+          zeros += 1;
+      end else begin
+          block.level[n] := coef;   //store coef, if it's a t1, then store the sign separately
+
+          //trailing 1s
+          if count_t1 and (block.t1 < 3) and (abs(coef) = 1) then begin
+              if coef < 0 then
+                  block.t1_signs := block.t1_signs or (1 shl block.t1);
+              block.t1 += 1;
+          end else
+              count_t1 := false;
+
+          if n > 0 then
+              block.run_before[n-1] := zeros  //save run_before
+          else
+              block.t0 := zeros;              //empty blocks never enter this loop, so it's always set
           zeros := 0;
           n += 1;
       end;

@@ -147,9 +147,10 @@ type
 
   //residual block
   block_t = record
-       t0, t1, t1_signs: byte;
        ncoef, nlevel: byte;
-       run_before: array[0..15] of byte;
+       t1, t1_signs: byte;
+       t0: byte;
+       run_before: array[0..14] of byte;
        level: array[0..15] of int16;
   end;
 

@@ -221,9 +221,8 @@ const SAD_DECIMATE_TRESH: array[0..51] of word = (
 
 procedure block_use_zero(var b: block_t);
 begin
-  b.t0 := 0;
-  b.t1 := 0;
   b.nlevel := 0;
+  b.t1 := 0;
 end;
 
 
@@ -447,7 +446,7 @@ begin
   //dc transform
   for j := 0 to 1 do begin
       transqt_dc_2x2(mb.chroma_dc[j], mb.qpc);
-      cavlc_analyse_block(mb.block[25 + j], @mb.chroma_dc[j], 4);
+      cavlc_analyse_block_2x2(mb.block[25 + j], @mb.chroma_dc[j]);
   end;
 
   //cbp
