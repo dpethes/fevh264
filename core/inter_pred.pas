@@ -36,11 +36,13 @@ var
   t: macroblock_p;
 begin
   t := @frame.mbs[idx];
-  m.avail  := is_inter(t^.mbtype);
+  m.avail := is_inter(t^.mbtype);
+  if not m.avail then
+      exit;
+
   m.mv     := t^.mv;
   m.refidx := t^.ref;
-  if m.avail then
-      num_available += 1;
+  num_available += 1;
 end;
 
 var
@@ -54,7 +56,6 @@ begin
   if frame.ftype = SLICE_I then
       exit;
 
-  mb.mv := ZERO_MV;
   num_available := 0;
   for i := 0 to 2 do begin
       mbs[i].avail := false;

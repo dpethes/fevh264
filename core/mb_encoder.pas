@@ -159,17 +159,15 @@ end;
 procedure TMacroblockEncoder.EncodeCurrentType;
 begin
   case mb.mbtype of
-      //MB_I_PCM, MB_P_SKIP: no coding
+      //MB_P_SKIP: no coding
 
       MB_I_4x4: begin
-          mb.mv := ZERO_MV;
           encode_mb_intra_i4(mb, frame, intrapred);
           if chroma_coding then
               encode_mb_chroma(mb, intrapred, true);
       end;
 
       MB_I_16x16: begin
-          mb.mv := ZERO_MV;
           intrapred.Predict_16x16(mb.i16_pred_mode, mb.x, mb.y);
           encode_mb_intra_i16(mb);
           if chroma_coding then
@@ -183,6 +181,17 @@ begin
               encode_mb_chroma(mb, intrapred, false);
           end;
       end;
+
+      MB_I_PCM: begin
+          //necessary for proper cavlc initialization for neighboring blocks
+          FillByte(mb.nz_coef_cnt, 16, 16);
+          FillByte(mb.nz_coef_cnt_chroma_ac[0], 4, 16);
+          FillByte(mb.nz_coef_cnt_chroma_ac[1], 4, 16);
+      end;
+  end;
+  if is_intra(mb.mbtype) then begin
+      mb.mv := ZERO_MV;
+      mb.ref := -1;
   end;
 end;
 
@@ -199,7 +208,7 @@ begin
           decode_mb_inter_pskip(mb);
   end;
   if chroma_coding and (mb.mbtype <> MB_I_PCM) then
-      decode_mb_chroma(mb, mb.mbtype in [MB_I_4x4, MB_I_16x16]);
+      decode_mb_chroma(mb, is_intra(mb.mbtype));
 end;
 
 procedure TMacroblockEncoder.SetChromaQPOffset(const AValue: shortint);

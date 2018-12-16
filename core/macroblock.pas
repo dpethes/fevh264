@@ -510,7 +510,6 @@ procedure decode_mb_pcm(var mb: macroblock_t);
 begin
   move(mb.pixels^, mb.pixels_dec^, 256);
   move(mb.pixels_c[0]^, mb.pixels_dec_c[0]^, 128);
-  FillByte(mb.nz_coef_cnt, 16, 0);  //todo unnecessary?
   mb.cbp := 0;
 end;
 
