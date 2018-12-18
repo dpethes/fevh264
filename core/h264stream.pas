@@ -1044,7 +1044,7 @@ end;
 
 procedure TH264InterPredCostEvaluator.SetQP(qp: integer);
 begin
-  _lambda := lambda_mv[median(0, qp, 51)];
+  _lambda := lambda_mv[qp];
 end;
 
 function TH264InterPredCostEvaluator.BitCost(const mv: motionvec_t): integer;
