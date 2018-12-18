@@ -136,7 +136,7 @@ begin
       1: mb_enc := TMBEncoderQuickAnalyse.Create;
       2: mb_enc := TMBEncoderQuickAnalyseSATD.Create;
   else
-      mb_enc := TMBEncoderRateAnalyse.Create;
+      mb_enc := TMBEncoderRDoptAnalyse.Create;
   end;
   mb_enc.num_ref_frames := num_ref_frames;
   mb_enc.chroma_coding := true;

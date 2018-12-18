@@ -45,6 +45,7 @@ type
       stride_c: integer;
       pixel_cache: pbyte;
       mb_width: integer;
+      last_score: integer;
 
       constructor Create;
       destructor Free;
@@ -57,7 +58,7 @@ type
       function Analyse_4x4(const ref: pbyte; const mbx, mby, n: integer): integer;
 
       procedure Analyse_8x8_cr(refU, refV: pbyte; mbx, mby: integer; out mode: integer);
-      procedure Analyse_16x16 (mbx, mby: integer; out mode: integer; out score: integer);
+      procedure Analyse_16x16 (mbx, mby: integer; out mode: integer);
 
     private
       mbcmp_16x16,
@@ -734,6 +735,8 @@ begin
 
   //restore best mode's prediction from cache
   pixel_load_4x4(prediction + block_offset4[n], pred4_cache[result], I4x4CACHE_STRIDE);
+
+  last_score += min_score;
 end;
 
 
@@ -787,7 +790,7 @@ begin
 end;
 
 
-procedure TIntraPredictor.Analyse_16x16(mbx, mby: integer; out mode: integer; out score: integer);
+procedure TIntraPredictor.Analyse_16x16(mbx, mby: integer; out mode: integer);
 var
   mscore, cscore: integer;
   cmp: mbcmp_func_t;
@@ -827,7 +830,7 @@ begin
       ipmode(INTRA_PRED_PLANE);
   end;
 
-  score := mscore;
+  last_score := mscore;
 end;
 
 

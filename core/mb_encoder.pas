@@ -90,9 +90,9 @@ type
       procedure Encode(mbx, mby: integer); override;
   end;
 
-  { TMBEncoderRateAnalyse }
+  { TMBEncoderRDoptAnalyse }
 
-  TMBEncoderRateAnalyse = class(TMacroblockEncoder)
+  TMBEncoderRDoptAnalyse = class(TMacroblockEncoder)
     private
       mb_cache: array[0..2] of macroblock_t; //todo init in constructor
       mb_type_bitcost: array[MB_I_4x4..MB_P_SKIP] of integer;
@@ -391,9 +391,9 @@ begin
 end;
 
 
-{ TMBEncoderRateAnalyse }
+{ TMBEncoderRDoptAnalyse }
 
-procedure TMBEncoderRateAnalyse.CacheStore;
+procedure TMBEncoderRDoptAnalyse.CacheStore;
 begin
   with mb_cache[mb.mbtype] do begin
       mv   := mb.mv;
@@ -409,7 +409,7 @@ begin
   move(mb.dct[0]^, mb_cache[mb.mbtype].dct[0]^, 2 * 16 * 25);
 end;
 
-procedure TMBEncoderRateAnalyse.CacheLoad;
+procedure TMBEncoderRDoptAnalyse.CacheLoad;
 begin
   with mb_cache[mb.mbtype] do begin
       mb.mv                    := mv;
@@ -425,14 +425,14 @@ begin
   move(mb_cache[mb.mbtype].dct[0]^, mb.dct[0]^, 2 * 16 * 25);
 end;
 
-function TMBEncoderRateAnalyse.MBCost: integer;
+function TMBEncoderRDoptAnalyse.MBCost: integer;
 begin
   result := h264s.GetBitCost(mb);
   mb_type_bitcost[mb.mbtype] := result;
 end;
 
 
-constructor TMBEncoderRateAnalyse.Create;
+constructor TMBEncoderRDoptAnalyse.Create;
 var
   i: integer;
 begin
@@ -442,7 +442,7 @@ begin
       mb_cache[i].dct[0] := fev_malloc(2 * 16 * 25);
 end;
 
-destructor TMBEncoderRateAnalyse.Free;
+destructor TMBEncoderRDoptAnalyse.Free;
 var
   i: integer;
 begin
@@ -452,10 +452,20 @@ begin
 end;
 
 
-procedure TMBEncoderRateAnalyse.EncodeInter;
+procedure TMBEncoderRDoptAnalyse.EncodeInter;
+const
+  LAMBDA_MBTYPE: array[0..51] of byte = (  //todo tune lambdas
+     4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+     4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
+    16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+    16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
+    24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
+    32, 32
+  );
 var
-  score_i, score_p: integer;
-  bits_i16, bits_intra, bits_inter: integer;
+  score_i4, score_intra, score_p: integer;
+  bits_i4, bits_intra, bits_inter: integer;
+  mode_lambda: integer;
 begin
   mb.mbtype := MB_P_16x16;
   InterPredLoadMvs(mb, frame, num_ref_frames);
@@ -488,42 +498,45 @@ begin
           exit;
 
   //encode as intra if prediction score isn't much worse
-  intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode, score_i);
-  if score_i < score_p * 2 then begin
-      CacheStore;
+  intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
+  score_intra := intrapred.last_score;
+  if score_intra < score_p * 2 then begin
       //I16x16
+      CacheStore;
       mb.mbtype := MB_I_16x16;
       EncodeCurrentType;
-      bits_i16 := MBCost;
+      bits_intra := MBCost;
       //try I4x4 if I16x16 wasn't much worse
-      if (bits_i16 < bits_inter * 2) and (min(bits_inter, bits_i16) > MIN_I_4x4_BITCOST) then begin
+      if (bits_intra < bits_inter * 2) and (min(bits_inter, bits_intra) > MIN_I_4x4_BITCOST) then begin
           CacheStore;
           mb.mbtype := MB_I_4x4;
           EncodeCurrentType;
-          bits_intra := MBCost;
+          bits_i4  := MBCost;
+          score_i4 := intrapred.last_score;
+
           //pick better
-          if bits_i16 < bits_intra then begin
+          if bits_intra < bits_i4 then begin
               mb.mbtype := MB_I_16x16;
               CacheLoad;
-              bits_intra := bits_i16;
+          end else begin
+              bits_intra  := bits_i4;
+              score_intra := score_i4;
           end;
-      end else
-          bits_intra := bits_i16;
-
+      end;
       //inter / intra?
-      if bits_inter < bits_intra then begin
+      mode_lambda := LAMBDA_MBTYPE[mb.qp];
+      if mode_lambda * bits_inter + score_p < mode_lambda * bits_intra + score_intra then begin
           mb.mbtype := MB_P_16x16;
           CacheLoad;
       end;
   end;
 end;
 
-procedure TMBEncoderRateAnalyse.EncodeIntra;
+procedure TMBEncoderRDoptAnalyse.EncodeIntra;
 var
   bits_i16, bits_i4: integer;
-  score_i: integer;
 begin
-  intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode, score_i);
+  intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
   mb.mbtype := MB_I_16x16;
   EncodeCurrentType;
   CacheStore;
@@ -540,7 +553,7 @@ begin
   end;
 end;
 
-procedure TMBEncoderRateAnalyse.Encode(mbx, mby: integer);
+procedure TMBEncoderRDoptAnalyse.Encode(mbx, mby: integer);
 begin
   InitMB(mbx, mby);
 
@@ -581,7 +594,8 @@ begin
       score_p := dsp.sad_16x16(mb.pixels, mb.mcomp, 16);
 
       //intra score
-      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode, score_i);
+      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
+      score_i := intrapred.last_score;
       if score_i < score_p then begin
           if score_i < mb.qp * I16_SAD_QPBONUS then
               mb.mbtype := MB_I_16x16
@@ -650,7 +664,8 @@ begin
       score_p += InterCost.BitCost(mb.mv - mb.mvp);
 
       //intra score
-      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode, score_i);
+      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
+      score_i := intrapred.last_score;
       if score_i + INTRA_MODE_PENALTY < score_p then begin
           if score_i < mb.qp * I16_SATD_QPBONUS then
               mb.mbtype := MB_I_16x16
@@ -668,7 +683,8 @@ begin
       end;
 
   end else begin
-      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode, score_i);
+      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
+      score_i := intrapred.last_score;
       if score_i < mb.qp * I16_SATD_QPBONUS then
           mb.mbtype := MB_I_16x16
       else

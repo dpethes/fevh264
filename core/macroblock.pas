@@ -238,6 +238,7 @@ begin
   for i := 0 to 3 do cbp[i] := 0;
   sad_tresh := SAD_DECIMATE_TRESH[mb.qp];
 
+  intrapred.last_score := 0;
   for i := 0 to 15 do begin
       block := mb.dct[i];
 
