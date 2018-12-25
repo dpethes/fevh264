@@ -698,16 +698,15 @@ const
   TopMask        = %1111111111001100;  //!(n in [0, 1, 4, 5])
   LeftMask       = %1111101011111010;  //!(n in [0, 2, 8, 10])
   TopLeftMask    = %1111101011001000;  //n in [3, 6, 7, 9, 11, 12, 13, 14, 15]
-  InsideTTRMask  = %0101011101000100;  //top/topright,      n in [2, 6, 8, 9, 10, 12, 14]
-  InsideLTTRMask = %0101001001000000;  //left/top/topright, n in [6, 9, 12, 14]
-  OutsideTTRMask = %0101011101110111;  //top/topright,      !(n in [3, 7, 11, 13, 15])
+  InsideTTRMask  = %0101011101000100;  //top/topright, n in [2, 6, 8, 9, 10, 12, 14]
+  OutsideTTRMask = %0101011101110111;  //top/topright, !(n in [3, 7, 11, 13, 15])
   MISPREDICTION_COST = 3 * 4; //TODO suitable for qp ~22, needs to be qp modulated
 var
   pix: pbyte;
   modes, mode: integer;
   score, min_score: integer;
   mask, mbx, mby: integer;
-  has_top, has_left, has_tl, has_inside_ttr, has_inside_lttr, has_outside_ttr: Boolean;
+  has_top, has_left, has_tl, has_inside_ttr, has_outside_ttr: Boolean;
   predicted_mode: Byte;
 begin
   pix := pixels + block_offset4[n];
@@ -731,7 +730,6 @@ begin
   has_left := (LeftMask    and mask) > 0;
   has_tl   := (TopLeftMask and mask) > 0;
   has_inside_ttr  := (InsideTTRMask  and mask) > 0;
-  has_inside_lttr := (InsideLTTRMask and mask) > 0;
   has_outside_ttr := (OutsideTTRMask and mask) > 0;
 
   //enable modes that need:
@@ -744,12 +742,9 @@ begin
   //top & left pixels
   if ((mbx > 0) and (mby > 0)) or has_tl then
       modes := modes or (1 << INTRA_PRED_DDR) or (1 << INTRA_PRED_VR) or (1 << INTRA_PRED_HD);
-  //top & top-right pixels
+  //top & top-right pixels (we could use sample substitution instead of last-in-a-row check for top-right pixels)
   if ((mby > 0) and (mbx < mb_width - 1) and has_outside_ttr) or has_inside_ttr then
-      modes := modes or (1 << INTRA_PRED_DDL);
-  //left, top & top-right pixels
-  if ((mby > 0) and (mbx > 0) and (mbx < mb_width - 1) and has_outside_ttr) or has_inside_lttr then
-      modes := modes or (1 << INTRA_PRED_VL);
+      modes := modes or (1 << INTRA_PRED_DDL) or (1 << INTRA_PRED_VL);
 
   //run all enabled modes
   for mode := 0 to 8 do begin
@@ -764,11 +759,10 @@ begin
           end;
       end;
   end;
+  LastScore += min_score;
 
   //restore best mode's prediction from cache
   pixel_load_4x4(prediction + block_offset4[n], pred4_cache[result], I4x4CACHE_STRIDE);
-
-  LastScore += min_score;
 end;
 
 
