@@ -371,7 +371,15 @@ end;
 (*******************************************************************************
 luma DC 4x4
 *)
-procedure core_4x4_dc(block: psmallint);
+function divide2x(a: integer): int16;
+begin
+  if a > 0 then
+      result := (a + 1) div 2
+  else
+      result := (a - 1) div 2;
+end;
+
+procedure core_4x4_dc(block: psmallint; scale_result: boolean);
 var
   m: matrix_t;
   e, f, g, h: array[0..3] of smallint;
@@ -400,12 +408,20 @@ begin
       h[i] := m[i][1] - m[i][2];
   end;
 
-  for i := 0 to 3 do begin
-      m[i][0] := e[i] + g[i];
-      m[i][1] := f[i] + h[i];
-      m[i][2] := e[i] - g[i];
-      m[i][3] := f[i] - h[i];
-  end;
+  if scale_result then
+      for i := 0 to 3 do begin
+          m[i][0] := divide2x(e[i] + g[i]);
+          m[i][1] := divide2x(f[i] + h[i]);
+          m[i][2] := divide2x(e[i] - g[i]);
+          m[i][3] := divide2x(f[i] - h[i]);
+      end
+  else
+      for i := 0 to 3 do begin
+          m[i][0] := e[i] + g[i];
+          m[i][1] := f[i] + h[i];
+          m[i][2] := e[i] - g[i];
+          m[i][3] := f[i] - h[i];
+      end;
 
   copy_block32(@m, block);
 end;
@@ -418,13 +434,6 @@ var
   qbits: byte;
   mf: psmallint;
 begin
-  //scale by 2
-  for i := 0 to 15 do
-      if a[i] > 0 then
-          a[i] := (a[i] + 1) div 2
-      else
-          a[i] := (a[i] - 1) div 2;
-
   //multiply factor
   mf := @mult_factor[ table_qp_mod6[qp] ];
   //multiply shift
@@ -462,14 +471,14 @@ end;
 
 procedure transqt_dc_4x4(block: psmallint; const qp: byte);
 begin
-  core_4x4_dc(block);
+  core_4x4_dc(block, true);
   quant_dc_4x4(block, qp);
 end;
 
 
 procedure itransqt_dc_4x4(block: psmallint; const qp: byte);
 begin
-  core_4x4_dc  (block);
+  core_4x4_dc(block, false);
   iquant_dc_4x4(block, qp);
 end;
 
