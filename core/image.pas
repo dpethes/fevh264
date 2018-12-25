@@ -1,6 +1,6 @@
 (*******************************************************************************
 image.pas
-Copyright (c) 2010-2017 David Pethes
+Copyright (c) 2010-2018 David Pethes
 
 This file is part of Fev.
 
@@ -27,7 +27,7 @@ uses
   util;
 
 const
-  QPARAM_AUTO = 52;
+  QPARAM_AUTO = 255;
 
 type
   { TPlanarImage }
@@ -50,7 +50,8 @@ type
       property Height: integer read GetHeight;
 
       constructor Create(const width_, height_: integer);
-      destructor Free;
+      constructor Create(const width_, height_, stride_p0, stride_p12: integer);
+      destructor Destroy; override;
       procedure SwapUV;
   end;
 
@@ -83,21 +84,27 @@ begin
 end;
 
 constructor TPlanarImage.Create(const width_, height_: integer);
+begin
+  Create(width_, height_, width_, width_ div 2);
+end;
+
+constructor TPlanarImage.Create(const width_, height_, stride_p0, stride_p12: integer);
 var
   memsize: integer;
 begin
   w := width_;
   h := height_;
-  memsize := w * h + (w * h) div 2;
+  stride   := stride_p0;
+  stride_c := stride_p12;
+
+  memsize := stride_p0 * h + 2 * (stride_p12 * (h div 2));
   plane[0] := getmem(memsize);
-  plane[1] := plane[0] + w * h;
-  plane[2] := plane[1] + (w * h) div 4;
-  stride   := w;
-  stride_c := w div 2;
+  plane[1] := plane[0] + stride_p0  * h;
+  plane[2] := plane[1] + stride_p12 * (h div 2);
   qp := QPARAM_AUTO;
 end;
 
-destructor TPlanarImage.Free;
+destructor TPlanarImage.Destroy;
 begin
   freemem(plane[0]);
 end;

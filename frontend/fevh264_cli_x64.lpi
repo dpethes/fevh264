@@ -110,7 +110,7 @@
         <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
       </local>
     </RunParams>
-    <Units Count="29">
+    <Units Count="30">
       <Unit0>
         <Filename Value="fevh264_cli.pas"/>
         <IsPartOfProject Value="True"/>
@@ -228,6 +228,10 @@
         <Filename Value="vfw.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit28>
+      <Unit29>
+        <Filename Value="ffms.pas"/>
+        <IsPartOfProject Value="True"/>
+      </Unit29>
     </Units>
   </ProjectOptions>
   <CompilerOptions>

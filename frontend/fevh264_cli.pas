@@ -1,6 +1,6 @@
 (*******************************************************************************
 fevh264_cli.pas
-Copyright (c) 2010-2017 David Pethes
+Copyright (c) 2010-2018 David Pethes
 
 This file is part of Fev.
 
@@ -161,8 +161,9 @@ var
   input: string;
   ext: string;
   width, height: integer;
+  ok: Boolean;
 begin
-  if (options.GetUnparsedParams).Count = 0 then begin
+  if options.UnparsedCount = 0 then begin
       writeln(stderr, 'no input file specified');
       halt;
   end;
@@ -177,18 +178,15 @@ begin
       result := TAvsReader.Create(input)
   else if ext = '.y4m' then
       result := TY4MFileReader.Create(input)
-  else begin
-      try
-          width  := StrToInt( options.GetUnparsed(1) );
-          height := StrToInt( options.GetUnparsed(2) );
-      except
-          on EConvertError do begin
-              writeln(stderr, 'invalid width/height');
-              Halt;
-          end;
+  else if options.UnparsedCount = 3 then begin
+      ok := TryStrToInt(options.GetUnparsed(1), width) and TryStrToInt(options.GetUnparsed(2), height);
+      if not ok then begin
+          writeln(stderr, 'invalid width/height');
+          Halt;
       end;
       result := TYuvFileReader.Create(input, width, height);
-  end;
+  end else
+      result := TFFMS2Reader.Create(input);
 
   if options.IsSet('output') then
       foutput := options['o']

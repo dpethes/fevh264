@@ -1,6 +1,6 @@
 (*******************************************************************************
 yuv4mpeg.pas
-Copyright (c) 2010-2017 David Pethes
+Copyright (c) 2010-2018 David Pethes
 
 This file is part of Fev.
 
@@ -40,7 +40,10 @@ unit yuv4mpeg;
 interface
 
 uses
-  image{$ifdef windows}, vfw{$endif};
+  sysutils, image
+  {$ifdef windows}, vfw {$endif}
+  {$ifdef HAS_FFMS2}, ffms {$endif}
+  ;
 
 
 type
@@ -68,7 +71,6 @@ type
       property CurrentFrame: longword read GetCurrentFrame;
       property FrameRate: double read GetFrameRate;
       function ReadFrame: TPlanarImage; virtual; abstract;
-      destructor Free; virtual; abstract;
   end;
 
   { TY4MFileReader }
@@ -83,7 +85,7 @@ type
       procedure ParseHeader;
     public
       constructor Create(const filename: string);
-      destructor Free; override;
+      destructor Destroy; override;
       function ReadFrame: TPlanarImage; override;
   end;
 
@@ -96,12 +98,13 @@ type
       img: TPlanarImage;
     public
       constructor Create(const filename: string; const width_, height_: word);
-      destructor Free; override;
+      destructor Destroy; override;
       function ReadFrame: TPlanarImage; override;
   end;
 
-  { TAvsReader }
 {$ifdef windows}
+  { TAvsReader }
+
   TAvsReader = class(TAbstractFileReader)
     private
       p_avi: IAVIStream;
@@ -109,11 +112,30 @@ type
       img: TPlanarImage;
     public
       constructor Create(const filename: string);
-      destructor Free; override;
+      destructor Destroy; override;
       function ReadFrame: TPlanarImage; override;
   end;
 {$else}
-   TAvsReader = TY4MFileReader;
+  TAvsReader = TY4MFileReader;
+{$endif}
+
+{$ifdef HAS_FFMS2}
+  { TFFMS2Reader }
+
+  TFFMS2Reader = class(TAbstractFileReader)
+    private
+      videosource: PFFMS_VideoSource;
+      errinfo: FFMS_ErrorInfo;
+      error_buffer: array[0..1023] of char;
+      last_progress: integer;
+      img: TPlanarImage;
+    public
+      constructor Create(const filename: string);
+      destructor Destroy; override;
+      function ReadFrame: TPlanarImage; override;
+  end;
+{$else}
+  TFFMS2Reader = TY4MFileReader;
 {$endif}
 
 
@@ -122,9 +144,6 @@ type
 *******************************************************************************)
 implementation
 
-uses
-  sysutils;
-  
 const
   Y4M_MAGIC   = 'YUV4MPEG2';
   FRAME_MAGIC = 'FRAME'#10;
@@ -151,7 +170,7 @@ begin
   img := TPlanarImage.Create(width, height);
 end;
 
-destructor TYuvFileReader.Free;
+destructor TYuvFileReader.Destroy;
 begin
   img.Free;
   CloseFile(fileHandle);
@@ -230,7 +249,7 @@ begin
   img := TPlanarImage.Create(width, height);
 end;
 
-destructor TY4MFileReader.Free;
+destructor TY4MFileReader.Destroy;
 begin
   img.Free;
   CloseFile(fileHandle);
@@ -291,7 +310,7 @@ begin
   img.SwapUV;
 end;
 
-destructor TAvsReader.Free;
+destructor TAvsReader.Destroy;
 begin
   AVIStreamRelease(p_avi);
   AVIFileExit;
@@ -306,6 +325,108 @@ begin
   if res <> 0 then
       writeln('AVIStreamRead failed: ' + IntToStr(res));
   current_frame += 1;
+  result := img;
+end;
+{$endif}
+
+{$ifdef HAS_FFMS2}
+{ TFFMS2Reader }
+
+function IndexerProgressCallback(Current: int64; Total: int64; ICPrivate: pointer): integer; {$IFDEF Windows} stdcall; {$endif}
+var
+  h: TFFMS2Reader;
+  p: integer;
+begin
+  h := TFFMS2Reader(ICPrivate);
+  p := round(Current/Total*100);
+  if h.last_progress <> p then begin
+      write(format('indexing %d', [p]), '%'+#13);
+      h.last_progress := p;
+  end;
+  result := 0;
+end;
+
+constructor TFFMS2Reader.Create(const filename: string);
+var
+  indexer: PFFMS_Indexer;
+  index: PFFMS_Index;
+  trackno: LongInt;
+  videoprops: PFFMS_VideoProperties;
+  propframe: PFFMS_Frame;
+
+begin
+  _filename := filename;
+  FFMS_Init();
+
+  errinfo.Buffer := @error_buffer[0];
+  errinfo.BufferSize := SizeOf(error_buffer);
+  errinfo.ErrorType  := ord(FFMS_ERROR_SUCCESS);
+  errinfo.SubType    := ord(FFMS_ERROR_SUCCESS);
+
+  indexer := FFMS_CreateIndexer(PChar(filename), @errinfo);
+  if indexer = nil then begin
+      writeln('FFMS_CreateIndexer failed');
+      halt;
+  end;
+
+  FFMS_SetProgressCallback(indexer, @IndexerProgressCallback, self);
+  index := FFMS_DoIndexing2(indexer, ord(FFMS_IEH_ABORT), @errinfo);
+  if index = nil then begin
+      writeln('FFMS_DoIndexing2 failed');
+      halt;
+  end;
+
+  //Retrieve the track number of the first video track
+  trackno := FFMS_GetFirstTrackOfType(index, ord(FFMS_TYPE_VIDEO), @errinfo);
+  if trackno < 0 then begin
+      //no video tracks found in the file, this is bad and you should handle it
+      writeln('FFMS_GetFirstTrackOfType failed');
+      halt;
+  end;
+
+  videosource := FFMS_CreateVideoSource(PChar(filename), trackno, index, 1, ord(FFMS_SEEK_NORMAL), @errinfo);
+  if videosource = nil then begin
+      writeln('FFMS_CreateVideoSource failed');
+      halt;
+  end;
+
+  FFMS_DestroyIndex(index);
+
+  videoprops := FFMS_GetVideoProperties(videosource);
+  propframe := FFMS_GetFrame(videosource, 0, @errinfo);
+
+  //Assert(propframe^.ColorSpace = 0);
+  Assert(propframe^.Linesize[1] = propframe^.Linesize[2]);
+
+  frame_count := videoprops^.NumFrames;
+  width  := propframe^.EncodedWidth;
+  height := propframe^.EncodedHeight;
+  frame_rate := videoprops^.FPSNumerator / videoprops^.FPSDenominator;
+  current_frame := 0;
+  last_progress := 0;
+
+  img := TPlanarImage.Create(width, height, propframe^.Linesize[0], propframe^.Linesize[1]);
+end;
+
+destructor TFFMS2Reader.Destroy;
+begin
+  img.Free;
+  FFMS_DestroyVideoSource(videosource);
+end;
+
+function TFFMS2Reader.ReadFrame: TPlanarImage;
+var
+  f: PFFMS_Frame;
+begin
+  f := FFMS_GetFrame(videosource, current_frame, @errinfo);
+  if f = nil then begin
+      writeln('FFMS_GetFrame failed');
+      halt;
+  end;
+  current_frame += 1;
+  move(f^.Data[0]^, img.plane[0]^, img.Height * img.stride);
+  move(f^.Data[1]^, img.plane[1]^, img.Height div 2 * img.stride_c);
+  move(f^.Data[2]^, img.plane[2]^, img.Height div 2 * img.stride_c);
   result := img;
 end;
 {$endif}
@@ -336,9 +457,6 @@ function TAbstractFileReader.GetFrameWidth: word;
 begin
   result := width
 end;
-
-
-
 
 
 end.

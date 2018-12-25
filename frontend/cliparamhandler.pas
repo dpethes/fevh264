@@ -42,12 +42,13 @@ type
       function HasShortOption(const shortName: char): boolean;
     public
       constructor Create;
-      destructor Free;
+      destructor Destroy; override;
       procedure AddOption(const shortName: char; const arg: TArgumentType; const longName, desc: string);
       procedure ParseParameters;
       function IsSet(const longOptName: string): boolean;
       function GetOptionValue(const longOptName: string): string;
       function GetShortOptionValue(const shortName: char): string;
+      function UnparsedCount: integer;
       function GetUnparsedParams: TStringList;
       function GetUnparsed(const index: word): string;
       function GetDescriptions: String;
@@ -88,7 +89,7 @@ begin
   unparsed := TStringList.Create;
 end;
 
-destructor TCliOptionHandler.Free;
+destructor TCliOptionHandler.Destroy;
 var
   option: TCliOption;
 begin
@@ -205,6 +206,11 @@ begin
           result := lastOption.Value;
       writeln(result);
   end;
+end;
+
+function TCliOptionHandler.UnparsedCount: integer;
+begin
+  result := unparsed.Count;
 end;
 
 function TCliOptionHandler.GetUnparsedParams: TStringList;
