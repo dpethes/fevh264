@@ -392,7 +392,6 @@ begin
       cbp  := mb.cbp;
       chroma_dc      := mb.chroma_dc;
       nz_coef_cnt    := mb.nz_coef_cnt;
-      nz_coef_cnt_dc := mb.nz_coef_cnt_dc;
       nz_coef_cnt_chroma_ac := mb.nz_coef_cnt_chroma_ac;
       block          := mb.block;
   end;
@@ -408,7 +407,6 @@ begin
       mb.cbp                   := cbp;
       mb.chroma_dc             := chroma_dc;
       mb.nz_coef_cnt           := nz_coef_cnt;
-      mb.nz_coef_cnt_dc        := nz_coef_cnt_dc;
       mb.nz_coef_cnt_chroma_ac := nz_coef_cnt_chroma_ac;
       mb.block                 := block;
   end;

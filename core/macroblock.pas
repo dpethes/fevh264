@@ -297,7 +297,6 @@ begin
   //dc transform
   transqt_dc_4x4(mb.dct[24], mb.qp);
   cavlc_analyse_block(mb.block[24], mb.dct[24], 16);
-  mb.nz_coef_cnt_dc := mb.block[24].nlevel;
 
   //cbp: only 0 or 15
   if cbp = 0 then

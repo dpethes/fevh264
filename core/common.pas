@@ -215,7 +215,6 @@ type
       //non-zero coef count of surrounding blocks for I4x4/I16x16/chroma ac blocks
       nz_coef_cnt: array[0..23] of byte;
       nz_coef_cnt_chroma_ac: array[0..1, 0..7] of byte;
-      nz_coef_cnt_dc: byte;
 
       //me
       L0_mvp: array[0..15] of motionvec_t; //predicted mv for L0 refs
