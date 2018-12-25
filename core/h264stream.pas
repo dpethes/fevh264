@@ -139,6 +139,8 @@ type
       function BitCost(const mv: motionvec_t): integer; override;
   end;
 
+  function predict_intra_4x4_mode(const modes: array of byte; const i: byte): byte;
+
 implementation
 
 const

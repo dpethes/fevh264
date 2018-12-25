@@ -25,7 +25,7 @@ unit intra_pred;
 interface
 
 uses
-  stdint, common, util, pixel;
+  stdint, common, util, pixel, h264stream;
 
 type
   TPredict4x4Func = procedure (src, dst: uint8_p; stride: integer);
@@ -34,7 +34,11 @@ type
   { TIntraPredictor }
 
   TIntraPredictor = class
-    public
+    private
+      mbcmp_16x16,
+      mbcmp_8x8,
+      mbcmp_4x4: mbcmp_func_t;
+      pred4_cache: array[0..8] of pbyte;  //cache for 4x4 predicted pixels
       //luma
       pixels,
       prediction: pbyte;
@@ -45,26 +49,24 @@ type
       stride_c: integer;
       pixel_cache: pbyte;
       mb_width: integer;
-      last_score: integer;
+      mb: macroblock_p;
+
+    public
+      LastScore: integer;
 
       constructor Create;
       destructor Free;
       procedure UseSATDCompare;
+      procedure SetMB(const mb_: macroblock_p);
+      procedure SetFrame(const frame: frame_p);
       procedure Predict_4x4   (mode: integer; ref: pbyte; mbx, mby, n: integer);
       procedure Predict_8x8_cr(mode: integer; refU, refV: pbyte; mbx, mby: integer);
       procedure Predict_16x16 (mode: integer; mbx, mby: integer);
 
       //Get best mode for i4x4 prediction. Also stores the predicted pixels
-      function Analyse_4x4(const ref: pbyte; const mbx, mby, n: integer): integer;
-
-      procedure Analyse_8x8_cr(refU, refV: pbyte; mbx, mby: integer; out mode: integer);
-      procedure Analyse_16x16 (mbx, mby: integer; out mode: integer);
-
-    private
-      mbcmp_16x16,
-      mbcmp_8x8,
-      mbcmp_4x4: mbcmp_func_t;
-      pred4_cache: array[0..8] of pbyte;  //cache for 4x4 predicted pixels
+      function  Analyse_4x4(const ref: pbyte; const n: integer): integer;
+      procedure Analyse_8x8_chroma(refU, refV: pbyte; out mode: integer);
+      procedure Analyse_16x16(out mode: integer);
   end;
 
 var
@@ -619,6 +621,25 @@ begin
   mbcmp_4x4 := dsp.satd_4x4;
 end;
 
+procedure TIntraPredictor.SetMB(const mb_: macroblock_p);
+begin
+  mb := mb_;
+  pixels      := mb^.pixels;
+  prediction  := mb^.pred;
+  pixels_c[0] := mb^.pixels_c[0];
+  pixels_c[1] := mb^.pixels_c[1];
+  prediction_c[0] := mb^.pred_c[0];
+  prediction_c[1] := mb^.pred_c[1];
+  pixel_cache := @(mb^.intra_pixel_cache);
+end;
+
+procedure TIntraPredictor.SetFrame(const frame: frame_p);
+begin
+  frame_stride := frame^.stride;
+  stride_c := frame^.stride_c;
+  mb_width := frame^.mbw;
+end;
+
 
 procedure TIntraPredictor.Predict_4x4(mode: integer; ref: pbyte; mbx, mby, n: integer);
 begin
@@ -672,7 +693,7 @@ begin
 end;
 
 
-function TIntraPredictor.Analyse_4x4(const ref: pbyte; const mbx, mby, n: integer): integer;
+function TIntraPredictor.Analyse_4x4(const ref: pbyte; const n: integer): integer;
 const
   TopMask        = %1111111111001100;  //!(n in [0, 1, 4, 5])
   LeftMask       = %1111101011111010;  //!(n in [0, 2, 8, 10])
@@ -680,19 +701,28 @@ const
   InsideTTRMask  = %0101011101000100;  //top/topright,      n in [2, 6, 8, 9, 10, 12, 14]
   InsideLTTRMask = %0101001001000000;  //left/top/topright, n in [6, 9, 12, 14]
   OutsideTTRMask = %0101011101110111;  //top/topright,      !(n in [3, 7, 11, 13, 15])
+  MISPREDICTION_COST = 3 * 4; //TODO suitable for qp ~22, needs to be qp modulated
 var
   pix: pbyte;
   modes, mode: integer;
   score, min_score: integer;
-  mask: integer;
+  mask, mbx, mby: integer;
   has_top, has_left, has_tl, has_inside_ttr, has_inside_lttr, has_outside_ttr: Boolean;
+  predicted_mode: Byte;
 begin
   pix := pixels + block_offset4[n];
+  mbx := mb^.x;
+  mby := mb^.y;
+
+  predicted_mode := predict_intra_4x4_mode(mb^.i4_pred_mode, n);
 
   //always run dc
-  predict_dc4 (ref, pred4_cache[INTRA_PRED_DC], frame_stride, mbx, mby, n);
-  min_score := mbcmp_4x4(pix, pred4_cache[INTRA_PRED_DC], I4x4CACHE_STRIDE);
-  result := INTRA_PRED_DC;
+  mode := INTRA_PRED_DC;
+  predict_dc4 (ref, pred4_cache[mode], frame_stride, mbx, mby, n);
+  min_score := mbcmp_4x4(pix, pred4_cache[mode], I4x4CACHE_STRIDE);
+  if predicted_mode <> mode then
+      min_score += MISPREDICTION_COST;
+  result := mode;
   modes := 0;
 
   //rules based on the 4x4 block position inside 16x16 macroblock
@@ -726,6 +756,8 @@ begin
       if ((1 << mode) and modes) > 0 then begin
           Predict4x4Funcs[mode](ref, pred4_cache[mode], frame_stride);
           score := mbcmp_4x4(pix, pred4_cache[mode], I4x4CACHE_STRIDE);
+          if predicted_mode <> mode then
+              score += MISPREDICTION_COST;
           if score < min_score then begin
               min_score := score;
               result := mode;
@@ -736,13 +768,13 @@ begin
   //restore best mode's prediction from cache
   pixel_load_4x4(prediction + block_offset4[n], pred4_cache[result], I4x4CACHE_STRIDE);
 
-  last_score += min_score;
+  LastScore += min_score;
 end;
 
 
-procedure TIntraPredictor.Analyse_8x8_cr(refU, refV: pbyte; mbx, mby: integer; out mode: integer);
+procedure TIntraPredictor.Analyse_8x8_chroma(refU, refV: pbyte; out mode: integer);
 var
-  mscore, cscore: integer;
+  mscore, cscore, mby, mbx: integer;
   cmp: mbcmp_func_t;
 
 procedure ipmode(m: byte);
@@ -758,6 +790,8 @@ end;
 begin
   mscore := MaxInt;
   cmp := mbcmp_8x8;
+  mbx := mb^.x;
+  mby := mb^.y;
 
   //dc
   predict_dc8   (refU, prediction_c[0], stride_c, mbx, mby);
@@ -790,9 +824,9 @@ begin
 end;
 
 
-procedure TIntraPredictor.Analyse_16x16(mbx, mby: integer; out mode: integer);
+procedure TIntraPredictor.Analyse_16x16(out mode: integer);
 var
-  mscore, cscore: integer;
+  mscore, cscore, mbx, mby: integer;
   cmp: mbcmp_func_t;
 
 procedure ipmode(m: byte);
@@ -807,6 +841,8 @@ end;
 begin
   mscore := MaxInt;
   cmp := mbcmp_16x16;
+  mbx := mb^.x;
+  mby := mb^.y;
 
   //dc
   predict_dc16(pixel_cache, prediction, mbx, mby);
@@ -830,7 +866,7 @@ begin
       ipmode(INTRA_PRED_PLANE);
   end;
 
-  last_score := mscore;
+  LastScore := mscore;
 end;
 
 

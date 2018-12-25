@@ -238,11 +238,11 @@ begin
   for i := 0 to 3 do cbp[i] := 0;
   sad_tresh := SAD_DECIMATE_TRESH[mb.qp];
 
-  intrapred.last_score := 0;
+  intrapred.LastScore := 0;
   for i := 0 to 15 do begin
       block := mb.dct[i];
 
-      mb.i4_pred_mode[i] := intrapred.Analyse_4x4(mb.pfdec + frame.blk_offset[i], mb.x, mb.y, i);
+      mb.i4_pred_mode[i] := intrapred.Analyse_4x4(mb.pfdec + frame.blk_offset[i], i);
       sad := dsp.sad_4x4(mb.pixels + block_offset4[i], mb.pred + block_offset4[i], 16);
       if sad >= sad_tresh then begin
           dsp.pixel_sub_4x4(mb.pixels + block_offset4[i], mb.pred + block_offset4[i], block);
@@ -414,7 +414,7 @@ begin
   sad_tresh := SAD_DECIMATE_TRESH[mb.qpc];
 
   if intra then
-      intrapred.Analyse_8x8_cr(mb.pfdec_c[0], mb.pfdec_c[1], mb.x, mb.y, mb.chroma_pred_mode);
+      intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1], mb.chroma_pred_mode);
 
   for j := 0 to 1 do begin
       if intra then

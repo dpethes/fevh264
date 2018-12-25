@@ -364,15 +364,7 @@ begin
   mb_alloc(mb);
   mb.chroma_qp_offset := 0;
   intrapred := TIntraPredictor.Create;
-  with intrapred do begin
-      pixels     := mb.pixels;
-      prediction := mb.pred;
-      pixels_c[0] := mb.pixels_c[0];
-      pixels_c[1] := mb.pixels_c[1];
-      prediction_c[0] := mb.pred_c[0];
-      prediction_c[1] := mb.pred_c[1];
-      pixel_cache := @mb.intra_pixel_cache;
-  end;
+  intrapred.SetMB(@mb);
 end;
 
 destructor TMacroblockEncoder.Free;
@@ -384,9 +376,7 @@ end;
 procedure TMacroblockEncoder.SetFrame(const f: frame_t);
 begin
   frame := f;
-  intrapred.frame_stride := frame.stride;
-  intrapred.stride_c := frame.stride_c;
-  intrapred.mb_width := frame.mbw;
+  intrapred.SetFrame(@frame);
   stats := f.stats;
 end;
 
@@ -498,8 +488,8 @@ begin
           exit;
 
   //encode as intra if prediction score isn't much worse
-  intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
-  score_intra := intrapred.last_score;
+  intrapred.Analyse_16x16(mb.i16_pred_mode);
+  score_intra := intrapred.LastScore;
   if score_intra < score_p * 2 then begin
       //I16x16
       CacheStore;
@@ -512,7 +502,7 @@ begin
           mb.mbtype := MB_I_4x4;
           EncodeCurrentType;
           bits_i4  := MBCost;
-          score_i4 := intrapred.last_score;
+          score_i4 := intrapred.LastScore;
 
           //pick better
           if bits_intra < bits_i4 then begin
@@ -536,7 +526,7 @@ procedure TMBEncoderRDoptAnalyse.EncodeIntra;
 var
   bits_i16, bits_i4: integer;
 begin
-  intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
+  intrapred.Analyse_16x16(mb.i16_pred_mode);
   mb.mbtype := MB_I_16x16;
   EncodeCurrentType;
   CacheStore;
@@ -594,8 +584,8 @@ begin
       score_p := dsp.sad_16x16(mb.pixels, mb.mcomp, 16);
 
       //intra score
-      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
-      score_i := intrapred.last_score;
+      intrapred.Analyse_16x16(mb.i16_pred_mode);
+      score_i := intrapred.LastScore;
       if score_i < score_p then begin
           if score_i < mb.qp * I16_SAD_QPBONUS then
               mb.mbtype := MB_I_16x16
@@ -664,8 +654,8 @@ begin
       score_p += InterCost.BitCost(mb.mv - mb.mvp);
 
       //intra score
-      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
-      score_i := intrapred.last_score;
+      intrapred.Analyse_16x16(mb.i16_pred_mode);
+      score_i := intrapred.LastScore;
       if score_i + INTRA_MODE_PENALTY < score_p then begin
           if score_i < mb.qp * I16_SATD_QPBONUS then
               mb.mbtype := MB_I_16x16
@@ -683,8 +673,8 @@ begin
       end;
 
   end else begin
-      intrapred.Analyse_16x16(mb.x, mb.y, mb.i16_pred_mode);
-      score_i := intrapred.last_score;
+      intrapred.Analyse_16x16(mb.i16_pred_mode);
+      score_i := intrapred.LastScore;
       if score_i < mb.qp * I16_SATD_QPBONUS then
           mb.mbtype := MB_I_16x16
       else
