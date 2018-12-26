@@ -429,7 +429,7 @@ begin
       core_4x4(@xform_buffer);
       move(xform_buffer, coefficients, 2*16);
 
-      //init_mmx;
+      init_mmx;
       move(residual, xform_buffer, 2*16);
       core_4x4(@xform_buffer);
 
@@ -457,7 +457,7 @@ begin
       icore_4x4(@xform_buffer);
       move(xform_buffer, decoded_residual, 2*16);
 
-      //init_mmx;
+      init_mmx;
       move(coefficients, xform_buffer, 2*16);
       icore_4x4(@xform_buffer);
 

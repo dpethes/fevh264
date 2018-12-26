@@ -5,26 +5,21 @@ SECTION .text
 cglobal core_4x4_mmx
 cglobal icore_4x4_mmx
 
-;transpose 4x4 matrix
+; transpose 4x4 matrix of int16-s
 ; in/out: m0..3
-; scratch: m5..7
-%macro mTRANSPOSE4 0
-    movq      mm6, mm0
-    movq      mm5, mm1
-    punpckldq mm0, mm2
-    punpckldq mm1, mm3
-    punpckhdq mm6, mm2
-    punpckhdq mm5, mm3
-    movq      mm7, mm0
+; scratch: m5, m6
+%macro TRANSPOSE_4x4_int16 0
+    movq      mm5, mm0
+    movq      mm6, mm2
     punpcklwd mm0, mm1
-    movq      mm2, mm6
-    punpckhwd mm7, mm1
-    punpcklwd mm2, mm5
+    punpcklwd mm2, mm3
+    punpckhwd mm5, mm1
+    punpckhwd mm6, mm3
     movq      mm1, mm0
-    punpckhwd mm6, mm5
-    punpckldq mm0, mm7
-    movq      mm3, mm2
-    punpckhdq mm1, mm7
+    punpckldq mm0, mm2
+    punpckhdq mm1, mm2
+    movq      mm2, mm5
+    movq      mm3, mm5
     punpckldq mm2, mm6
     punpckhdq mm3, mm6
 %endmacro
@@ -100,9 +95,9 @@ core_4x4_mmx:
     movq  mm2, [r1+16]
     movq  mm3, [r1+24]
     MULTIPLY_MATRIX_CORE4
-    mTRANSPOSE4
+    TRANSPOSE_4x4_int16
     MULTIPLY_MATRIX_CORE4
-    mTRANSPOSE4
+    TRANSPOSE_4x4_int16
     movq  [r1]   , mm0
     movq  [r1+8] , mm1
     movq  [r1+16], mm2
@@ -116,9 +111,9 @@ icore_4x4_mmx:
     movq  mm1, [r1+8]
     movq  mm2, [r1+16]
     movq  mm3, [r1+24]
-    mTRANSPOSE4
+    TRANSPOSE_4x4_int16
     MULTIPLY_MATRIX_ICORE4
-    mTRANSPOSE4
+    TRANSPOSE_4x4_int16
     ; generate constant 32(word) for rounding
     pcmpeqb mm5, mm5
     psrlw   mm5, 15
@@ -142,7 +137,7 @@ icore_4x4_mmx:
 
 ; ******************************************************************************
 ; transquant_x64.asm
-; Copyright (c) 2013-2018 David Pethes
+; Copyright (c) 2018 David Pethes
 ;
 ; This file is part of Fev.
 ;

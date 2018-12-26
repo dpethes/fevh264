@@ -374,26 +374,21 @@ pixel_avg_16x16_sse2:
 %endmacro
 
 
-;transpose 4x4 matrix
+; transpose 4x4 matrix of int16-s
 ; in/out: m0..3
-; scratch: m5..7
-%macro mTRANSPOSE4 0
-    movq      mm6, mm0
-    movq      mm5, mm1
-    punpckldq mm0, mm2
-    punpckldq mm1, mm3
-    punpckhdq mm6, mm2
-    punpckhdq mm5, mm3
-    movq      mm7, mm0
+; scratch: m5, m6
+%macro TRANSPOSE_4x4_int16 0
+    movq      mm5, mm0
+    movq      mm6, mm2
     punpcklwd mm0, mm1
-    movq      mm2, mm6
-    punpckhwd mm7, mm1
-    punpcklwd mm2, mm5
+    punpcklwd mm2, mm3
+    punpckhwd mm5, mm1
+    punpckhwd mm6, mm3
     movq      mm1, mm0
-    punpckhwd mm6, mm5
-    punpckldq mm0, mm7
-    movq      mm3, mm2
-    punpckhdq mm1, mm7
+    punpckldq mm0, mm2
+    punpckhdq mm1, mm2
+    movq      mm2, mm5
+    movq      mm3, mm5
     punpckldq mm2, mm6
     punpckhdq mm3, mm6
 %endmacro
@@ -504,7 +499,7 @@ satd_4x4_mmx:
     PUSH_XMM_REGS 2
     mSUB4x4 r1, r2, r3, 0
     mHADAMARD4
-    mTRANSPOSE4
+    TRANSPOSE_4x4_int16
     mHADAMARD4
     mSUM
     SUM2DW mm0, r0
@@ -523,7 +518,7 @@ satd_8x8_mmx:
     %rep 2
         mSUB4x4 r1, r2, r3, i
         mHADAMARD4
-        mTRANSPOSE4
+        TRANSPOSE_4x4_int16
         mHADAMARD4
         mSUM
         paddd   mm4, mm0
