@@ -59,12 +59,13 @@ type
       procedure SetSubMELevel(AValue: integer);
 
     public
-      property Subme: integer write SetSubMELevel;
+      property Subme: integer read _subme write SetSubMELevel;
 
       property NumReferences: integer read ref_count write SetNumReferences;
       constructor Create(const w, h, mbw, mbh: integer; mc: TMotionCompensation; h264stream: TH264Stream);
       destructor Free;
       procedure Estimate(var mb: macroblock_t; var fenc: frame_t);
+      procedure Refine(var mb: macroblock_t; var fenc: frame_t);
   end;
 
 
@@ -198,6 +199,23 @@ begin
   mb.mv := ClipMVRange(mb.mv, 512);
   MotionCompensator.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
   mv_field[mb.y * mb_width + mb.x] := mb.mv;
+end;
+
+procedure TMotionEstimator.Refine(var mb: macroblock_t; var fenc: frame_t);
+var
+  mv: motionvec_t;
+begin
+  if _subme < 5 then
+      exit;
+
+  mv := mb.mv;
+  SearchRegion.SearchQPelRDO(mb, mb.fref);
+  if mv <> mb.mv then begin
+      ClipMVRange(mb.mv, 512);
+      mv_field[mb.y * mb_width + mb.x] := mb.mv;
+  end;
+
+  MotionCompensator.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
 end;
 
 

@@ -480,8 +480,13 @@ begin
 
   //early termination if surrounding MBs are inter and have similar bitcost
   if (mb.mba <> nil) and (mb.mbb <> nil) and is_inter(mb.mba^.mbtype) and is_inter(mb.mbb^.mbtype)
-      and (bits_inter < (mb.mba^.bitcost + mb.mbb^.bitcost) div 3 * 2) then
+      and (bits_inter < (mb.mba^.bitcost + mb.mbb^.bitcost) div 3 * 2) then begin
+          if me.Subme > 4 then begin
+              me.Refine(mb, frame);
+              EncodeCurrentType;
+          end;
           exit;
+      end;
 
   //encode as intra if prediction score isn't much worse
   intrapred.Analyse_16x16(mb.i16_pred_mode);
@@ -514,6 +519,10 @@ begin
       if mode_lambda * bits_inter + score_p < mode_lambda * bits_intra + score_intra then begin
           mb.mbtype := MB_P_16x16;
           CacheLoad;
+          if me.Subme > 4 then begin
+              me.Refine(mb, frame);
+              EncodeCurrentType;
+          end;
       end;
   end;
 end;

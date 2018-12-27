@@ -172,7 +172,7 @@ end;
 
 procedure TEncodingParameters.SetSubpixelMELevel(const AValue: byte);
 begin
-  subme := clip3(0, AValue, 4);
+  subme := clip3(0, AValue, 5);
   ValidateSubME;
 end;
 

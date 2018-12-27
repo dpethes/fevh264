@@ -25,7 +25,7 @@ unit motion_est_search;
 interface
 
 uses
-  stdint, common, util, motion_comp, frame, h264stream;
+  stdint, common, util, motion_comp, frame, h264stream, macroblock;
 
 type
   { TRegionSearch }
@@ -52,6 +52,7 @@ type
       function SearchFPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchHPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchQPel(var mb: macroblock_t; const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
+      procedure SearchQPelRDO(var mb: macroblock_t; const fref: frame_p);
  end;
 
 (*******************************************************************************
@@ -398,6 +399,96 @@ begin
   _last_search_score := min_score;
   mb.mv := mv;
   result := mv;
+end;
+
+
+
+procedure TRegionSearch.SearchQPelRDO(var mb: macroblock_t; const fref: frame_p);
+const
+{ for qp in range(15,52):
+    lx = 0.85 * pow(2, (qp-12) / 3.2)
+}
+  LAMBDA_ME: array[0..51] of uint16 = (
+    1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    1, 1, 1, 1, 1, 2, 2, 3, 3, 4,
+    5, 6, 7, 9, 11, 14, 18, 22, 27, 34, 42,
+    52, 65, 80, 100, 124, 154, 191, 237, 295, 366,
+    454, 564, 701, 870, 1081, 1342, 1667, 2070, 2571,
+    3193, 3965
+  );
+var
+  max_x, max_y: integer;
+  mbx, mby,              //macroblock qpel x,y position
+  x, y: integer;         //currently searched qpel x,y position
+  min_score: integer;
+  lambda: integer;
+  mv,
+  mv_prev_pass: motionvec_t;
+  range: integer;
+  iter: integer;
+  check_bounds: boolean;
+
+procedure check_pattern_qpel;
+var
+  i: integer;
+  nx, ny,
+  score: integer;
+begin
+  for i := 0 to 3 do begin
+      nx := x + pt_dia_small[i][0];
+      ny := y + pt_dia_small[i][1];
+
+      MotionCompensator.CompensateQPelXY(fref, nx, ny, mb.mcomp);
+      MotionCompensator.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
+      encode_mb_inter(mb);
+      encode_mb_chroma(mb, nil, false);
+
+      //bitcost first, decoding modifies dct coefs in-place
+      mb.mv := XYToMVec(nx - mbx, ny - mby);
+      score := h264s.GetBitCost(mb) * lambda;
+
+      decode_mb_inter(mb);
+      decode_mb_chroma(mb, false);
+      score += dsp.ssd_16x16(mb.pixels, mb.pixels_dec, 16);
+      score += dsp.ssd_8x8(mb.pixels_c[0], mb.pixels_dec_c[0], 16)
+             + dsp.ssd_8x8(mb.pixels_c[1], mb.pixels_dec_c[1], 16);
+
+      if score < min_score then begin
+          min_score := score;
+          mv := mb.mv
+      end;
+  end;
+  x := mbx + mv.x;
+  y := mby + mv.y;
+end;
+
+begin
+  mbx    := _mbx * 4;
+  mby    := _mby * 4;
+  max_x  := _max_x_qpel;
+  max_y  := _max_y_qpel;
+  range  := 2;
+
+  mv := mb.mv;
+  x := mbx + mv.x;
+  y := mby + mv.y;
+  lambda := LAMBDA_ME[mb.qp];
+  min_score := MaxInt;
+
+  iter := 0;
+  check_bounds := (x - range < MIN_XY_QPEL) or (x + range > max_x) or
+                  (y - range < MIN_XY_QPEL) or (y + range > max_y);
+  repeat
+      mv_prev_pass := mv;
+      if check_bounds then
+          if (x - 1 < MIN_XY_QPEL) or (x + 1 > max_x) or
+             (y - 1 < MIN_XY_QPEL) or (y + 1 > max_y) then break;
+      check_pattern_qpel();
+      iter += 1;
+  until (mv = mv_prev_pass) or (iter >= range);
+
+  _last_search_score := min_score;
+  mb.mv := mv;
 end;
 
 end.
