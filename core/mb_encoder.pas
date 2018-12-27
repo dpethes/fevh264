@@ -44,7 +44,6 @@ type
       procedure EncodeCurrentType;
       procedure Decode;
       procedure SetChromaQPOffset(const AValue: shortint);
-      procedure Store;
       function TrySkip(const use_satd: boolean = true): boolean;
       function TryPostInterEncodeSkip(const score_inter: integer): boolean;
       procedure MakeSkip;
@@ -133,29 +132,6 @@ begin
   mb.ref  := 0;
 end;
 
-//some nz_coef_cnt-s are set in Decode, therefore it must come before CalculateBStrength
-procedure TMacroblockEncoder.FinalizeMB;
-begin
-  h264s.WriteMB(mb);
-  Decode;
-  if LoopFilter then begin
-      CalculateBStrength(@mb);
-  end;
-  Store;
-  if not LoopFilter then begin
-      stats.ssd[0] += dsp.ssd_16x16(mb.pixels_dec,      mb.pfenc,      frame.stride  );
-      stats.ssd[1] += dsp.ssd_8x8  (mb.pixels_dec_c[0], mb.pfenc_c[0], frame.stride_c);
-      stats.ssd[2] += dsp.ssd_8x8  (mb.pixels_dec_c[1], mb.pfenc_c[1], frame.stride_c);
-  end;
-
-  mb.pfenc += 16;
-  mb.pfdec += 16;
-  mb.pfenc_c[0] += 8;
-  mb.pfenc_c[1] += 8;
-  mb.pfdec_c[0] += 8;
-  mb.pfdec_c[1] += 8;
-end;
-
 procedure TMacroblockEncoder.EncodeCurrentType;
 begin
   case mb.mbtype of
@@ -216,13 +192,16 @@ begin
   mb.chroma_qp_offset := AValue;
 end;
 
-//store MB to frame's MB array, move decoded pixels to frame
-procedure TMacroblockEncoder.Store;
+{ Write mb to bitstream, decode and write pixels to frame and store MB to frame's MB array.
+  Update stats and calculate SSD if the loopfilter isn't enabled (otherwise get it later,
+  after all relevant pixels are decoded)
+}
+procedure TMacroblockEncoder.FinalizeMB;
 var
-  i: integer;
+  i: Integer;
 begin
-  i := mb.y * frame.mbw + mb.x;
-  move(mb, frame.mbs[i], sizeof(macroblock_t));
+  h264s.WriteMB(mb);
+  Decode;
 
   if mb.mbtype <> MB_I_4x4 then
       dsp.pixel_save_16x16(mb.pixels_dec, mb.pfdec, frame.stride);
@@ -254,6 +233,25 @@ begin
           stats.ref[mb.ref] += 1;
       end;
   end;
+
+  if not LoopFilter then begin
+      stats.ssd[1] += dsp.ssd_8x8  (mb.pixels_dec_c[0], mb.pixels_c[0], 16);
+      stats.ssd[2] += dsp.ssd_8x8  (mb.pixels_dec_c[1], mb.pixels_c[1], 16);
+      stats.ssd[0] += dsp.ssd_16x16(mb.pixels_dec,      mb.pixels,      16);
+  end else begin
+      //some nz_coef_cnt-s are set in Decode(), so it must be called first
+      CalculateBStrength(@mb);
+  end;
+
+  i := mb.y * frame.mbw + mb.x;
+  move(mb, frame.mbs[i], sizeof(macroblock_t));
+
+  mb.pfenc += 16;
+  mb.pfdec += 16;
+  mb.pfenc_c[0] += 8;
+  mb.pfenc_c[1] += 8;
+  mb.pfdec_c[0] += 8;
+  mb.pfdec_c[1] += 8;
 end;
 
 
