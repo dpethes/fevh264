@@ -838,22 +838,19 @@ begin
   mbx := mb^.x;
   mby := mb^.y;
 
-  //dc
-  predict_dc16(pixel_cache, prediction, mbx, mby);
-  ipmode(INTRA_PRED_DC);
-
   //vertical
   if (mby > 0) then begin
       predict_top16(pixel_cache, prediction);
       ipmode(INTRA_PRED_TOP);
   end;
-
   //horizontal
   if (mbx > 0) then begin
       predict_left16(pixel_cache, prediction);
       ipmode(INTRA_PRED_LEFT);
   end;
-
+  //dc
+  predict_dc16(pixel_cache, prediction, mbx, mby);
+  ipmode(INTRA_PRED_DC);
   //plane
   if (mbx > 0) and (mby > 0) then begin
       predict_plane16(pixel_cache, prediction);
