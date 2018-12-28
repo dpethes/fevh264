@@ -82,7 +82,7 @@ type
 
   TMBEncoderQuickAnalyseSATD = class(TMBEncoderQuickAnalyse)
     private
-      InterCost: IInterPredCostEvaluator;
+      InterCost: TInterPredCost;
     public
       constructor Create; override;
       procedure SetFrame(const f: frame_t); override;
@@ -618,7 +618,7 @@ end;
 procedure TMBEncoderQuickAnalyseSATD.SetFrame(const f: frame_t);
 begin
   inherited SetFrame(f);
-  InterCost := h264s.GetInterPredCostEvaluator;
+  InterCost := h264s.InterPredCost;
 end;
 
 procedure TMBEncoderQuickAnalyseSATD.Encode(mbx, mby: integer);

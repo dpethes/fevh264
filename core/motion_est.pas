@@ -25,7 +25,7 @@ unit motion_est;
 interface
 
 uses
-  common, util, motion_comp, inter_pred, motion_est_search;
+  common, util, motion_comp, inter_pred, motion_est_search, h264stream;
 
 type
   TScoreListItem = record
@@ -48,7 +48,8 @@ type
       scoreList: array of TScoreListItem;
       SearchRegion: TRegionSearch;
       MotionCompensator: TMotionCompensation;
-      InterCost: IInterPredCostEvaluator;
+      InterCost: TInterPredCost;
+      H264s: TH264Stream;
 
       procedure EstimateMultiRef(var mb: macroblock_t; var fenc: frame_t);
       procedure EstimateSingleRef(var mb: macroblock_t; var fenc: frame_t);
@@ -61,7 +62,7 @@ type
       property Subme: integer write SetSubMELevel;
 
       property NumReferences: integer read ref_count write SetNumReferences;
-      constructor Create(const w, h, mbw, mbh: integer; mc: TMotionCompensation; inter_cost: IInterPredCostEvaluator);
+      constructor Create(const w, h, mbw, mbh: integer; mc: TMotionCompensation; h264stream: TH264Stream);
       destructor Free;
       procedure Estimate(var mb: macroblock_t; var fenc: frame_t);
   end;
@@ -130,8 +131,7 @@ begin
   _subme := AValue;
 end;
 
-constructor TMotionEstimator.Create
-  (const w, h, mbw, mbh: integer; mc: TMotionCompensation; inter_cost: IInterPredCostEvaluator);
+constructor TMotionEstimator.Create(const w, h, mbw, mbh: integer; mc: TMotionCompensation; h264stream: TH264Stream);
 var
   size: integer;
 begin
@@ -146,10 +146,11 @@ begin
 
   predicted_mv_list.Clear;
 
-  InterCost := inter_cost;
+  H264s := h264stream;
+  InterCost := H264s.InterPredCost;
   MotionCompensator := mc;
 
-  SearchRegion := TRegionSearch.Create(width, height, mc, InterCost);
+  SearchRegion := TRegionSearch.Create(width, height, mc, H264s);
 end;
 
 destructor TMotionEstimator.Free;

@@ -57,7 +57,7 @@ type
       num_ref_frames: byte;
   end;
 
-  TH264InterPredCostEvaluator = class;
+  TInterPredCost = class;
 
   { TH264Stream }
 
@@ -74,7 +74,7 @@ type
       slice: slice_header_t;
       last_mb_qp: byte;
 
-      interPredCostEval: TH264InterPredCostEvaluator;
+      interPredCostEval: TInterPredCost;
       cabac: boolean;
       //stats?
 
@@ -120,12 +120,12 @@ type
       procedure GetSliceBitstream(var buffer: pbyte; out size: longword);
       procedure WriteMB (var mb: macroblock_t);
       function GetBitCost (const mb: macroblock_t): integer;
-      function GetInterPredCostEvaluator: IInterPredCostEvaluator;
+      function InterPredCost: TInterPredCost;
   end;
 
-  { TH264InterPredCostEvaluator }
+  { TInterPredCost }
 
-  TH264InterPredCostEvaluator = class (IInterPredCostEvaluator)
+  TInterPredCost = class
     private
       _h264stream: TH264Stream;
       _lambda: integer;
@@ -134,9 +134,10 @@ type
       _ref_frame_bits: integer;
     public
       constructor Create(const h264stream: TH264Stream);
-      procedure SetQP(qp: integer); override;
-      procedure SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer); override;
-      function BitCost(const mv: motionvec_t): integer; override;
+      procedure SetQP(qp: integer);
+      procedure SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer);
+      function BitCost(const mv: motionvec_t): integer; inline;
+      function Bits(const mvx, mvy: integer): integer;
   end;
 
   function predict_intra_4x4_mode(const modes: array of byte; const i: byte): byte;
@@ -717,7 +718,7 @@ begin
 
   cabac := false;
 
-  interPredCostEval := TH264InterPredCostEvaluator.Create(self);
+  interPredCostEval := TInterPredCost.Create(self);
 end;
 
 destructor TH264Stream.Free;
@@ -915,8 +916,7 @@ begin
   result += se_code_len(x) + se_code_len(y);
 end;
 
-//Get InterPredCostEvaluator for current slice
-function TH264Stream.GetInterPredCostEvaluator: IInterPredCostEvaluator;
+function TH264Stream.InterPredCost: TInterPredCost;
 begin
   result := interPredCostEval;
 end;
@@ -1012,7 +1012,7 @@ begin
   result := ue_code_len(mb_skip_count + 1) - ue_code_len(mb_skip_count);
 end;
 
-{ TH264InterPredCostEvaluator }
+{ TInterPredCost }
 
 const
   lambda_mv: array[0..51] of byte = (
@@ -1024,7 +1024,7 @@ const
       74,83
   );
 
-procedure TH264InterPredCostEvaluator.SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer);
+procedure TInterPredCost.SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer);
 begin
   _mvp := mvp;
   _ref_idx := idx;
@@ -1036,7 +1036,7 @@ begin
   end;
 end;
 
-constructor TH264InterPredCostEvaluator.Create(const h264stream: TH264Stream);
+constructor TInterPredCost.Create(const h264stream: TH264Stream);
 begin
   _h264stream := h264stream;
   _lambda := 1;
@@ -1044,17 +1044,21 @@ begin
   _ref_idx := 0;
 end;
 
-procedure TH264InterPredCostEvaluator.SetQP(qp: integer);
+procedure TInterPredCost.SetQP(qp: integer);
 begin
   _lambda := lambda_mv[qp];
 end;
 
-function TH264InterPredCostEvaluator.BitCost(const mv: motionvec_t): integer;
+function TInterPredCost.BitCost(const mv: motionvec_t): integer;
 begin
-  result := _ref_frame_bits + se_code_len(mv.x - _mvp.x) + se_code_len(mv.y - _mvp.y);
-  result *= _lambda;
+  result := Bits(mv.x, mv.y);
 end;
 
+function TInterPredCost.Bits(const mvx, mvy: integer): integer;
+begin
+  result := _ref_frame_bits + se_code_len(mvx - _mvp.x) + se_code_len(mvy - _mvp.y);
+  result *= _lambda;
+end;
 
 
 end.

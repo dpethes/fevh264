@@ -137,7 +137,7 @@ type
   operator * (const a: motionvec_t; const multiplier: integer): motionvec_t; inline;
   operator + (const a, b: motionvec_t): motionvec_t; inline;
   operator - (const a, b: motionvec_t): motionvec_t; inline;
-  function XYToMVec(const x: integer; const y: integer): motionvec_t; inline;
+  function XYToMVec(const x: integer; const y: integer): motionvec_t;
 
 const
   ZERO_MV: motionvec_t = (x:0; y:0);
@@ -268,12 +268,6 @@ type
       stats: TFrameStats;
       estimated_framebits: integer;
       qp_adj: integer;
-  end;
-
-  IInterPredCostEvaluator = class
-      procedure SetQP(qp: integer); virtual; abstract;
-      procedure SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer); virtual; abstract;
-      function BitCost(const mv: motionvec_t): integer; virtual; abstract;
   end;
 
 (*******************************************************************************

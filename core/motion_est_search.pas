@@ -25,7 +25,7 @@ unit motion_est_search;
 interface
 
 uses
-  stdint, common, util, motion_comp, frame;
+  stdint, common, util, motion_comp, frame, h264stream;
 
 type
   { TRegionSearch }
@@ -38,7 +38,8 @@ type
       _last_search_score: integer;
       _starting_fpel_mv: motionvec_t;
       MotionCompensator: TMotionCompensation;
-      InterCostEval: IInterPredCostEvaluator;
+      InterCost: TInterPredCost;
+      h264s: TH264Stream;
 
     public
       cur: pbyte;
@@ -46,7 +47,7 @@ type
 
       property LastSearchScore: integer read _last_search_score;
 
-      constructor Create(region_width, region_height: integer; mc: TMotionCompensation; cost_eval: IInterPredCostEvaluator);
+      constructor Create(region_width, region_height: integer; mc: TMotionCompensation; h264stream: TH264Stream);
       procedure PickFPelStartingPoint(const fref: frame_p; const predicted_mv_list: TMotionVectorList);
       function SearchFPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchHPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
@@ -79,12 +80,14 @@ const
   pt_square: array[0..7] of TXYOffs =
       ( (0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1) );
 
-constructor TRegionSearch.Create(region_width, region_height: integer; mc: TMotionCompensation; cost_eval: IInterPredCostEvaluator);
+constructor TRegionSearch.Create(region_width, region_height: integer;
+  mc: TMotionCompensation; h264stream: TH264Stream);
 var
   edge: integer;
 begin
   MotionCompensator := mc;
-  InterCostEval := cost_eval;
+  H264s := h264stream;
+  InterCost := H264s.InterPredCost;
 
   _starting_fpel_mv  := ZERO_MV;
   _last_search_score := MaxInt;
@@ -162,7 +165,7 @@ var
   range: integer;
   pixel_range: integer;
 
-procedure check_pattern(const pattern: array of TXYOffs); inline;
+procedure check_pattern(const pattern: array of TXYOffs);
 var
   i: integer;
   nx, ny: integer;
@@ -170,7 +173,7 @@ var
 begin
   if check_bounds then
       if (x - 2 < MIN_XY) or (x + 2 > max_x) or
-         (y - 2 < MIN_XY) or (y + 2 > max_y) then exit;  //use large diamond range
+         (y - 2 < MIN_XY) or (y + 2 > max_y) then exit;
   for i := 0 to Length(pattern) - 1 do begin
       nx := x + pattern[i][0];
       ny := y + pattern[i][1];
@@ -204,7 +207,7 @@ begin
   min_score := _last_search_score;
 
   iter := 0;
-  pixel_range := 2 * range + 1;
+  pixel_range := 2 * range + 1; //use large diamond range
   check_bounds := (x - pixel_range < MIN_XY) or (x + pixel_range > max_x) or
                   (y - pixel_range < MIN_XY) or (y + pixel_range > max_y);
   repeat
@@ -243,16 +246,13 @@ var
   iter: integer;
   check_bounds: boolean;
 
-procedure check_pattern_hpel(); inline;
+procedure check_pattern_hpel();
 var
   i, idx: integer;
   nx, ny,
   mcx, mcy: integer;
   score: integer;
 begin
-  if check_bounds then
-      if (x - 1 < MIN_XY_HPEL) or (x + 1 > max_x) or
-         (y - 1 < MIN_XY_HPEL) or (y + 1 > max_y) then exit;
   for i := 0 to 3 do begin
       nx := x + pt_dia_small[i][0];
       ny := y + pt_dia_small[i][1];
@@ -261,7 +261,7 @@ begin
       mcy := ny div 2;
       idx := ((ny and 1) shl 1) or (nx and 1);
       score := dsp.sad_16x16(cur, ref[idx] + mcy * stride + mcx, stride)
-               + InterCostEval.BitCost(XYToMVec(nx - mbx, ny - mby) * 2);
+               + InterCost.Bits((nx - mbx) * 2, (ny - mby) * 2);
 
       if score < min_score then begin
           min_score := score;
@@ -293,6 +293,9 @@ begin
                or (y - range < MIN_XY_HPEL) or (y + range > max_y);
   repeat
       mv_prev_pass := mv;
+      if check_bounds then
+          if (x - 1 < MIN_XY_HPEL) or (x + 1 > max_x) or
+             (y - 1 < MIN_XY_HPEL) or (y + 1 > max_y) then break;
       check_pattern_hpel;
       iter += 1;
   until (mv = mv_prev_pass) or (iter >= range);
@@ -325,32 +328,24 @@ var
   iter: integer;
   check_bounds: boolean;
 
-function chroma_score: integer; inline;
-begin
-  result := dsp.satd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16);
-  result += dsp.satd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
-end;
-
-procedure check_pattern_qpel; inline;
+procedure check_pattern_qpel();
 var
   i: integer;
   nx, ny,
   score: integer;
 begin
-  if check_bounds then
-      if (x - 1 < MIN_XY_QPEL) or (x + 1 > max_x) or
-         (y - 1 < MIN_XY_QPEL) or (y + 1 > max_y) then exit;
   for i := 0 to 3 do begin
       nx := x + pt_dia_small[i][0];
       ny := y + pt_dia_small[i][1];
 
       MotionCompensator.CompensateQPelXY(fref, nx, ny, mb.mcomp);
       score := mbcmp(cur, mb.mcomp, 16)
-               + InterCostEval.BitCost(XYToMVec(nx - mbx, ny - mby));
+               + InterCost.Bits(nx - mbx, ny - mby);
 
       if chroma_me then begin
           MotionCompensator.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
-          score += chroma_score();
+          score += dsp.satd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16) +
+                   dsp.satd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
       end;
 
       if score < min_score then begin
@@ -368,7 +363,7 @@ begin
   max_x  := _max_x_qpel;
   max_y  := _max_y_qpel;
   if satd then
-      mbcmp := dsp.satd_16x16
+      mbcmp := dsp.satd_16x16  //chroma_me always uses satd
   else
       mbcmp := dsp.sad_16x16;
   range  := ME_RANGES[mpQpel];
@@ -383,16 +378,20 @@ begin
                   (y - range < MIN_XY_QPEL) or (y + range > max_y);
   repeat
       mv_prev_pass := mv;
+      if check_bounds then
+          if (x - 1 < MIN_XY_QPEL) or (x + 1 > max_x) or
+             (y - 1 < MIN_XY_QPEL) or (y + 1 > max_y) then break;
       check_pattern_qpel();
       iter += 1;
   until (mv = mv_prev_pass) or (iter >= range);
 
   if min_score = MaxInt then begin    //return valid score if no searches were done (rare cases at the padded edge of a frame)
       MotionCompensator.CompensateQPelXY(fref, x, y, mb.mcomp);
-      min_score := mbcmp(cur, mb.mcomp, 16) + InterCostEval.BitCost(mv);
+      min_score := mbcmp(cur, mb.mcomp, 16) + InterCost.BitCost(mv);
       if chroma_me then begin
           MotionCompensator.CompensateChromaQpelXY(fref, x, y, mb.mcomp_c[0], mb.mcomp_c[1]);
-          min_score += chroma_score();
+          min_score += dsp.satd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16) +
+                       dsp.satd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
       end;
   end;
 

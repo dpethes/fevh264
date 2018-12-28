@@ -120,7 +120,7 @@ begin
 
   //inter pred
   mc := TMotionCompensation.Create;
-  me := TMotionEstimator.Create(width, height, mb_width, mb_height, mc, h264s.GetInterPredCostEvaluator);
+  me := TMotionEstimator.Create(width, height, mb_width, mb_height, mc, h264s);
   me.subme := param.SubpixelMELevel;
 
   //ratecontrol
