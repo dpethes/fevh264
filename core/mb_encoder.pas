@@ -647,7 +647,7 @@ begin
       //inter score
       me.Estimate(mb, frame);
       score_p := dsp.satd_16x16(mb.pixels, mb.mcomp, 16);
-      score_p += InterCost.BitCost(mb.mv - mb.mvp);
+      score_p += InterCost.Bits(mb.mv);
 
       //intra score
       intrapred.Analyse_16x16(mb.i16_pred_mode);

@@ -387,7 +387,7 @@ begin
 
   if min_score = MaxInt then begin    //return valid score if no searches were done (rare cases at the padded edge of a frame)
       MotionCompensator.CompensateQPelXY(fref, x, y, mb.mcomp);
-      min_score := mbcmp(cur, mb.mcomp, 16) + InterCost.BitCost(mv);
+      min_score := mbcmp(cur, mb.mcomp, 16) + InterCost.Bits(mv);
       if chroma_me then begin
           MotionCompensator.CompensateChromaQpelXY(fref, x, y, mb.mcomp_c[0], mb.mcomp_c[1]);
           min_score += dsp.satd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16) +

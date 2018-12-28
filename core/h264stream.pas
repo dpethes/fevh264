@@ -136,7 +136,7 @@ type
       constructor Create(const h264stream: TH264Stream);
       procedure SetQP(qp: integer);
       procedure SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer);
-      function BitCost(const mv: motionvec_t): integer; inline;
+      function Bits(const mv: motionvec_t): integer; inline;
       function Bits(const mvx, mvy: integer): integer;
   end;
 
@@ -1049,7 +1049,7 @@ begin
   _lambda := lambda_mv[qp];
 end;
 
-function TInterPredCost.BitCost(const mv: motionvec_t): integer;
+function TInterPredCost.Bits(const mv: motionvec_t): integer;
 begin
   result := Bits(mv.x, mv.y);
 end;
