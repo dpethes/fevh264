@@ -414,8 +414,7 @@ var
   i: integer;
   coef: integer;
   run_before, zeros_left, total_zeros: integer;
-  nz,                   //TotalCoeff( coeff_token )
-  t0, t1: integer;      //trailing 0, TrailingOnes( coeff_token )
+  nz, t1: integer;
 
   tab: byte;
   suffix_length: byte;
@@ -423,7 +422,6 @@ var
 
 begin
   result := 0;
-  t0 := blok.t0;
   t1 := blok.t1;
   nz := blok.nlevel;
 
@@ -468,7 +466,7 @@ begin
   end;
 
   //total number of zeros in runs
-  total_zeros := blok.ncoef - nz - t0;
+  total_zeros := blok.ncoef - nz - blok.t0;
   if nz < blok.ncoef then begin
       if res <> RES_DC then begin
           if nz < 8 then
