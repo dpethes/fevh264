@@ -108,9 +108,6 @@ const
 
   block_dc_order: array[0..15] of byte = (0, 1, 4, 5,  2, 3, 6, 7, 8, 9, 12, 13, 10, 11, 14, 15);
 
-function is_intra(const m: integer): boolean; inline;
-function is_inter(const m: integer): boolean; inline;
-
 type
   //motion vector
   motionvec_t = record
@@ -152,6 +149,15 @@ type
        t0: byte;
        run_before: array[0..14] of byte;
        level: array[0..15] of int16;
+  end;
+
+  //transquant function params cache
+  TQuantCtx = record
+      mult_factor,
+      rescale_factor: pint16;
+      f_intra, f_inter, f_dc: integer;
+      qp_div6, qbits, qbits_dc: byte;
+      qp: byte;  //just for correctness checks
   end;
 
   //boundary strength
@@ -217,10 +223,12 @@ type
       nz_coef_cnt_chroma_ac: array[0..1, 0..7] of byte;
 
       //me
-      L0_mvp: array[0..15] of motionvec_t; //predicted mv for L0 refs
       score_skip,
       score_skip_uv: integer;
       residual_bits: integer;
+
+      //transquant
+      quant_ctx_qp, quant_ctx_qpc: TQuantCtx;
 
       //loopfilter
       mba, mbb: macroblock_p;
@@ -269,6 +277,9 @@ type
       estimated_framebits: integer;
       qp_adj: integer;
   end;
+
+function is_intra(const m: integer): boolean; inline;
+function is_inter(const m: integer): boolean; inline;
 
 (*******************************************************************************
 *******************************************************************************)

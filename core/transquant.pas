@@ -25,10 +25,11 @@ unit transquant;
 interface
 
 uses
-  util;
+  common, util;
 
-procedure transqt (block: psmallint; const qp: byte; const intra: boolean; const quant_start_idx: byte = 0);
-procedure itransqt(block: psmallint; const qp: byte; const quant_start_idx: byte = 0);
+procedure transqt_init_for_qp(out p: TQuantCtx; const qp: byte);
+procedure transqt (block: psmallint; const qp: TQuantCtx; const intra: boolean; const quant_start_idx: byte = 0);
+procedure itransqt(block: psmallint; const qp: TQuantCtx; const quant_start_idx: byte = 0);
 
 procedure transqt_dc_2x2 (block: psmallint; const qp: byte);
 procedure itransqt_dc_2x2(block: psmallint; const qp: byte);
@@ -114,6 +115,25 @@ begin
   end;
 end;
 
+procedure transqt_init_for_qp(out p: TQuantCtx; const qp: byte);
+var
+  qbits: Byte;
+begin
+  p.mult_factor    := @mult_factor[ table_qp_mod6[qp] ];
+  p.rescale_factor := @resc_factor[ table_qp_mod6[qp] ];
+  p.qp_div6 := table_qp_div6[qp];
+
+  qbits := 15 + p.qp_div6;
+  p.f_intra := (1 shl qbits) div 3;
+  p.f_inter := (1 shl qbits) div 6;
+  p.f_dc    := 1 shl qbits;
+
+  p.qbits := qbits;
+  p.qbits_dc := qbits + 1;
+
+  p.qp := qp;
+end;
+
 procedure copy_block32(src, dst: pointer); inline;
 var
   i: Integer;
@@ -127,23 +147,10 @@ end;
 
 
 //Z = (|W| . MF + f) >> qbits
-procedure quant(a: psmallint; const qp: byte; const intra: boolean; const sidx: byte);
+procedure quant(a: psmallint; mf: psmallint; const f: integer; const qbits: byte; const sidx: byte);
 var
   i: integer;
-  f: integer;
-  qbits: byte;
-  mf: psmallint;
 begin
-  //multiply shift
-  qbits := 15 + table_qp_div6[qp];
-  //multiply factor
-  mf := @mult_factor[ table_qp_mod6[qp] ];
-  //rounding factor
-  if intra then
-      f := (1 shl qbits) div 3
-  else
-      f := (1 shl qbits) div 6;
-
   a  += sidx;
   mf += sidx;
   for i := sidx to 15 do begin
@@ -208,10 +215,13 @@ begin
 end;
 
 
-procedure transqt(block: psmallint; const qp: byte; const intra: boolean; const quant_start_idx: byte);
+procedure transqt(block: psmallint; const qp: TQuantCtx; const intra: boolean; const quant_start_idx: byte);
 begin
   core_4x4(block);
-  quant(block, qp, intra, quant_start_idx);
+  if intra then
+      quant(block, qp.mult_factor, qp.f_intra, qp.qbits, quant_start_idx)
+  else
+      quant(block, qp.mult_factor, qp.f_inter, qp.qbits, quant_start_idx);
 end;
 
 
@@ -219,14 +229,10 @@ end;
 (*******************************************************************************
 iHCT + dequant
 *)
-procedure iquant(a: psmallint; const qp: byte; const sidx: byte);
+procedure iquant(a: psmallint; mf: psmallint; const shift: integer; const sidx: byte);
 var
   i: integer;
-  shift: integer;
-  mf: psmallint;
 begin
-  shift := table_qp_div6[qp];
-  mf := @resc_factor[ table_qp_mod6[qp] ];
   a  += sidx;
   mf += sidx;
   for i := sidx to 15 do begin
@@ -275,9 +281,9 @@ begin
 end;
 
 
-procedure itransqt(block: psmallint; const qp: byte; const quant_start_idx: byte = 0);
+procedure itransqt(block: psmallint; const qp: TQuantCtx; const quant_start_idx: byte = 0);
 begin
-  iquant(block, qp, quant_start_idx);
+  iquant(block, qp.rescale_factor, qp.qp_div6, quant_start_idx);
   icore_4x4(block);
 end;
 

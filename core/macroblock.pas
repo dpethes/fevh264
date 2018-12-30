@@ -202,6 +202,9 @@ begin
       mb.qpc := tab_qp_chroma[mb.qp];
   mb.qpc += mb.chroma_qp_offset;
 
+  transqt_init_for_qp(mb.quant_ctx_qp,  mb.qp);
+  transqt_init_for_qp(mb.quant_ctx_qpc, mb.qpc);
+
   //intra cache
   fill_intra_pred_cache(mb, frame);
 
@@ -251,7 +254,7 @@ begin
       sad := dsp.sad_4x4(mb.pixels + block_offset4[i], mb.pred + block_offset4[i], 16);
       if sad >= sad_tresh then begin
           dsp.pixel_sub_4x4(mb.pixels + block_offset4[i], mb.pred + block_offset4[i], block);
-          transqt(block, mb.qp, true);
+          transqt(block, mb.quant_ctx_qp, true);
           cavlc_analyse_block(mb.block[i], block, 16);
       end else
           block_use_zero(mb.block[i]);
@@ -261,7 +264,7 @@ begin
 
       //decode block
       if mb.nz_coef_cnt[i] > 0 then begin
-          itransqt(block, mb.qp);
+          itransqt(block, mb.quant_ctx_qp);
           dsp.pixel_add_4x4 (mb.pixels_dec + block_offset4[i], mb.pred + block_offset4[i], block);
       end else
           pixel_load_4x4(mb.pixels_dec + block_offset4[i], mb.pred + block_offset4[i], 16);
@@ -289,7 +292,7 @@ begin
       block := mb.dct[i];
 
       dsp.pixel_sub_4x4(mb.pixels + block_offset4[i], mb.pred + block_offset4[i], block);
-      transqt(block, mb.qp, true, 1);
+      transqt(block, mb.quant_ctx_qp, true, 1);
 
       mb.dct[24][ block_dc_order[i] ] := block[0];
       block[0] := 0;
@@ -326,7 +329,7 @@ begin
       block[0] := mb.dct[24][ block_dc_order[i] ];
 
       if mb.nz_coef_cnt[i] > 0 then
-          itransqt(block, mb.qp, 1)
+          itransqt(block, mb.quant_ctx_qp, 1)
       else
           itrans_dc(block);
 
@@ -356,7 +359,7 @@ begin
       sad := dsp.sad_4x4(mb.pixels + block_offset4[i], mb.mcomp + block_offset4[i], 16);
       if sad >= sad_tresh then begin
           dsp.pixel_sub_4x4(mb.pixels + block_offset4[i], mb.mcomp + block_offset4[i], block);
-          transqt(block, mb.qp, false);
+          transqt(block, mb.quant_ctx_qp, false);
           cavlc_analyse_block(mb.block[i], block, 16);
       end else
           block_use_zero(mb.block[i]);
@@ -380,7 +383,7 @@ begin
       block := mb.dct[i];
 
       if mb.nz_coef_cnt[i] > 0 then begin
-          itransqt(block, mb.qp);
+          itransqt(block, mb.quant_ctx_qp);
           dsp.pixel_add_4x4 (mb.pixels_dec + block_offset4[i], mb.mcomp + block_offset4[i], block);
       end else
           pixel_save_4x4(mb.mcomp + block_offset4[i], mb.pixels_dec + block_offset4[i], 16);
@@ -433,7 +436,7 @@ begin
           sad := dsp.sad_4x4(mb.pixels_c[j] + block_offset_chroma[i], pred + block_offset_chroma[i], 16);
           if sad >= sad_tresh then begin
               dsp.pixel_sub_4x4(mb.pixels_c[j] + block_offset_chroma[i], pred + block_offset_chroma[i], block);
-              transqt(block, mb.qpc, false, 1);
+              transqt(block, mb.quant_ctx_qpc, false, 1);
               mb.chroma_dc[j, i] := block[0];
               block[0] := 0;
               cavlc_analyse_block(mb.block[n], block, 15);
@@ -497,7 +500,7 @@ begin
               block[0] := mb.chroma_dc[j, i];
 
               if mb.nz_coef_cnt_chroma_ac[j, i] > 0 then
-                  itransqt(block, mb.qpc, 1)
+                  itransqt(block, mb.quant_ctx_qpc, 1)
               else
                   itrans_dc(block);
 

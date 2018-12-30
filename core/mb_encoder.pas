@@ -134,6 +134,7 @@ end;
 
 procedure TMacroblockEncoder.EncodeCurrentType;
 begin
+  Assert(mb.qp = mb.quant_ctx_qp.qp);
   case mb.mbtype of
       //MB_P_SKIP: no coding
 
