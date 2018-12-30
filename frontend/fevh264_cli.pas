@@ -217,6 +217,7 @@ var
   psnr_avg: array[0..2] of real;
   kbps: real;
   i: integer;
+  encoding_fps: single;
 
 begin
   time_total := 0;
@@ -272,10 +273,14 @@ begin
 
       stream_size_total += stream_size;
       kbps := stream_size_total / 1000 * 8 / ((i+1) / fps);
-      write( format('frame: %6d  psnr: %5.2f  kbps: %7.1f',
-                     [i, psnr_avg[0] / (i + 1), kbps]), #13 );
+
+      if time_total > 0 then
+          encoding_fps := (i+1) / (time_total/1000)
+      else
+          encoding_fps := 1000;
+      if (encoding_fps < 10) or (i mod 5 = 0) then
+          write(format('frame: %5d  psnr: %5.2f  kbps: %7.1f  [%3.1f fps]   '#13, [i, psnr_avg[0]/(i+1), kbps, encoding_fps]));
   end;
-  writeln;
 
   //stream stats
   if time_total = 0 then time_total := 1;
