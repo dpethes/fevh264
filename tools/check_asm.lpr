@@ -171,7 +171,7 @@ begin
   end;
 end;
 
-function check_arrays(const a, b: pbyte; const length: integer): boolean;
+function check_arrays(a, b: pbyte; const length: integer): boolean;
 var
   i: integer;
 begin
@@ -179,11 +179,11 @@ begin
   for i := 0 to length - 1 do begin
       if a^ <> b^ then begin
           result := false;
-          break;
+          writeln('mismatch!');
+          exit;
       end;
-  end;
-  if not result then begin
-      writeln('mismatch!');
+      a += 1;
+      b += 1;
   end;
 end;
 
@@ -397,6 +397,7 @@ begin
 end;
 
 
+{$codealign localmin=16}
 procedure test_transform;
 var
   residual: array [0..15] of int16 = (
@@ -407,13 +408,16 @@ var
   );
   decoded_residual: array [0..15] of int16;
   coefficients: array [0..15] of int16;
+  quantized_coefficients: array [0..15] of int16;
   xform_buffer: array [0..16 * 4] of int16;
   i: integer;
+  qpctx: TQuantCtx;
 
 procedure PrintXform;
 var
   i: integer;
 begin
+  writeln;
   for i := 0 to 15 do begin
       write(xform_buffer[i]:3, ',');
       if (i+1) mod 4 = 0 then writeln;
@@ -475,6 +479,55 @@ begin
               stop_timer;
           end;
           bench_results(4);
+      end;
+  end;
+
+  test('quant_4x4');
+  transqt_init_for_qp(qpctx, 12);
+  Fillbyte(xform_buffer, 64*2, 0);
+  begin
+      init_noasm;
+      move(coefficients, xform_buffer, 2*16);
+      quant_4x4(@xform_buffer, qpctx.mult_factor, qpctx.f_inter, qpctx.qbits, 1);
+      move(xform_buffer, decoded_residual, 2*16);
+
+      init_sse2;
+      move(coefficients, xform_buffer, 2*16);
+      quant_4x4(@xform_buffer, qpctx.mult_factor, qpctx.f_inter, qpctx.qbits, 1);
+
+      if check_arrays(@xform_buffer, @decoded_residual, 2*16) then begin
+          for i := 0 to MBCMP_ITERS - 1 do begin
+              move(coefficients, xform_buffer, 2*16);
+              start_timer;
+              quant_4x4(@xform_buffer, qpctx.mult_factor, qpctx.f_inter, qpctx.qbits, 0);
+              stop_timer;
+          end;
+          bench_results;
+      end;
+  end;
+
+  test('iquant_4x4');
+  begin
+      move(coefficients, xform_buffer, 2*16);
+      quant_4x4(@xform_buffer, qpctx.mult_factor, qpctx.f_inter, qpctx.qbits, 0);
+      move(xform_buffer, quantized_coefficients, 2*16);
+
+      init_noasm;
+      iquant_4x4(@xform_buffer, qpctx.rescale_factor, qpctx.qp_div6, 1);
+      move(xform_buffer, decoded_residual, 2*16);
+
+      init_sse2;
+      move(quantized_coefficients, xform_buffer, 2*16);
+      iquant_4x4(@xform_buffer, qpctx.rescale_factor, qpctx.qp_div6, 1);
+
+      if check_arrays(@xform_buffer, @decoded_residual, 2*16) then begin
+          for i := 0 to MBCMP_ITERS - 1 do begin
+              move(coefficients, xform_buffer, 2*16);
+              start_timer;
+              iquant_4x4(@xform_buffer, qpctx.rescale_factor, qpctx.qp_div6, 1);
+              stop_timer;
+          end;
+          bench_results;
       end;
   end;
 end;

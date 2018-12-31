@@ -55,7 +55,7 @@ DEFAULT REL
 
 ; win64 function params: RCX, RDX, R8, R9
 ; linux64: RDI, RSI, RDX, RCX, R8, R9
-; volatile R10, R11
+; common volatile regs: RAX, R10, R11, XMM0..XMM5 
 ; return value: RAX/EAX
 ; 32b regcall: EAX, EDX, ECX
 %define r0 rax

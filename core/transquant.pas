@@ -41,6 +41,8 @@ procedure itrans_dc  (block: psmallint);
 
 var
   core_4x4, icore_4x4: core_xform_func_t;
+  quant_4x4: quant_func_t;
+  iquant_4x4: iquant_func_t;
 
 procedure transquant_init(const flags: TDsp_init_flags);
 
@@ -147,7 +149,7 @@ end;
 
 
 //Z = (|W| . MF + f) >> qbits
-procedure quant(a: psmallint; mf: psmallint; const f: integer; const qbits: byte; const sidx: byte);
+procedure quant(a: pInt16; mf: pInt16; f: integer; qbits: integer; sidx: integer);
 var
   i: integer;
 begin
@@ -219,9 +221,9 @@ procedure transqt(block: psmallint; const qp: TQuantCtx; const intra: boolean; c
 begin
   core_4x4(block);
   if intra then
-      quant(block, qp.mult_factor, qp.f_intra, qp.qbits, quant_start_idx)
+      quant_4x4(block, qp.mult_factor, qp.f_intra, qp.qbits, quant_start_idx)
   else
-      quant(block, qp.mult_factor, qp.f_inter, qp.qbits, quant_start_idx);
+      quant_4x4(block, qp.mult_factor, qp.f_inter, qp.qbits, quant_start_idx);
 end;
 
 
@@ -229,7 +231,7 @@ end;
 (*******************************************************************************
 iHCT + dequant
 *)
-procedure iquant(a: psmallint; mf: psmallint; const shift: integer; const sidx: byte);
+procedure iquant(a: pInt16; mf: pInt16; shift: integer; sidx: integer);
 var
   i: integer;
 begin
@@ -283,7 +285,7 @@ end;
 
 procedure itransqt(block: psmallint; const qp: TQuantCtx; const quant_start_idx: byte = 0);
 begin
-  iquant(block, qp.rescale_factor, qp.qp_div6, quant_start_idx);
+  iquant_4x4(block, qp.rescale_factor, qp.qp_div6, quant_start_idx);
   icore_4x4(block);
 end;
 
@@ -496,16 +498,24 @@ ASM init
 {$ifdef CPUX86_64}
 procedure core_4x4_mmx(block: pInt16); external name 'core_4x4_mmx';
 procedure icore_4x4_mmx(block: pInt16); external name 'icore_4x4_mmx';
+procedure quant_4x4_sse2(block: pInt16; mf: pInt16; f: integer; qbits: integer; starting_idx: integer); external name 'quant_4x4_sse2';
+procedure iquant_4x4_sse2(block: pInt16; mf: pInt16; shift: integer; starting_idx: integer); external name 'iquant_4x4_sse2';
 {$endif}
 
 procedure transquant_init(const flags: TDsp_init_flags);
 begin
   core_4x4  := @core_4x4_pas;
   icore_4x4 := @icore_4x4_pas;
+  quant_4x4 := @quant;
+  iquant_4x4 := @iquant;
   {$ifdef CPUX86_64}
   if flags.mmx then begin
       core_4x4 := @core_4x4_mmx;
       icore_4x4 := @icore_4x4_mmx;
+  end;
+  if flags.sse2 then begin
+      quant_4x4 := @quant_4x4_sse2;
+      iquant_4x4 := @iquant_4x4_sse2;
   end;
   {$endif}
 end;

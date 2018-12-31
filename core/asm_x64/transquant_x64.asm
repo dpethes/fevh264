@@ -4,6 +4,8 @@ SECTION .text
 
 cglobal core_4x4_mmx
 cglobal icore_4x4_mmx
+cglobal quant_4x4_sse2
+cglobal iquant_4x4_sse2
 
 ; transpose 4x4 matrix of int16-s
 ; in/out: m0..3
@@ -132,6 +134,81 @@ icore_4x4_mmx:
     movq  [r1+8] , mm1
     movq  [r1+16], mm2
     movq  [r1+24], mm3
+    ret
+
+; quant_4x4_sse2(block: pInt16; mf: pInt16; f: integer; qbits: integer; starting_index: integer)
+ALIGN 16
+quant_4x4_sse2
+    PUSH_XMM_REGS 1
+    movd    xmm3, r3   ; f
+    pshufd  xmm3, xmm3, 0
+    movd    xmm4, r4   ; qbits
+    pxor    xmm6, xmm6
+    mov r4, 4
+    mov     ax, [r1] 
+.loop
+    movq    xmm0, [r1]
+    movq    xmm1, [r2]
+    movdqa   xmm5, xmm0
+    pcmpgtw  xmm5, xmm6   ; greater than 0 mask
+
+    movdqa  xmm2, xmm0
+    pmullw  xmm0, xmm1
+    pmulhw  xmm2, xmm1
+    punpcklwd xmm0, xmm2  ; block * mf
+
+    movdqa  xmm1, xmm3
+    psubd   xmm1, xmm0    ; f - block * mf
+    psrld   xmm1, xmm4    ; >> qbits
+    pxor    xmm2, xmm2
+    psubd   xmm2, xmm1    ; negate
+    packssdw xmm2, xmm2   ; convert to int16
+
+    paddd   xmm0, xmm3    ; block * mf + f
+    psrld   xmm0, xmm4    ; >> qbits
+    packssdw xmm0, xmm0   ; convert to int16
+
+    pand    xmm0, xmm5    ; merge lanes
+    pandn   xmm5, xmm2
+    por     xmm0, xmm5
+    movq    [r1], xmm0
+
+    add r1, 8
+    add r2, 8
+    dec r4
+    jnz .loop
+    
+    bind_param_5  r10     ; restore first coefficient if desired
+    cmp r10b, 0
+    jz .done
+    mov [r1-32], ax
+.done:
+    POP_XMM_REGS 1
+    ret
+
+; iquant_4x4_sse2(block: pInt16; mf: pInt16; shift: integer; starting_idx: integer)
+ALIGN 16
+iquant_4x4_sse2
+    movd    xmm4, r3   ; shift
+    mov     ax, [r1] 
+
+    movdqa    xmm0, [r1]
+    movdqu    xmm1, [r2]
+    pmullw  xmm0, xmm1    ; block * mf
+    psllw   xmm0, xmm4    ; << shift
+    movdqa    [r1], xmm0
+
+    movdqa    xmm0, [r1+16]
+    movdqu    xmm1, [r2+16]
+    pmullw  xmm0, xmm1
+    psllw   xmm0, xmm4
+    movdqa    [r1+16], xmm0
+   
+    mov r10, r4
+    cmp r10b, 0
+    jz .done
+    mov [r1], ax
+.done:
     ret
 
 

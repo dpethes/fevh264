@@ -48,6 +48,8 @@ pixoper_func_t = procedure (pix1, pix2: pbyte; diff: int16_p); {$ifdef CPUI386} 
 pixavg_func_t = procedure (src1, src2, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 mc_chroma_func_t = procedure (src, dst: pbyte; const stride: integer; coef: pbyte); {$ifdef CPUI386} cdecl; {$endif}
 core_xform_func_t = procedure (block: pInt16); {$ifdef CPUI386} cdecl; {$endif}
+quant_func_t  = procedure(block: pInt16; mf: pInt16; f: integer; qbits: integer; starting_idx: integer); {$ifdef CPUI386} cdecl; {$endif}
+iquant_func_t = procedure(block: pInt16; mf: pInt16; shift: integer; starting_idx: integer); {$ifdef CPUI386} cdecl; {$endif}
 
 TDsp_init_flags = record
     mmx: boolean;
