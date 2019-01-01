@@ -54,6 +54,7 @@ iquant_func_t = procedure(block: pInt16; mf: pInt16; shift: integer; starting_id
 TDsp_init_flags = record
     mmx: boolean;
     sse2: boolean;
+    ssse3: boolean;
 end;
 
 { TDsp }

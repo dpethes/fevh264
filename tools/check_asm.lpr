@@ -85,8 +85,11 @@ begin
 end;
 
 
-procedure init_units;
+procedure init_units(mmx: boolean = false; sse2: boolean = false; ssse3: boolean = false);
 begin
+  flags.mmx:=mmx;
+  flags.sse2:=sse2;
+  flags.ssse3:=ssse3;
   //todo switch to dsp init?
   pixel_init(flags);
   motion_compensate_init(flags);
@@ -97,23 +100,22 @@ end;
 
 procedure init_noasm;
 begin
-  flags.mmx:=false;
-  flags.sse2:=false;
-  init_units;
+  init_units();
 end;
 
 procedure init_mmx;
 begin
-  flags.mmx:=true;
-  flags.sse2:=false;
-  init_units;
+  init_units(true);
 end;
 
 procedure init_sse2;
 begin
-  flags.mmx:=true;
-  flags.sse2:=true;
-  init_units;
+  init_units(true, true);
+end;
+
+procedure init_ssse3;
+begin
+  init_units(true, true, true);
 end;
 
 procedure init_src;
@@ -390,6 +392,23 @@ begin
       for i := 0 to MBCMP_ITERS - 1 do begin
           start_timer;
           predict_plane16(@mb.intra_pixel_cache, src_mbalign);
+          stop_timer;
+      end;
+      bench_results();
+  end;
+
+  test('predict_left16');
+  init_noasm;
+  predict_left16(@mb.intra_pixel_cache, src_mbalign);
+  Move(src_mbalign^, buf_byte, 256);
+  FillByte(src_mbalign^, 256, 1);
+  init_ssse3;
+  predict_left16(@mb.intra_pixel_cache, src_mbalign);
+
+  if check_arrays(src_mbalign, @buf_byte, 256) then begin
+      for i := 0 to MBCMP_ITERS - 1 do begin
+          start_timer;
+          predict_left16(@mb.intra_pixel_cache, src_mbalign);
           stop_timer;
       end;
       bench_results();

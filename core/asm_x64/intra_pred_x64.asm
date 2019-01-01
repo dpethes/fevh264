@@ -34,10 +34,9 @@ vec_w_minus7_to_0:
 SECTION .text
 
 cglobal predict_top16_sse2
-cglobal predict_left16_mmx
+cglobal predict_left16_ssse3
+cglobal predict_left16_ssse3.loop
 cglobal predict_plane16_sse2
-
-cglobal predict_left16_mmx.loop
 cglobal predict_plane16_sse2.loop
 
 ; I16 prediction modes
@@ -58,26 +57,24 @@ predict_top16_sse2:
     %endrep
     ret
 
-
 ; predict_left16(src, dst: uint8_p)
 ALIGN 16
-predict_left16_mmx:
+predict_left16_ssse3:
     add r1, 18  ; left column
     mov r3, 8
+    pxor xmm2, xmm2
 .loop:
     movzx   r0, byte [r1]
-    movd    mm0, r0
-    pshufw  mm0, mm0, 0
-    packuswb  mm0, mm0
-    movzx   r0, byte [r1+1]
+    movd    xmm0, r0
+    pshufb  xmm0, xmm2
+
+    movzx   r4, byte [r1+1]
     add     r1, 2
-    movd    mm1, r0
-    pshufw  mm1, mm1, 0
-    packuswb  mm1, mm1
-    movq    [r2   ], mm0
-    movq    [r2+ 8], mm0
-    movq    [r2+16], mm1
-    movq    [r2+24], mm1
+    movd    xmm1, r4
+    pshufb  xmm1, xmm2
+    
+    movdqu    [r2   ], xmm0
+    movdqu    [r2+16], xmm1
     add     r2, 16*2
     dec r3
     jnz .loop

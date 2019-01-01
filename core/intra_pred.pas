@@ -106,8 +106,7 @@ var
 begin
   src -= 1;
   for i := 0 to 3 do begin
-      p := (src^ shl 8) or src^;
-      int32_p(dst)^ := (p shl 16) or p;
+      PUInt32(dst)^ := src^ * uint32($01010101);
       src += sstride;
       dst += I4x4CACHE_STRIDE;
   end;
@@ -337,14 +336,13 @@ end;
 procedure predict_left16_pas(src, dst: uint8_p); {$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
-  v: int64;
+  v: uint64;
 begin
   src += 18;
   for i := 0 to 15 do begin
-      v := (src^ shl 24) or (src^ shl 16) or (src^ shl 8) or src^;
-      v := v or (v shl 32);
-      int64_p(dst  )^ := v;
-      int64_p(dst+8)^ := v;
+      v := src^ * uint64($0101010101010101);
+      PUInt64(dst  )^ := v;
+      PUInt64(dst+8)^ := v;
       src += 1;
       dst += 16;
   end;
@@ -535,12 +533,11 @@ end;
 
 procedure predict_left8( src, dst: uint8_p; sstride: integer );
 var
-  i, j: integer;
+  i: integer;
 begin
   src -= 1;
   for i := 0 to 7 do begin
-      for j := 0 to 7 do
-          dst[j] := src^;
+      PUInt64(dst)^ := src^ * uint64($0101010101010101);
       src += sstride;
       dst += 16;
   end;
@@ -872,7 +869,7 @@ procedure predict_plane16_sse2(src, dst: uint8_p); cdecl; external;
 {$endif}
 {$ifdef CPUX86_64}
 procedure predict_top16_sse2(src, dst: uint8_p); external name 'predict_top16_sse2';
-procedure predict_left16_mmx(src, dst: uint8_p); external name 'predict_left16_mmx';
+procedure predict_left16_ssse3(src, dst: uint8_p); external name 'predict_left16_ssse3';
 procedure predict_plane16_sse2(src, dst: uint8_p); external name 'predict_plane16_sse2';
 {$endif}
 
@@ -883,9 +880,6 @@ begin
   predict_plane16 := @predict_plane16_pas;
 
   {$ifdef CPUI386}
-  if flags.mmx then begin
-      predict_left16  := @predict_left16_mmx;
-  end;
   if flags.sse2 then begin
       predict_top16   := @predict_top16_sse2;
       predict_plane16 := @predict_plane16_sse2;
@@ -894,8 +888,10 @@ begin
   {$ifdef CPUX86_64}
   if flags.sse2 then begin
       predict_top16   := @predict_top16_sse2;
-      predict_left16  := @predict_left16_mmx;
       predict_plane16 := @predict_plane16_sse2;
+  end;
+  if flags.ssse3 then begin
+      predict_left16  := @predict_left16_ssse3;
   end;
   {$endif}
 end;
