@@ -483,7 +483,7 @@ begin
   if (mb.mba <> nil) and (mb.mbb <> nil) and is_inter(mb.mba^.mbtype) and is_inter(mb.mbb^.mbtype)
       and (bits_inter < (mb.mba^.bitcost + mb.mbb^.bitcost) div 3 * 2) then begin
           if me.Subme > 4 then begin
-              me.Refine(mb, frame);
+              me.Refine(mb);
               EncodeCurrentType;
           end;
           exit;
@@ -521,7 +521,7 @@ begin
           mb.mbtype := MB_P_16x16;
           CacheLoad;
           if me.Subme > 4 then begin
-              me.Refine(mb, frame);
+              me.Refine(mb);
               EncodeCurrentType;
           end;
       end;

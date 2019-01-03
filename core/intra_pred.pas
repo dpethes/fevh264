@@ -102,7 +102,7 @@ end;
 (* left *)
 procedure predict_left4( src, dst: uint8_p; sstride: integer );
 var
-  i, p: integer;
+  i: integer;
 begin
   src -= 1;
   for i := 0 to 3 do begin

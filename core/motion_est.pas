@@ -65,7 +65,7 @@ type
       constructor Create(const w, h, mbw, mbh: integer; mc: TMotionCompensation; h264stream: TH264Stream);
       destructor Free;
       procedure Estimate(var mb: macroblock_t; var fenc: frame_t);
-      procedure Refine(var mb: macroblock_t; var fenc: frame_t);
+      procedure Refine(var mb: macroblock_t);
   end;
 
 
@@ -201,7 +201,7 @@ begin
   mv_field[mb.y * mb_width + mb.x] := mb.mv;
 end;
 
-procedure TMotionEstimator.Refine(var mb: macroblock_t; var fenc: frame_t);
+procedure TMotionEstimator.Refine(var mb: macroblock_t);
 var
   mv: motionvec_t;
 begin

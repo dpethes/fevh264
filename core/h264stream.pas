@@ -172,16 +172,6 @@ LEVEL_DPB: array[0..14, 0..1] of integer = (
 );
 
 
-function slice2naltype(i: integer): integer;
-begin
-  case i of
-    SLICE_I: result := NAL_IDR;
-  else
-    result := NAL_NOIDR;
-  end;
-end;
-
-
 function get_level(const w, h, refcount: integer): byte;
 var
   dpb, i: integer;
