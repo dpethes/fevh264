@@ -28,11 +28,12 @@ uses
 
 type
   IDeblocker = class
+      procedure BeginFrame(const frame: frame_t; const constant_qp: boolean = true); virtual; abstract;
       procedure MBRowFinished; virtual; abstract;
-      procedure FrameFinished; virtual; abstract;
+      procedure FinishFrame(abort: boolean = false); virtual; abstract;
   end;
 
-function GetNewDeblocker(const frame: frame_t; const constant_qp, threading_enabled: boolean): IDeblocker;
+function GetNewDeblocker(threading_enabled: boolean): IDeblocker;
 procedure CalculateBStrength (const mb: macroblock_p);
 
 (*******************************************************************************
@@ -44,27 +45,29 @@ type
   { TDeblockThread }
   TDeblockThread = class(TThread)
     private
-      _encoded_mb_rows: integer;
-      _encoded_mb_rows_lock: TCriticalSection;
+      _new_frame_event: TSimpleEvent;
+      _finished_frame_event: TSimpleEvent;
       _row_processed_event: TSimpleEvent;
-      _abort: boolean;
       _abort_lock: TCriticalSection;
 
+      _frame: frame_p;
+      _encoded_mb_rows: integer;
+      _cqp: boolean;
+      _abort: boolean;
+
       function GetAbort: boolean;
-      procedure SetEncodedMBRows(AValue: integer);
-      function GetEncodedMBRows(): integer;
+      procedure DeblockRows;
 
     public
-      frame: frame_p;
-      cqp: boolean;
 
-      property EncodedMBRows: integer read GetEncodedMBRows write SetEncodedMBRows;
       property Abort: boolean read GetAbort;
 
-      constructor Create;
-      destructor Free;
+      constructor Create();
+      destructor Destroy; override;
 
       procedure Execute; override;
+      procedure BeginFrame(frame: frame_p; const cqp: boolean = true);
+      procedure WaitEndFrame();
       procedure IncreaseEncodedMBRows;
       procedure AbortProcessing;
   end;
@@ -75,14 +78,12 @@ type
   TThreadedDeblocker = class(IDeblocker)
     private
       dthread: TDeblockThread;
-      scheduled_mbrows: integer;
-      f: frame_p;
-      _is_frame_finished: boolean;
     public
-      constructor Create(const frame: frame_t; const cqp: boolean = true);
+      constructor Create();
       destructor Destroy; override;
+      procedure BeginFrame(const frame: frame_t; const cqp: boolean = true); override;
       procedure MBRowFinished; override;
-      procedure FrameFinished; override;
+      procedure FinishFrame(abort: boolean = false); override;
   end;
 
   { TSimpleDeblocker
@@ -90,22 +91,21 @@ type
   }
   TSimpleDeblocker = class(IDeblocker)
     private
-      f: frame_p;
-      scheduled_mbrows: integer;
+      _f: frame_p;
       _cqp: boolean;
     public
-      constructor Create(const frame: frame_t; const cqp: boolean = true);
-      procedure FrameFinished; override;
+      procedure BeginFrame(const frame: frame_t; const cqp: boolean = true); override;
+      procedure FinishFrame(abort: boolean = false); override;
       procedure MBRowFinished; override;
   end;
 
 
-function GetNewDeblocker(const frame: frame_t; const constant_qp, threading_enabled: boolean): IDeblocker;
+function GetNewDeblocker(threading_enabled: boolean): IDeblocker;
 begin
     if threading_enabled then
-        result := TThreadedDeblocker.Create(frame, constant_qp)
+        result := TThreadedDeblocker.Create()
     else
-        result := TSimpleDeblocker.Create(frame, constant_qp);
+        result := TSimpleDeblocker.Create();
 end;
 
 const
@@ -543,11 +543,20 @@ end;
 
 { TDeblockThread }
 
-procedure TDeblockThread.SetEncodedMBRows(AValue: integer);
+constructor TDeblockThread.Create();
 begin
-  _encoded_mb_rows_lock.Acquire;
-  _encoded_mb_rows := AValue;
-  _encoded_mb_rows_lock.Release;
+  inherited Create(true);
+  _new_frame_event := TSimpleEvent.Create;
+  _finished_frame_event := TSimpleEvent.Create;
+  _row_processed_event := TSimpleEvent.Create;
+  _abort_lock := TCriticalSection.Create;
+end;
+
+destructor TDeblockThread.Destroy;
+begin
+  _new_frame_event.Free;
+  _row_processed_event.Free;
+  _abort_lock.Free;
 end;
 
 function TDeblockThread.GetAbort: boolean;
@@ -557,68 +566,67 @@ begin
   _abort_lock.Release;
 end;
 
-function TDeblockThread.GetEncodedMBRows: integer;
+procedure TDeblockThread.BeginFrame(frame: frame_p; const cqp: boolean);
 begin
-  _encoded_mb_rows_lock.Acquire;
-  result := _encoded_mb_rows;
-  _encoded_mb_rows_lock.Release;
-end;
-
-constructor TDeblockThread.Create;
-begin
-  inherited Create(true);
-
-  _row_processed_event := TSimpleEvent.Create;
-  _encoded_mb_rows_lock := TCriticalSection.Create;
-  _abort_lock := TCriticalSection.Create;
-
+  _frame := frame;
+  _encoded_mb_rows := 0;
+  _cqp := cqp;
   _abort := false;
-  EncodedMBRows := 0;
+  _new_frame_event.SetEvent;
 end;
 
-destructor TDeblockThread.Free;
+procedure TDeblockThread.WaitEndFrame;
 begin
-  _row_processed_event.Free;
-  _encoded_mb_rows_lock.Free;
-  _abort_lock.Free;
+  _finished_frame_event.WaitFor(INFINITE);
+  _finished_frame_event.ResetEvent;
+end;
+
+procedure TDeblockThread.IncreaseEncodedMBRows;
+begin
+  InterlockedIncrement(_encoded_mb_rows);
+  _row_processed_event.SetEvent;
 end;
 
 procedure TDeblockThread.Execute;
+begin
+  repeat
+      _new_frame_event.WaitFor(INFINITE);
+      _new_frame_event.ResetEvent;
+      if _frame <> nil then begin
+          DeblockRows;
+          _finished_frame_event.SetEvent;
+      end
+      else
+          break;
+  until false;
+end;
+
+procedure TDeblockThread.DeblockRows;
 var
   mby: integer;
   row_deblock_limit: integer;
   encoded_rows: integer;
-
 begin
   mby := 0;
-
-  while mby < frame^.mbh do begin
+  while mby < _frame^.mbh do begin
       _row_processed_event.WaitFor(INFINITE);
       _row_processed_event.ResetEvent;
       if Abort then
           break;
 
-      encoded_rows := EncodedMBRows;
-      if encoded_rows < frame^.mbh then
-          row_deblock_limit := encoded_rows - 2
+      encoded_rows := _encoded_mb_rows;
+      if encoded_rows < _frame^.mbh then
+          row_deblock_limit := encoded_rows - 1
       else
-          row_deblock_limit := frame^.mbh;
+          row_deblock_limit := _frame^.mbh;
 
       //run in a loop: several rows may have been decoded since the last run (event was set multiple times),
       //or the frame is fully decoded
       while (mby < row_deblock_limit) do begin
-          DeblockMBRow(mby, frame^, cqp);
+          DeblockMBRow(mby, _frame^, _cqp);
           mby += 1;
       end;
   end;
-end;
-
-procedure TDeblockThread.IncreaseEncodedMBRows;
-begin
-  _encoded_mb_rows_lock.Acquire;
-  _encoded_mb_rows += 1;
-  _encoded_mb_rows_lock.Release;
-  _row_processed_event.SetEvent;
 end;
 
 procedure TDeblockThread.AbortProcessing;
@@ -632,65 +640,58 @@ end;
 
 { TThreadedDeblocker }
 
-constructor TThreadedDeblocker.Create(const frame: frame_t; const cqp: boolean);
+constructor TThreadedDeblocker.Create();
 begin
-  f := @frame;
-  scheduled_mbrows := 0;
-  _is_frame_finished := false;
-
   dthread := TDeblockThread.Create;
-  dthread.frame := f;
-  dthread.cqp := cqp;
-
   dthread.Start;
 end;
 
 destructor TThreadedDeblocker.Destroy;
 begin
-  if not _is_frame_finished then
-      FrameFinished;
+  dthread.BeginFrame(nil);
+  dthread.WaitFor;
   dthread.Free;
+end;
+
+procedure TThreadedDeblocker.BeginFrame(const frame: frame_t; const cqp: boolean);
+begin
+  dthread.BeginFrame(@frame, cqp);
 end;
 
 procedure TThreadedDeblocker.MBRowFinished;
 begin
-  scheduled_mbrows += 1;
   dthread.IncreaseEncodedMBRows;
 end;
 
-procedure TThreadedDeblocker.FrameFinished;
+procedure TThreadedDeblocker.FinishFrame(abort: boolean);
 begin
-  if scheduled_mbrows < f^.mbh then
+  if abort then
       dthread.AbortProcessing;
-  dthread.WaitFor;
-  _is_frame_finished := true;
+  dthread.WaitEndFrame();
 end;
 
 { TSimpleDeblocker }
 
-constructor TSimpleDeblocker.Create(const frame: frame_t; const cqp: boolean);
+procedure TSimpleDeblocker.BeginFrame(const frame: frame_t; const cqp: boolean);
 begin
-  f := @frame;
+  _f := @frame;
   _cqp := cqp;
-  scheduled_mbrows := 0;
 end;
 
-procedure TSimpleDeblocker.FrameFinished;
+procedure TSimpleDeblocker.FinishFrame(abort: boolean);
 var
   mby: integer;
 begin
-  if scheduled_mbrows = f^.mbh then
-      for mby := 0 to f^.mbh - 1 do begin
-          DeblockMBRow(mby, f^, _cqp);
+  if not abort then
+      for mby := 0 to _f^.mbh - 1 do begin
+          DeblockMBRow(mby, _f^, _cqp);
       end;
 end;
 
 procedure TSimpleDeblocker.MBRowFinished;
 begin
-  scheduled_mbrows += 1;
 end;
 
 
 end.
-
 

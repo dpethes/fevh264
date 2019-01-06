@@ -69,6 +69,7 @@ type
       rc: TRatecontrol;
       mc: TMotionCompensation;
       me: TMotionEstimator;
+      deblocker: IDeblocker;
 
       procedure SetISlice;
       procedure SetPSlice;
@@ -147,6 +148,8 @@ begin
   mb_enc.chroma_coding := not param.IgnoreChroma;
   mb_enc.LoopFilter := param.LoopFilterEnabled;
 
+  deblocker := GetNewDeblocker(param.FilterThreadEnabled);
+
   //stats
   stats := TStreamStats.Create;
   h264s.SEIString := param.ToString;
@@ -169,6 +172,7 @@ begin
   mc.Free;
   h264s.Free;
   mb_enc.Free;
+  deblocker.Free;
   stats.Free;
 end;
 
@@ -230,7 +234,6 @@ end;
 function TFevh264Encoder.TryEncodeFrame(const img: TPlanarImage): boolean;
 var
   x, y: integer;
-  deblocker: IDeblocker;
   loopfilter: boolean;
 begin
   result := true;
@@ -247,7 +250,7 @@ begin
   mb_enc.SetFrame(fenc);
   loopfilter := _param.LoopFilterEnabled;
   if loopfilter then
-      deblocker := GetNewDeblocker(fenc, not(_param.AdaptiveQuant), _param.FilterThreadEnabled);
+      deblocker.BeginFrame(fenc, not(_param.AdaptiveQuant));
 
   //encode rows
   for y := 0 to (mb_height - 1) do begin
@@ -256,6 +259,7 @@ begin
 
       if SceneCut(y) then begin
           result := false;
+          deblocker.FinishFrame(true);
           h264s.AbortSlice;
           break;
       end;
@@ -265,11 +269,9 @@ begin
   end;
 
   //finish frame processing. If we don't do any deblocking, SSD is already calculated at the last stage of macroblock encoding
-  if loopfilter then begin
-      deblocker.FrameFinished;
-      deblocker.Free;
-      if result then
-          GetFrameSSD;
+  if result and loopfilter then begin
+      deblocker.FinishFrame();
+      GetFrameSSD;
   end;
 end;
 
