@@ -127,7 +127,6 @@ end;
 
 procedure TEncodingParameters.SetFilterThreadEnabled(AValue: boolean);
 begin
-  if filter_thread = AValue then Exit;
   filter_thread := AValue;
   if AValue and not loopfilter then
       LoopFilterEnabled := true;

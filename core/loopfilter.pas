@@ -26,19 +26,6 @@ interface
 uses
   common, util, classes, sysutils, syncobjs;
 
-type
-  IDeblocker = class
-      procedure BeginFrame(const frame: frame_t; const constant_qp: boolean = true); virtual; abstract;
-      procedure MBRowFinished; virtual; abstract;
-      procedure FinishFrame(abort: boolean = false); virtual; abstract;
-  end;
-
-function GetNewDeblocker(threading_enabled: boolean): IDeblocker;
-procedure CalculateBStrength (const mb: macroblock_p);
-
-(*******************************************************************************
-*******************************************************************************)
-implementation
 
 type
 
@@ -55,13 +42,10 @@ type
       _cqp: boolean;
       _abort: boolean;
 
-      function GetAbort: boolean;
+      function CheckAbort: boolean;
       procedure DeblockRows;
 
     public
-
-      property Abort: boolean read GetAbort;
-
       constructor Create();
       destructor Destroy; override;
 
@@ -72,41 +56,30 @@ type
       procedure AbortProcessing;
   end;
 
-  { TThreadedDeblocker
+  { TDeblocker
     Deblocks in paralell with encoding; running a few macroblock rows behind the encoding thread
   }
-  TThreadedDeblocker = class(IDeblocker)
+  TDeblocker = class
     private
       dthread: TDeblockThread;
     public
       constructor Create();
       destructor Destroy; override;
-      procedure BeginFrame(const frame: frame_t; const cqp: boolean = true); override;
-      procedure MBRowFinished; override;
-      procedure FinishFrame(abort: boolean = false); override;
+      procedure BeginFrame(const frame: frame_t; const cqp: boolean = true);
+      procedure MBRowFinished;
+      procedure FinishFrame(abort: boolean = false);
   end;
 
-  { TSimpleDeblocker
-    Deblocks after the whole frame is encoded
-  }
-  TSimpleDeblocker = class(IDeblocker)
-    private
-      _f: frame_p;
-      _cqp: boolean;
-    public
-      procedure BeginFrame(const frame: frame_t; const cqp: boolean = true); override;
-      procedure FinishFrame(abort: boolean = false); override;
-      procedure MBRowFinished; override;
-  end;
+procedure CalculateBStrength (const mb: macroblock_p);
+procedure DeblockMBRow(
+  const mby: integer;
+  const f: frame_t;
+  const cqp: boolean = true;
+  const offset_a: integer = 0; const offset_b: integer = 0);
 
-
-function GetNewDeblocker(threading_enabled: boolean): IDeblocker;
-begin
-    if threading_enabled then
-        result := TThreadedDeblocker.Create()
-    else
-        result := TSimpleDeblocker.Create();
-end;
+(*******************************************************************************
+*******************************************************************************)
+implementation
 
 const
 //Table 8-14 – Derivation of indexA and indexB from offset dependent threshold variables α and β
@@ -559,7 +532,7 @@ begin
   _abort_lock.Free;
 end;
 
-function TDeblockThread.GetAbort: boolean;
+function TDeblockThread.CheckAbort: boolean;
 begin
   _abort_lock.Acquire;
   result := _abort;
@@ -611,7 +584,7 @@ begin
   while mby < _frame^.mbh do begin
       _row_processed_event.WaitFor(INFINITE);
       _row_processed_event.ResetEvent;
-      if Abort then
+      if CheckAbort() then
           break;
 
       encoded_rows := _encoded_mb_rows;
@@ -638,60 +611,37 @@ begin
   _row_processed_event.SetEvent;
 end;
 
-{ TThreadedDeblocker }
+{ TDeblocker }
 
-constructor TThreadedDeblocker.Create();
+constructor TDeblocker.Create();
 begin
   dthread := TDeblockThread.Create;
   dthread.Start;
 end;
 
-destructor TThreadedDeblocker.Destroy;
+destructor TDeblocker.Destroy;
 begin
   dthread.BeginFrame(nil);
   dthread.WaitFor;
   dthread.Free;
 end;
 
-procedure TThreadedDeblocker.BeginFrame(const frame: frame_t; const cqp: boolean);
+procedure TDeblocker.BeginFrame(const frame: frame_t; const cqp: boolean);
 begin
   dthread.BeginFrame(@frame, cqp);
 end;
 
-procedure TThreadedDeblocker.MBRowFinished;
+procedure TDeblocker.MBRowFinished;
 begin
   dthread.IncreaseEncodedMBRows;
 end;
 
-procedure TThreadedDeblocker.FinishFrame(abort: boolean);
+procedure TDeblocker.FinishFrame(abort: boolean);
 begin
   if abort then
       dthread.AbortProcessing;
   dthread.WaitEndFrame();
 end;
-
-{ TSimpleDeblocker }
-
-procedure TSimpleDeblocker.BeginFrame(const frame: frame_t; const cqp: boolean);
-begin
-  _f := @frame;
-  _cqp := cqp;
-end;
-
-procedure TSimpleDeblocker.FinishFrame(abort: boolean);
-var
-  mby: integer;
-begin
-  if not abort then
-      for mby := 0 to _f^.mbh - 1 do begin
-          DeblockMBRow(mby, _f^, _cqp);
-      end;
-end;
-
-procedure TSimpleDeblocker.MBRowFinished;
-begin
-end;
-
 
 end.
 

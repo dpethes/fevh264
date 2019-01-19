@@ -69,16 +69,20 @@ type
       rc: TRatecontrol;
       mc: TMotionCompensation;
       me: TMotionEstimator;
-      deblocker: IDeblocker;
+      deblocker: TDeblocker;
 
       procedure SetISlice;
       procedure SetPSlice;
       function TryEncodeFrame(const img: TPlanarImage): boolean;
       function SceneCut(const mbrow: integer): boolean;
-      procedure GetFrameSSD;
       procedure WriteStats;
       procedure UpdateStats;
       procedure DumpFrame;
+      procedure GetFrameSSD;
+      procedure LoopfilterInit;
+      procedure LoopfilterAdvanceRow;
+      procedure LoopfilterAbort;
+      procedure LoopfilterDone;
   end;
 
 
@@ -148,7 +152,7 @@ begin
   mb_enc.chroma_coding := not param.IgnoreChroma;
   mb_enc.LoopFilter := param.LoopFilterEnabled;
 
-  deblocker := GetNewDeblocker(param.FilterThreadEnabled);
+  deblocker := TDeblocker.Create();
 
   //stats
   stats := TStreamStats.Create;
@@ -195,13 +199,14 @@ begin
       TryEncodeFrame(img);
   end;
 
+  //convert bitstream to bytestream of NAL units
+  h264s.GetSliceBitstream(buffer, stream_size);
+
   //prepare reference frame for ME
+  LoopfilterDone;
   frame_paint_edges(fenc);
   if _param.SubpixelMELevel > 0 then
       frame_hpel_interpolate(fenc);
-
-  //convert bitstream to bytestream of NAL units
-  h264s.GetSliceBitstream(buffer, stream_size);
 
   //stats
   rc.Update(frame_num, stream_size * 8, fenc);
@@ -234,7 +239,6 @@ end;
 function TFevh264Encoder.TryEncodeFrame(const img: TPlanarImage): boolean;
 var
   x, y: integer;
-  loopfilter: boolean;
 begin
   result := true;
 
@@ -248,9 +252,7 @@ begin
   //frame encoding setup
   fenc.stats.Clear;
   mb_enc.SetFrame(fenc);
-  loopfilter := _param.LoopFilterEnabled;
-  if loopfilter then
-      deblocker.BeginFrame(fenc, not(_param.AdaptiveQuant));
+  LoopfilterInit;
 
   //encode rows
   for y := 0 to (mb_height - 1) do begin
@@ -258,20 +260,13 @@ begin
           mb_enc.Encode(x, y);
 
       if SceneCut(y) then begin
-          result := false;
-          deblocker.FinishFrame(true);
+          LoopfilterAbort;
           h264s.AbortSlice;
+          result := false;
           break;
       end;
 
-      if loopfilter then
-          deblocker.MBRowFinished;
-  end;
-
-  //finish frame processing. If we don't do any deblocking, SSD is already calculated at the last stage of macroblock encoding
-  if result and loopfilter then begin
-      deblocker.FinishFrame();
-      GetFrameSSD;
+      LoopfilterAdvanceRow;
   end;
 end;
 
@@ -365,6 +360,49 @@ begin
           fenc.stats.ssd[2] += dsp.ssd_8x8  (mb^.pixels_c[1], mb^.pfenc_c[1], fenc.stride_c);
       end;
   end;
+end;
+
+procedure TFevh264Encoder.LoopfilterInit;
+begin
+  if not _param.LoopFilterEnabled then
+      exit;
+  if _param.FilterThreadEnabled then
+      deblocker.BeginFrame(fenc, not(_param.AdaptiveQuant));
+end;
+
+procedure TFevh264Encoder.LoopfilterAdvanceRow;
+begin
+  if not _param.LoopFilterEnabled then
+      exit;
+  if _param.FilterThreadEnabled then
+      deblocker.MBRowFinished;
+end;
+
+procedure TFevh264Encoder.LoopfilterAbort;
+begin
+  if _param.FilterThreadEnabled then
+      deblocker.FinishFrame(true);
+end;
+
+//finish frame filtering, if enabled. If it's disabled, SSD is already calculated at the last stage of macroblock encoding
+procedure TFevh264Encoder.LoopfilterDone;
+var
+  mby: Integer;
+  cqp: boolean;
+begin
+  if not _param.LoopFilterEnabled then
+      exit;
+
+  if _param.FilterThreadEnabled then begin
+      deblocker.FinishFrame;
+  end else begin
+      cqp := not _param.AdaptiveQuant;
+      for mby := 0 to fenc.mbh - 1 do begin
+          DeblockMBRow(mby, fenc, cqp);
+          //todo get row SSD
+      end;
+  end;
+  GetFrameSSD;
 end;
 
 
