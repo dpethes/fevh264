@@ -25,7 +25,7 @@ unit encoder;
 interface
 
 uses
-  sysutils, common, util, parameters, frame, h264stream, stats, pgm, loopfilter,
+  sysutils, common, util, parameters, frame, h264stream, stats, pgm, loopfilter, loopfilter_threading,
   intra_pred, motion_comp, motion_est, ratecontrol, image, mb_encoder;
 
 type
