@@ -150,6 +150,7 @@ end;
 
 //Z = (|W| . MF + f) >> qbits
 procedure quant(a: pInt16; mf: pInt16; f: integer; qbits: integer; sidx: integer);
+{$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
 begin
@@ -232,6 +233,7 @@ end;
 iHCT + dequant
 *)
 procedure iquant(a: pInt16; mf: pInt16; shift: integer; sidx: integer);
+{$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
 begin
