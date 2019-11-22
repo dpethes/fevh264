@@ -109,10 +109,19 @@ begin
   if (mby > 0) and (mbx > 0) then
       predicted_mv_list.Add( mv_field[ (mby - 1) * mb_width + mbx - 1] );
 
-  //last frame: same position, posx+1
+  //last frame: same position, right
   predicted_mv_list.Add( mv_field[mby * mb_width + mbx] );
   if mbx < mb_width - 2 then
       predicted_mv_list.Add( mv_field[mby * mb_width + mbx + 1] );
+
+  //last frame: directly below, left/right
+  if mby < mb_height - 2 then begin
+      predicted_mv_list.Add( mv_field[mby * mb_width + mbx + mb_width] );
+      if (mbx > 0) then
+          predicted_mv_list.Add( mv_field[mby * mb_width + mbx - 1 + mb_width] );
+      if (mbx < mb_width - 1) then
+          predicted_mv_list.Add( mv_field[mby * mb_width + mbx + 1 + mb_width] );
+  end;
 end;
 
 class function TMotionEstimator.ClipMVRange(const mv: motionvec_t; range: integer): motionvec_t;
@@ -177,6 +186,7 @@ begin
       EstimateSingleRef(mb, fenc)
   else
       EstimateMultiRef(mb, fenc);
+  mv_field[mb.y * mb_width + mb.x] := mb.mv;
 end;
 
 
@@ -198,7 +208,6 @@ begin
 
   mb.mv := ClipMVRange(mb.mv, 512);
   MotionCompensator.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
-  mv_field[mb.y * mb_width + mb.x] := mb.mv;
 end;
 
 procedure TMotionEstimator.Refine(var mb: macroblock_t);
@@ -248,10 +257,12 @@ var
   best_refidx, best_score: integer;
   fref: frame_p;
   tested_ref_count: integer;
+  min_score: integer;
 
 begin
   mb.fref := fenc.refs[0];
   fref := mb.fref;
+  min_score := MaxInt;
 
   //fpel test
   for i := 0 to ref_count - 1 do begin
@@ -260,11 +271,12 @@ begin
       scoreList[i].mv := SearchRegion.SearchFPel(mb, fref);
       scoreList[i].score := SearchRegion.LastSearchScore;
       scoreList[i].refidx := i;
+      min_score := min(min_score, scoreList[i].score);
   end;
 
   //cut off refs with far worse score than best
   SortList;
-  tested_ref_count := CountLower(scoreList[0].score * 2);
+  tested_ref_count := CountLower(min_score * 2);
 
   //hpel/qpel
   best_score := MaxInt;
@@ -295,7 +307,6 @@ begin
 
   mb.mv := ClipMVRange(mv, 512);
   MotionCompensator.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
-  mv_field[mb.y * mb_width + mb.x] := mb.mv;
 end;
 
 

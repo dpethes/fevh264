@@ -119,7 +119,7 @@ type
 
   TMotionVectorList = record
     private
-      mvs: array[0..7] of motionvec_t;
+      mvs: array[0..10] of motionvec_t;
       function GetItem(i: byte): motionvec_t; inline;
     public
       Count: integer;
