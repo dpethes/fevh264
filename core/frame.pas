@@ -31,11 +31,13 @@ const
   FRAME_PADDING_W = 16;
   FRAME_EDGE_W = FRAME_PADDING_W div 2;
 
+procedure frame_new(var frame: frame_t; const mb_width, mb_height: integer);
+procedure frame_free(var frame: frame_t);
+procedure frame_decoded_macroblock_row_ssd(frame: frame_p; const mby: integer);
 procedure frame_write_stats (var stats_file: textfile; const frame: frame_t);
 procedure frame_img2frame_copy(var frame: frame_t; const img: TPlanarImage);
 procedure frame_paint_edges(var frame: frame_t);
 procedure frame_hpel_interpolate(var frame: frame_t);
-procedure frame_init(const flags: TDsp_init_flags);
 
 type
 
@@ -55,8 +57,7 @@ type
       destructor Free;
   end;
 
-procedure frame_new(var frame: frame_t; const mb_width, mb_height: integer);
-procedure frame_free(var frame: frame_t);
+procedure frame_init(const flags: TDsp_init_flags);
 
 (*******************************************************************************
 *******************************************************************************)
@@ -190,6 +191,31 @@ begin
   t := a;
   a := b;
   b := t;
+end;
+
+
+procedure frame_decoded_macroblock_row_ssd(frame: frame_p; const mby: integer);
+var
+  x, mb_width: integer;
+  mb: macroblock_p;
+  pixels: pbyte;
+  pixels_c: array[0..1] of pbyte;
+  pixelbuf: array[0..256+64*2+15] of byte;
+begin
+  mb_width := frame^.mbw;
+  pixels := Align(@pixelbuf[0], 16);
+  pixels_c[0] := pixels + 256;
+  pixels_c[1] := pixels + 256 + 8;
+  for x := 0 to (mb_width - 1) do begin
+      mb := @(frame^.mbs[mby * mb_width + x]);
+      dsp.pixel_load_16x16(pixels,      mb^.pfdec,      frame^.stride);
+      dsp.pixel_load_8x8  (pixels_c[0], mb^.pfdec_c[0], frame^.stride_c);
+      dsp.pixel_load_8x8  (pixels_c[1], mb^.pfdec_c[1], frame^.stride_c);
+
+      frame^.stats.ssd[0] += dsp.ssd_16x16(pixels,      mb^.pfenc,      frame^.stride);
+      frame^.stats.ssd[1] += dsp.ssd_8x8  (pixels_c[0], mb^.pfenc_c[0], frame^.stride_c);
+      frame^.stats.ssd[2] += dsp.ssd_8x8  (pixels_c[1], mb^.pfenc_c[1], frame^.stride_c);
+  end;
 end;
 
 

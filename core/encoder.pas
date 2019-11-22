@@ -78,7 +78,6 @@ type
       procedure WriteStats;
       procedure UpdateStats;
       procedure DumpFrame;
-      procedure GetFrameSSD;
       procedure LoopfilterInit;
       procedure LoopfilterAdvanceRow;
       procedure LoopfilterAbort;
@@ -343,25 +342,6 @@ begin
 end;
 
 
-procedure TFevh264Encoder.GetFrameSSD;
-var
-  x, y: integer;
-  mb: macroblock_p;
-begin
-  for y := 0 to (mb_height - 1) do begin
-      for x := 0 to (mb_width - 1) do begin
-          mb := @fenc.mbs[y * mb_width + x];
-          dsp.pixel_load_16x16(mb^.pixels,      mb^.pfdec,      fenc.stride);
-          dsp.pixel_load_8x8  (mb^.pixels_c[0], mb^.pfdec_c[0], fenc.stride_c);
-          dsp.pixel_load_8x8  (mb^.pixels_c[1], mb^.pfdec_c[1], fenc.stride_c);
-
-          fenc.stats.ssd[0] += dsp.ssd_16x16(mb^.pixels,      mb^.pfenc,      fenc.stride);
-          fenc.stats.ssd[1] += dsp.ssd_8x8  (mb^.pixels_c[0], mb^.pfenc_c[0], fenc.stride_c);
-          fenc.stats.ssd[2] += dsp.ssd_8x8  (mb^.pixels_c[1], mb^.pfenc_c[1], fenc.stride_c);
-      end;
-  end;
-end;
-
 procedure TFevh264Encoder.LoopfilterInit;
 begin
   if not _param.LoopFilterEnabled then
@@ -399,10 +379,12 @@ begin
       cqp := not _param.AdaptiveQuant;
       for mby := 0 to fenc.mbh - 1 do begin
           DeblockMBRow(mby, fenc, cqp);
-          //todo get row SSD
+          //the bottom edge will be filtered in the next iteration, so SSD should be behind by a single row
+          if mby > 0 then
+              frame_decoded_macroblock_row_ssd(@fenc, mby - 1);
       end;
+      frame_decoded_macroblock_row_ssd(@fenc, fenc.mbh - 1);
   end;
-  GetFrameSSD;
 end;
 
 
