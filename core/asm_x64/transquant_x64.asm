@@ -6,6 +6,7 @@ cglobal core_4x4_mmx
 cglobal icore_4x4_mmx
 cglobal quant_4x4_sse2
 cglobal iquant_4x4_sse2
+cglobal iquant_4x4_avx2
 
 ; transpose 4x4 matrix of int16-s
 ; in/out: m0..3
@@ -189,20 +190,38 @@ quant_4x4_sse2
 ; iquant_4x4_sse2(block: pInt16; mf: pInt16; shift: integer; starting_idx: integer)
 ALIGN 16
 iquant_4x4_sse2
-    movd    xmm4, r3   ; shift
-    mov     ax, [r1] 
+    movd  xmm4, r3   ; shift
+    mov   ax, [r1] 
 
-    movdqa    xmm0, [r1]
-    movdqu    xmm1, [r2]
+    movdqa  xmm0, [r1]
+    movdqu  xmm1, [r2]
     pmullw  xmm0, xmm1    ; block * mf
     psllw   xmm0, xmm4    ; << shift
-    movdqa    [r1], xmm0
+    movdqa  [r1], xmm0
 
-    movdqa    xmm0, [r1+16]
-    movdqu    xmm1, [r2+16]
+    movdqa  xmm0, [r1+16]
+    movdqu  xmm1, [r2+16]
     pmullw  xmm0, xmm1
     psllw   xmm0, xmm4
-    movdqa    [r1+16], xmm0
+    movdqa  [r1+16], xmm0
+   
+    mov r10, r4
+    cmp r10b, 0
+    jz .done
+    mov [r1], ax
+.done:
+    ret
+
+ALIGN 16
+iquant_4x4_avx2
+    movd  xmm4, r3   ; shift
+    mov   ax, [r1] 
+
+    vmovdqu  ymm0, [r1]
+    vmovdqu  ymm1, [r2]
+    vpmullw  ymm0, ymm1
+    vpsllw   ymm0, xmm4    ; << shift    
+    vmovdqu  [r1], ymm0
    
     mov r10, r4
     cmp r10b, 0

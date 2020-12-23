@@ -55,6 +55,7 @@ TDsp_init_flags = record
     mmx: boolean;
     sse2: boolean;
     ssse3: boolean;
+    avx2: boolean;
 end;
 
 { TDsp }

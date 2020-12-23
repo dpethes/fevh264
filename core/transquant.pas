@@ -502,6 +502,7 @@ procedure core_4x4_mmx(block: pInt16); external name 'core_4x4_mmx';
 procedure icore_4x4_mmx(block: pInt16); external name 'icore_4x4_mmx';
 procedure quant_4x4_sse2(block: pInt16; mf: pInt16; f: integer; qbits: integer; starting_idx: integer); external name 'quant_4x4_sse2';
 procedure iquant_4x4_sse2(block: pInt16; mf: pInt16; shift: integer; starting_idx: integer); external name 'iquant_4x4_sse2';
+procedure iquant_4x4_avx2(block: pInt16; mf: pInt16; shift: integer; starting_idx: integer); external name 'iquant_4x4_avx2';
 {$endif}
 
 procedure transquant_init(const flags: TDsp_init_flags);
@@ -518,6 +519,9 @@ begin
   if flags.sse2 then begin
       quant_4x4 := @quant_4x4_sse2;
       iquant_4x4 := @iquant_4x4_sse2;
+  end;
+  if flags.avx2 then begin
+      iquant_4x4 := @iquant_4x4_avx2;
   end;
   {$endif}
 end;

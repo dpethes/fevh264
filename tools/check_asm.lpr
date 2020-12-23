@@ -69,7 +69,9 @@ var
   ttimer: int64;
 begin
   id := test_name;
-  if flags.sse2 then
+  if flags.avx2 then
+      id += '_avx2'
+  else if flags.sse2 then
       id += '_sse2'
   else if flags.mmx then
       id += '_mmx'
@@ -85,11 +87,12 @@ begin
 end;
 
 
-procedure init_units(mmx: boolean = false; sse2: boolean = false; ssse3: boolean = false);
+procedure init_units(mmx: boolean = false; sse2: boolean = false; ssse3: boolean = false; avx2: boolean = false);
 begin
   flags.mmx:=mmx;
   flags.sse2:=sse2;
   flags.ssse3:=ssse3;
+  flags.avx2:=avx2;
   //todo switch to dsp init?
   pixel_init(flags);
   motion_compensate_init(flags);
@@ -116,6 +119,11 @@ end;
 procedure init_ssse3;
 begin
   init_units(true, true, true);
+end;
+
+procedure init_avx2;
+begin
+  init_units(true, true, true, true);
 end;
 
 procedure init_src;
@@ -536,6 +544,10 @@ begin
       move(xform_buffer, decoded_residual, 2*16);
 
       init_sse2;
+      move(quantized_coefficients, xform_buffer, 2*16);
+      iquant_4x4(@xform_buffer, qpctx.rescale_factor, qpctx.qp_div6, 1);
+
+      init_avx2;
       move(quantized_coefficients, xform_buffer, 2*16);
       iquant_4x4(@xform_buffer, qpctx.rescale_factor, qpctx.qp_div6, 1);
 

@@ -395,8 +395,11 @@ var
 
 initialization
   //asm
+  //TODO runtime detect
   flags.mmx := true;
   flags.sse2 := true;
+  flags.ssse3 := true;
+  flags.avx2 := true;
   frame_init(flags);
   intra_pred_init(flags);
   dsp := TDsp.Create(flags);
