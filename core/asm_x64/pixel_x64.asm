@@ -496,14 +496,12 @@ pixel_avg_16x16_sse2:
 ; function satd_4x4_mmx  (pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 satd_4x4_mmx:
-    PUSH_XMM_REGS 2
     mSUB4x4 r1, r2, r3, 0
     mHADAMARD4
     TRANSPOSE_4x4_int16
     mHADAMARD4
     mSUM
     SUM2DW mm0, r0
-    POP_XMM_REGS 2
     ret
 
 
@@ -512,7 +510,6 @@ ALIGN 16
 satd_8x8_mmx:
     mov   r4, 2
     pxor  mm4,mm4  ; sum
-    PUSH_XMM_REGS 2
 .loop:
     %assign i 0
     %rep 2
@@ -529,7 +526,6 @@ satd_8x8_mmx:
     dec   r4
     jnz   .loop
     SUM2DW mm4, r0
-    POP_XMM_REGS 2
     ret
 
 
