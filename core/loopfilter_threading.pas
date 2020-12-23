@@ -94,7 +94,7 @@ end;
 
 procedure TDeblockThread.IncreaseEncodedMBRows;
 begin
-  InterlockedIncrement(_encoded_mb_rows);
+  _encoded_mb_rows += 1; //there is only one writer thread, so interlocked is not needed
   _row_processed_event.SetEvent;
 end;
 
