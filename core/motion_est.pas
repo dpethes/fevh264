@@ -48,7 +48,6 @@ type
       scoreList: array of TScoreListItem;
       SearchRegion: TRegionSearch;
       InterCost: TInterPredCost;
-      H264s: TH264Stream;
 
       procedure EstimateMultiRef(var mb: macroblock_t; var fenc: frame_t);
       procedure EstimateSingleRef(var mb: macroblock_t; var fenc: frame_t);
@@ -155,10 +154,8 @@ begin
 
   predicted_mv_list.Clear;
 
-  H264s := h264stream;
-  InterCost := H264s.InterPredCost;
-
-  SearchRegion := TRegionSearch.Create(width, height, H264s);
+  InterCost := h264stream.InterPredCost;
+  SearchRegion := TRegionSearch.Create(width, height, h264stream);
 end;
 
 destructor TMotionEstimator.Free;
