@@ -41,6 +41,7 @@ type
 
       procedure InitMB(mbx, mby: integer);
       procedure FinalizeMB;
+      procedure AdvanceFramePointers;
       procedure EncodeCurrentType;
       procedure Decode;
       procedure SetChromaQPOffset(const AValue: shortint);
@@ -102,6 +103,14 @@ type
     public
       constructor Create; override;
       destructor Free; override;
+      procedure Encode(mbx, mby: integer); override;
+  end;
+
+  { TMBEncoderLowresRun }
+  TMBEncoderLowresRun = class(TMacroblockEncoder)
+    public
+      constructor Create; override;
+      procedure SetFrame(const f: frame_t); override;
       procedure Encode(mbx, mby: integer); override;
   end;
 
@@ -245,7 +254,11 @@ begin
 
   i := mb.y * frame.mbw + mb.x;
   move(mb, frame.mbs[i], sizeof(macroblock_t));
+  AdvanceFramePointers;
+end;
 
+procedure TMacroblockEncoder.AdvanceFramePointers;
+begin
   mb.pfenc += 16;
   mb.pfdec += 16;
   mb.pfenc_c[0] += 8;
@@ -718,6 +731,34 @@ begin
   end;
 
   FinalizeMB;
+end;
+
+{ TMBEncoderLowresRun }
+
+constructor TMBEncoderLowresRun.Create;
+begin
+  inherited Create;
+end;
+
+procedure TMBEncoderLowresRun.SetFrame(const f: frame_t);
+var
+  i: integer;
+begin
+  frame := f.lowres^;
+  for i := 0 to f.num_ref_frames - 1 do
+      frame.refs[i] := f.refs[i]^.lowres;
+end;
+
+procedure TMBEncoderLowresRun.Encode(mbx, mby: integer);
+var
+  i: integer;
+begin
+  InitMB(mbx, mby);
+  me.Estimate(mb, frame);
+
+  i := mb.y * frame.mbw + mb.x;
+  frame.mbs[i].mv := mb.mv;
+  AdvanceFramePointers;
 end;
 
 end.

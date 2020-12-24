@@ -167,6 +167,9 @@ end;
 
 
 procedure TMotionEstimator.Estimate(var mb: macroblock_t; var fenc: frame_t);
+var
+  lowres_mv: motionvec_t;
+  lowres_mb_idx: Integer;
 begin
   SearchRegion.cur := mb.pixels;
   SearchRegion._mbx := mb.x * 16;
@@ -175,6 +178,19 @@ begin
 
   predicted_mv_list.Clear;
   predicted_mv_list.Add(mb.mvp);
+  if fenc.lowres <> nil then begin
+      lowres_mb_idx := (mb.y div 2) * fenc.lowres^.mbw + (mb.x div 2);
+      lowres_mv := fenc.lowres^.mbs[lowres_mb_idx].mv * 2;
+      predicted_mv_list.Add(lowres_mv);
+
+      //topmost row lacks predictors, so take some more from lowres ME
+      if mb.y = 0 then begin
+          if mb.x < mb_width - 1 then begin
+              lowres_mv := fenc.lowres^.mbs[lowres_mb_idx + 1].mv * 2;
+              predicted_mv_list.Add(lowres_mv);
+          end;
+      end;
+  end;
   LoadMVPredictors(mb.x, mb.y);
 
   if NumReferences = 1 then

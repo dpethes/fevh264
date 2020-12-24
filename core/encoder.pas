@@ -47,6 +47,7 @@ type
     private
       h264s: TH264Stream;
       mb_enc: TMacroblockEncoder;
+      mb_enc_lowres: TMBEncoderLowresRun;
       fenc: frame_t;  //currently encoded frame
       stats: TStreamStats;
       frame_num: integer;
@@ -68,10 +69,12 @@ type
       frames: TFrameManager;
       rc: TRatecontrol;
       me: TMotionEstimator;
+      me_lowres: TMotionEstimator;
       deblocker: TDeblocker;
 
       procedure SetISlice;
       procedure SetPSlice;
+      procedure RunLowresME;
       function TryEncodeFrame(const img: TPlanarImage): boolean;
       function SceneCut(const mbrow: integer): boolean;
       procedure WriteStats;
@@ -141,12 +144,20 @@ begin
       mb_enc := TMBEncoderRDoptAnalyse.Create;
   end;
   mb_enc.num_ref_frames := num_ref_frames;
-  mb_enc.chroma_coding := true;
   mb_enc.me := me;
   mb_enc.h264s := h264s;
   mb_enc.ChromaQPOffset := param.ChromaQParamOffset;
   mb_enc.chroma_coding := not param.IgnoreChroma;
   mb_enc.LoopFilter := param.LoopFilterEnabled;
+
+  //lowres ME - fast fullpel luma search, only macroblock MV gets stored
+  me_lowres := TMotionEstimator.Create(
+                   frames.lowres_mb_width * 16, frames.lowres_mb_height * 16,
+                   frames.lowres_mb_width, frames.lowres_mb_height, h264s);
+  me_lowres.subme := 0;
+  mb_enc_lowres := TMBEncoderLowresRun.Create;
+  mb_enc_lowres.me := me_lowres;
+  mb_enc_lowres.num_ref_frames := num_ref_frames;
 
   deblocker := TDeblocker.Create();
 
@@ -171,6 +182,8 @@ begin
   me.Free;
   h264s.Free;
   mb_enc.Free;
+  me_lowres.Free;
+  mb_enc_lowres.Free;
   deblocker.Free;
   stats.Free;
 end;
@@ -180,13 +193,16 @@ procedure TFevh264Encoder.EncodeFrame(const img: TPlanarImage; buffer: pbyte; ou
 begin
   frames.GetFree(fenc);
   frame_img2frame_copy(fenc, img);
+  frame_lowres_from_input(fenc);
   fenc.num := frame_num;
 
   //set frame params
   if (frame_num = 0) or (frame_num - last_keyframe_num >= key_interval) then
       SetISlice
-  else
+  else begin
       SetPSlice;
+      RunLowresME;
+  end;
 
   //encode frame (or reencode P as I)
   if TryEncodeFrame(img) = false then begin
@@ -202,6 +218,7 @@ begin
   frame_paint_edges(fenc);
   if _param.SubpixelMELevel > 0 then
       frame_hpel_interpolate(fenc);
+  frame_lowres_from_decoded(fenc);
 
   //stats
   rc.Update(frame_num, stream_size * 8, fenc);
@@ -229,6 +246,17 @@ begin
   fenc.ftype := SLICE_P;
   frames.SetRefs(fenc, frame_num, fenc.num_ref_frames);
   me.NumReferences := fenc.num_ref_frames;
+end;
+
+procedure TFevh264Encoder.RunLowresME;
+var
+  x, y: integer;
+begin
+  mb_enc_lowres.SetFrame(fenc);
+  for y := 0 to (fenc.lowres^.mbh - 1) do begin
+      for x := 0 to (fenc.lowres^.mbw - 1) do
+          mb_enc_lowres.Encode(x, y);
+  end;
 end;
 
 function TFevh264Encoder.TryEncodeFrame(const img: TPlanarImage): boolean;
@@ -335,6 +363,9 @@ begin
       pgm_save(s + '-cr.pgm', fenc.mem[4], fenc.pw div 2, fenc.ph div 2);
       pgm_save(s + '-cb.pgm', fenc.mem[5], fenc.pw div 2, fenc.ph div 2);
   end;
+
+  s := format('fdec%6d lowres', [frame_num]);
+  pgm_save(s + '.pgm', fenc.lowres^.mem[3], fenc.lowres^.pw, fenc.lowres^.ph);
 end;
 
 

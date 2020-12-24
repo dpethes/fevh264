@@ -119,7 +119,7 @@ type
 
   TMotionVectorList = record
     private
-      mvs: array[0..10] of motionvec_t;
+      mvs: array[0..12] of motionvec_t;
       function GetItem(i: byte): motionvec_t; inline;
     public
       Count: integer;
@@ -264,6 +264,9 @@ type
       blk_chroma_offset: array[0..3] of integer;  //4x4 chroma block offsets
       filter_hv_temp: psmallint;      //temp storage for fir filter
       refs: array[0..15] of frame_p;  //L0 reference list
+
+      //low resolution frame for fast motion estimation
+      lowres: frame_p;
 
       //mb-adaptive quant data
       aq_table: pbyte;                //qp table

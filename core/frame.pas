@@ -38,6 +38,8 @@ procedure frame_write_stats (var stats_file: textfile; const frame: frame_t);
 procedure frame_img2frame_copy(var frame: frame_t; const img: TPlanarImage);
 procedure frame_paint_edges(var frame: frame_t);
 procedure frame_hpel_interpolate(var frame: frame_t);
+procedure frame_lowres_from_input(var frame: frame_t);
+procedure frame_lowres_from_decoded(var frame: frame_t);
 
 type
 
@@ -49,6 +51,9 @@ type
       ifree: integer;
       procedure GetRef(out f: frame_p; const frame_num: integer);
     public
+      lowres_mb_width,
+      lowres_mb_height: integer;
+
       procedure InsertRef(var f: frame_t);
       procedure SetRefs(var f: frame_t; const frame_num, nrefs: integer);
       procedure GetFree(var f: frame_t);
@@ -156,6 +161,7 @@ begin
   //other
   frame.filter_hv_temp := fev_malloc( padded_width * 2 );
   frame.bs_buf := fev_malloc(frame.w * frame.h * 3);
+  frame.lowres := nil;
 
   frame.stats := TFrameStats.Create;
 end;
@@ -468,9 +474,16 @@ var
 begin
   ifree := 0;
   SetLength(listL0, ref_count + 1);
+
+  lowres_mb_width  := (mb_w + 1) div 2;  //round mb count up
+  lowres_mb_height := (mb_h + 1) div 2;
+
   for i := 0 to ref_count do begin
       frame_new( listL0[i], mb_w, mb_h );
       listL0[i].num := -1;
+
+      listL0[i].lowres := fev_malloc(sizeof(frame_t));
+      frame_new(listL0[i].lowres^, lowres_mb_width, lowres_mb_height);
   end;
 end;
 
@@ -478,8 +491,13 @@ destructor TFrameManager.Free;
 var
   i: integer;
 begin
-  for i := 0 to Length(listL0) - 1 do
+  for i := 0 to Length(listL0) - 1 do begin
+      if listL0[i].lowres <> nil then begin
+          frame_free(listL0[i].lowres^);
+          fev_free(listL0[i].lowres);
+      end;
       frame_free(listL0[i]);
+  end;
   listL0 := nil;
 end;
 
@@ -613,6 +631,39 @@ begin
   else
   {$endif}
       filter_normal();
+end;
+
+procedure frame_lowres_from_plane(var frame: frame_t; src, dst: pbyte);
+var
+  src_stride: integer;
+  dst_width,
+  dst_height,
+  dst_stride: integer;
+  x, y: integer;
+begin
+  src_stride := frame.stride;
+
+  dst_width  := frame.lowres^.w;
+  dst_height := frame.lowres^.h;
+  dst_stride := frame.lowres^.stride;
+
+  for y := 0 to dst_height - 1 do begin
+      for x := 0 to dst_width - 1 do begin
+          dst[x] := (src[x * 2] + src[x * 2 + 1] + src[x * 2 + src_stride] + src[x * 2 + 1 + src_stride]) shr 2;
+      end;
+      dst += dst_stride;
+      src += src_stride * 2;
+  end;
+end;
+
+procedure frame_lowres_from_input(var frame: frame_t);
+begin
+  frame_lowres_from_plane(frame, frame.plane[0], frame.lowres^.plane[0]);
+end;
+
+procedure frame_lowres_from_decoded(var frame: frame_t);
+begin
+  frame_lowres_from_plane(frame, frame.plane_dec[0], frame.lowres^.plane_dec[0]);
 end;
 
 
