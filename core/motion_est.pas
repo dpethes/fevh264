@@ -47,7 +47,6 @@ type
 
       scoreList: array of TScoreListItem;
       SearchRegion: TRegionSearch;
-      MotionCompensator: TMotionCompensation;
       InterCost: TInterPredCost;
       H264s: TH264Stream;
 
@@ -62,7 +61,7 @@ type
       property Subme: integer read _subme write SetSubMELevel;
 
       property NumReferences: integer read ref_count write SetNumReferences;
-      constructor Create(const w, h, mbw, mbh: integer; mc: TMotionCompensation; h264stream: TH264Stream);
+      constructor Create(const w, h, mbw, mbh: integer; h264stream: TH264Stream);
       destructor Free;
       procedure Estimate(var mb: macroblock_t; var fenc: frame_t);
       procedure Refine(var mb: macroblock_t);
@@ -141,7 +140,7 @@ begin
   _subme := AValue;
 end;
 
-constructor TMotionEstimator.Create(const w, h, mbw, mbh: integer; mc: TMotionCompensation; h264stream: TH264Stream);
+constructor TMotionEstimator.Create(const w, h, mbw, mbh: integer; h264stream: TH264Stream);
 var
   size: integer;
 begin
@@ -158,9 +157,8 @@ begin
 
   H264s := h264stream;
   InterCost := H264s.InterPredCost;
-  MotionCompensator := mc;
 
-  SearchRegion := TRegionSearch.Create(width, height, mc, H264s);
+  SearchRegion := TRegionSearch.Create(width, height, H264s);
 end;
 
 destructor TMotionEstimator.Free;
@@ -207,7 +205,7 @@ begin
       mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
 
   mb.mv := ClipMVRange(mb.mv, 512);
-  MotionCompensator.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  MotionCompensation.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
 end;
 
 procedure TMotionEstimator.Refine(var mb: macroblock_t);
@@ -224,7 +222,7 @@ begin
       mv_field[mb.y * mb_width + mb.x] := mb.mv;
   end;
 
-  MotionCompensator.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
 end;
 
 
@@ -306,7 +304,7 @@ begin
   InterPredLoadMvs(mb, fenc, ref_count);
 
   mb.mv := ClipMVRange(mv, 512);
-  MotionCompensator.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  MotionCompensation.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
 end;
 
 

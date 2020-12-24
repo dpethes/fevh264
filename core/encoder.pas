@@ -26,7 +26,7 @@ interface
 
 uses
   sysutils, common, util, parameters, frame, h264stream, stats, pgm, loopfilter, loopfilter_threading,
-  intra_pred, motion_comp, motion_est, ratecontrol, image, mb_encoder;
+  intra_pred, motion_est, ratecontrol, image, mb_encoder;
 
 type
   { TFevh264Encoder }
@@ -67,7 +67,6 @@ type
       //classes
       frames: TFrameManager;
       rc: TRatecontrol;
-      mc: TMotionCompensation;
       me: TMotionEstimator;
       deblocker: TDeblocker;
 
@@ -123,8 +122,7 @@ begin
   frames := TFrameManager.Create(num_ref_frames, mb_width, mb_height);
 
   //inter pred
-  mc := TMotionCompensation.Create;
-  me := TMotionEstimator.Create(width, height, mb_width, mb_height, mc, h264s);
+  me := TMotionEstimator.Create(width, height, mb_width, mb_height, h264s);
   me.subme := param.SubpixelMELevel;
 
   //ratecontrol
@@ -144,7 +142,6 @@ begin
   end;
   mb_enc.num_ref_frames := num_ref_frames;
   mb_enc.chroma_coding := true;
-  mb_enc.mc := mc;
   mb_enc.me := me;
   mb_enc.h264s := h264s;
   mb_enc.ChromaQPOffset := param.ChromaQParamOffset;
@@ -172,7 +169,6 @@ begin
   rc.Free;
   frames.Free;
   me.Free;
-  mc.Free;
   h264s.Free;
   mb_enc.Free;
   deblocker.Free;

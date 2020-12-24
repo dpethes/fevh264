@@ -50,7 +50,6 @@ type
       function GetChromaMcSSD: integer;
 
     public
-      mc: TMotionCompensation;
       me: TMotionEstimator;
       h264s: TH264Stream;
       chroma_coding: boolean;  //todo private
@@ -154,7 +153,7 @@ begin
       MB_P_16x16: begin
           encode_mb_inter(mb);
           if chroma_coding then begin
-              mc.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+              MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
               encode_mb_chroma(mb, intrapred, false);
           end;
       end;
@@ -284,7 +283,7 @@ begin
       if mv.y + mb.y * 64 < MIN_XY then exit;
 
       mb.mv := mv;
-      mc.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+      MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
       score := dsp.ssd_16x16(mb.pixels, mb.mcomp, 16);
       if use_satd then
           mb.score_skip := dsp.satd_16x16(mb.pixels, mb.mcomp, 16)
@@ -292,7 +291,7 @@ begin
           mb.score_skip := dsp.sad_16x16 (mb.pixels, mb.mcomp, 16);
       score_c := 0;
       if chroma_coding then begin
-          mc.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
           score_c += GetChromaMcSSD;
       end;
       mb.score_skip_uv := score_c;
@@ -345,9 +344,9 @@ begin
       end;
       mb.mbtype := MB_P_SKIP;
       mb.mv     := mb.mv_skip;
-      mc.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+      MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
       if chroma_coding then
-          mc.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
   end;
 end;
 

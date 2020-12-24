@@ -37,7 +37,6 @@ type
       _max_x_qpel, _max_y_qpel: integer;
       _last_search_score: integer;
       _starting_fpel_mv: motionvec_t;
-      MotionCompensator: TMotionCompensation;
       InterCost: TInterPredCost;
       h264s: TH264Stream;
 
@@ -47,7 +46,7 @@ type
 
       property LastSearchScore: integer read _last_search_score;
 
-      constructor Create(region_width, region_height: integer; mc: TMotionCompensation; h264stream: TH264Stream);
+      constructor Create(region_width, region_height: integer; h264stream: TH264Stream);
       procedure PickFPelStartingPoint(const fref: frame_p; const predicted_mv_list: TMotionVectorList);
       function SearchFPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchHPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
@@ -81,12 +80,10 @@ const
   pt_square: array[0..7] of TXYOffs =
       ( (0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1) );
 
-constructor TRegionSearch.Create(region_width, region_height: integer;
-  mc: TMotionCompensation; h264stream: TH264Stream);
+constructor TRegionSearch.Create(region_width, region_height: integer; h264stream: TH264Stream);
 var
   edge: integer;
 begin
-  MotionCompensator := mc;
   H264s := h264stream;
   InterCost := H264s.InterPredCost;
 
@@ -339,12 +336,12 @@ begin
       nx := x + pt_dia_small[i][0];
       ny := y + pt_dia_small[i][1];
 
-      MotionCompensator.CompensateQPelXY(fref, nx, ny, mb.mcomp);
+      MotionCompensation.CompensateQPelXY(fref, nx, ny, mb.mcomp);
       score := mbcmp(cur, mb.mcomp, 16)
                + InterCost.Bits(nx - mbx, ny - mby);
 
       if chroma_me then begin
-          MotionCompensator.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
+          MotionCompensation.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
           score += dsp.satd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16) +
                    dsp.satd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
       end;
@@ -387,10 +384,10 @@ begin
   until (mv = mv_prev_pass) or (iter >= range);
 
   if min_score = MaxInt then begin    //return valid score if no searches were done (rare cases at the padded edge of a frame)
-      MotionCompensator.CompensateQPelXY(fref, x, y, mb.mcomp);
+      MotionCompensation.CompensateQPelXY(fref, x, y, mb.mcomp);
       min_score := mbcmp(cur, mb.mcomp, 16) + InterCost.Bits(mv);
       if chroma_me then begin
-          MotionCompensator.CompensateChromaQpelXY(fref, x, y, mb.mcomp_c[0], mb.mcomp_c[1]);
+          MotionCompensation.CompensateChromaQpelXY(fref, x, y, mb.mcomp_c[0], mb.mcomp_c[1]);
           min_score += dsp.satd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16) +
                        dsp.satd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
       end;
@@ -438,8 +435,8 @@ begin
       nx := x + pt_dia_small[i][0];
       ny := y + pt_dia_small[i][1];
 
-      MotionCompensator.CompensateQPelXY(fref, nx, ny, mb.mcomp);
-      MotionCompensator.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
+      MotionCompensation.CompensateQPelXY(fref, nx, ny, mb.mcomp);
+      MotionCompensation.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
       encode_mb_inter(mb);
       encode_mb_chroma(mb, nil, false);
 

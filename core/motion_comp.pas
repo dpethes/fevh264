@@ -29,14 +29,14 @@ uses
 
 type
 
-  { TMotionCompensation }
+  { MotionCompensation }
 
-  TMotionCompensation = class
+  MotionCompensation = class
     public
-      procedure Compensate       (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dst: pbyte);
-      procedure CompensateQPelXY (const fref: frame_p; qx, qy: integer; dst: pbyte);
-      procedure CompensateChroma (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte);
-      procedure CompensateChromaQpelXY(const fref: frame_p; qx, qy: integer; dstU, dstV: pbyte);
+      class procedure Compensate       (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dst: pbyte); static;
+      class procedure CompensateQPelXY (const fref: frame_p; qx, qy: integer; dst: pbyte); static;
+      class procedure CompensateChroma (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte); static;
+      class procedure CompensateChromaQpelXY(const fref: frame_p; qx, qy: integer; dstU, dstV: pbyte); static;
   end;
 
 
@@ -69,7 +69,7 @@ end;
 (*******************************************************************************
 motion_compensate
 *)
-procedure TMotionCompensation.Compensate(const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dst: pbyte);
+class procedure MotionCompensation.Compensate(const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dst: pbyte);
 var
   x, y,
   fx, fy: integer;  //fullpel position
@@ -93,7 +93,7 @@ end;
 
 
 
-procedure TMotionCompensation.CompensateQPelXY(const fref: frame_p; qx, qy: integer; dst: pbyte);
+class procedure MotionCompensation.CompensateQPelXY(const fref: frame_p; qx, qy: integer; dst: pbyte);
 const
 {
   plane 1/2 idx
@@ -159,7 +159,7 @@ begin
 end;
 
 
-procedure TMotionCompensation.CompensateChroma
+class procedure MotionCompensation.CompensateChroma
   (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte);
 var
   x, y: integer;
@@ -169,7 +169,7 @@ begin
   CompensateChromaQpelXY(fref, x, y, dstU, dstV);
 end;
 
-procedure TMotionCompensation.CompensateChromaQpelXY
+class procedure MotionCompensation.CompensateChromaQpelXY
   (const fref: frame_p; qx, qy: integer; dstU, dstV: pbyte);
 var
   fx, fy: integer;  //chroma fullpel
