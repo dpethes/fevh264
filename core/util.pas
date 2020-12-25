@@ -46,6 +46,7 @@ mbstat_func_t = function (pix: pbyte): uint32; {$ifdef CPUI386} cdecl; {$endif}
 pixmove_func_t = procedure (pix1, pix2: pbyte; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 pixoper_func_t = procedure (pix1, pix2: pbyte; diff: int16_p); {$ifdef CPUI386} cdecl; {$endif}
 pixavg_func_t = procedure (src1, src2, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+pixdownsample_func_t = procedure (src: uint8_p; src_stride: integer; dst: uint8_p; dst_width: integer); {$ifdef CPUI386} cdecl; {$endif}
 mc_chroma_func_t = procedure (src, dst: pbyte; const stride: integer; coef: pbyte); {$ifdef CPUI386} cdecl; {$endif}
 core_xform_func_t = procedure (block: pInt16); {$ifdef CPUI386} cdecl; {$endif}
 quant_func_t  = procedure(block: pInt16; mf: pInt16; f: integer; qbits: integer; starting_idx: integer); {$ifdef CPUI386} cdecl; {$endif}
@@ -78,6 +79,7 @@ TDsp = class
     pixel_add_4x4,
     pixel_sub_4x4: pixoper_func_t;
     pixel_avg_16x16: pixavg_func_t;
+    pixel_downsample_row: pixdownsample_func_t;
 
     pixel_loadu_16x16: pixmove_func_t; //unaligned memory load
     mc_chroma_8x8: mc_chroma_func_t;
@@ -194,6 +196,7 @@ begin
   pixel_add_4x4  := pixel.pixel_add_4x4;
   pixel_sub_4x4  := pixel.pixel_sub_4x4;
   pixel_avg_16x16  := pixel.pixel_avg_16x16;
+  pixel_downsample_row := pixel.pixel_downsample_row;
 
   mc_chroma_8x8 := motion_comp.mc_chroma_8x8;
 end;

@@ -45,6 +45,7 @@ cglobal pixel_save_8x8_sse2
 cglobal pixel_sub_4x4_mmx
 cglobal pixel_add_4x4_mmx
 cglobal pixel_avg_16x16_sse2
+cglobal pixel_downsample_row_sse2
 
 cglobal satd_4x4_mmx
 cglobal satd_8x8_mmx
@@ -336,6 +337,31 @@ pixel_avg_16x16_sse2:
 %endrep
     ret
     
+    
+; procedure pixel_downsample_row_sse2 (src: uint8_p; src_stride: integer; dst: uint8_p; dst_width: integer)
+ALIGN 16
+pixel_downsample_row_sse2:
+    pxor      xmm5, xmm5
+    pcmpeqb   xmm4, xmm4  
+    psrlw     xmm4, 8     ; mask every 2nd byte
+    shr   r4, 3           ; 8 bytes output in one iteration
+.loop:
+    movdqa    xmm0, [r1]
+    movdqu    xmm1, [r1+1]
+    movdqa    xmm2, [r1+r2]
+    movdqu    xmm3, [r1+r2+1]
+    pavgb     xmm0, xmm1
+    pavgb     xmm2, xmm3
+    pavgb     xmm0, xmm2
+    pand      xmm0, xmm4
+    packuswb  xmm0, xmm5  
+    movq      [r3], xmm0
+  
+    add   r1, 16
+    add   r3, 8
+    dec   r4
+    jnz   .loop
+    ret
    
 ; ******************************************************************************
 ; SATD

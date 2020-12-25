@@ -197,6 +197,22 @@ begin
   end;
 end;
 
+function check_arrays_with_tolerance(a, b: pbyte; const length, tolerance: integer): boolean;
+var
+  i: integer;
+begin
+  result := true;
+  for i := 0 to length - 1 do begin
+      if abs(a^ - b^) > tolerance then begin
+          result := false;
+          writeln('mismatch at ', i, ' diff: ', abs(a^ - b^));
+          exit;
+      end;
+      a += 1;
+      b += 1;
+  end;
+end;
+
 procedure test_pixelcmp;
 var
   res_noasm, res_asm: integer;
@@ -586,6 +602,36 @@ begin
 end;
 
 
+procedure test_downsample;
+const
+  DST_SAMPLES = 32;
+var
+  //src: array [0..31] of byte = (
+  //  1, 1, 2, 2, 3, 3, 1, 1, 1, 1, 1, 1, 8, 8, 1, 1,
+  //  1, 1, 2, 2, 3, 3, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2);
+  dst_plain, dst_opt: array [0..255] of byte;
+  i: Integer;
+begin
+  test('frame downsample');
+  init_noasm;
+  FillByte(dst_plain, DST_SAMPLES, 0);
+  pixel_downsample_row(src1, 2 * DST_SAMPLES, @dst_plain, DST_SAMPLES);
+
+  init_sse2;
+  FillByte(dst_opt, DST_SAMPLES, 0);
+  pixel_downsample_row(src1, 2 * DST_SAMPLES, @dst_opt, DST_SAMPLES);
+
+  if check_arrays_with_tolerance(@dst_plain, @dst_opt, DST_SAMPLES, 1) then begin
+      for i := 0 to MBCMP_ITERS - 1 do begin
+          start_timer;
+          pixel_downsample_row(src1, 2 * DST_SAMPLES, @dst_opt, DST_SAMPLES);
+          stop_timer;
+      end;
+      bench_results();
+  end;
+end;
+
+
 begin
   //init
   src_mbalign := fev_malloc(16*16);
@@ -611,6 +657,7 @@ begin
   test_predict;
   test_transform;
   test_frame_interpolation;
+  test_downsample;
 
   //cleanup
   src1 -= unaligned_offset;

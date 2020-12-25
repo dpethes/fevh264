@@ -639,7 +639,7 @@ var
   dst_width,
   dst_height,
   dst_stride: integer;
-  x, y: integer;
+  y: integer;
 begin
   src_stride := frame.stride;
 
@@ -648,9 +648,7 @@ begin
   dst_stride := frame.lowres^.stride;
 
   for y := 0 to dst_height - 1 do begin
-      for x := 0 to dst_width - 1 do begin
-          dst[x] := (src[x * 2] + src[x * 2 + 1] + src[x * 2 + src_stride] + src[x * 2 + 1 + src_stride]) shr 2;
-      end;
+      dsp.pixel_downsample_row(src, src_stride, dst, dst_width);
       dst += dst_stride;
       src += src_stride * 2;
   end;

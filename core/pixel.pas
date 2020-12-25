@@ -50,6 +50,7 @@ var
   pixel_add_4x4,
   pixel_sub_4x4: pixoper_func_t;
   pixel_avg_16x16: pixavg_func_t;
+  pixel_downsample_row: pixdownsample_func_t;
 
 
 
@@ -370,6 +371,16 @@ begin
 end;
 
 
+(*******************************************************************************
+pixel_downsample_row
+*)
+procedure pixel_downsample_row_pas(src: uint8_p; src_stride: integer; dst: uint8_p; dst_width: integer);
+var
+  x: integer;
+begin
+  for x := 0 to dst_width - 1 do
+      dst[x] := (src[x * 2] + src[x * 2 + 1] + src[x * 2 + src_stride] + src[x * 2 + 1 + src_stride]) shr 2;
+end;
 
 (*******************************************************************************
 init fn pointers
@@ -423,6 +434,7 @@ procedure pixel_save_8x8_sse2   (src, dest: uint8_p; stride: integer); external 
 procedure pixel_sub_4x4_mmx (pix1, pix2: pbyte; diff: int16_p); external name 'pixel_sub_4x4_mmx';
 procedure pixel_add_4x4_mmx (pix1, pix2: pbyte; diff: int16_p); external name 'pixel_add_4x4_mmx';
 procedure pixel_avg_16x16_sse2 (src1, src2, dest: uint8_p; stride: integer); external name 'pixel_avg_16x16_sse2';
+procedure pixel_downsample_row_sse2(src: uint8_p; src_stride: integer; dst: uint8_p; dst_width: integer); external name 'pixel_downsample_row_sse2';
 {$endif}
 
 procedure pixel_init(const flags: TDsp_init_flags);
@@ -447,6 +459,8 @@ begin
   pixel_add_4x4    := @pixel_add_4x4_pas;
   pixel_sub_4x4    := @pixel_sub_4x4_pas;
   pixel_avg_16x16  := @pixel_avg_16x16_pas;
+
+  pixel_downsample_row := @pixel_downsample_row_pas;
 
   {$ifdef CPUI386}
   if flags.mmx then begin
@@ -501,6 +515,8 @@ begin
       pixel_add_4x4  := @pixel_add_4x4_mmx;
       pixel_sub_4x4  := @pixel_sub_4x4_mmx;
       pixel_avg_16x16  := @pixel_avg_16x16_sse2;
+
+      pixel_downsample_row := @pixel_downsample_row_sse2;
   end;
   {$endif}
 end;
