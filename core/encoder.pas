@@ -157,7 +157,6 @@ begin
   me_lowres.subme := 0;
   mb_enc_lowres := TMBEncoderLowresRun.Create;
   mb_enc_lowres.me := me_lowres;
-  mb_enc_lowres.num_ref_frames := num_ref_frames;
 
   deblocker := TDeblocker.Create();
 

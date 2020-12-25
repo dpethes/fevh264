@@ -50,6 +50,7 @@ type
                                  2 - qpel
                                  3 - qpel SATD
                                  4 - qpel chroma SATD
+                                 5 - qpel RD
                                }
       analyse: byte;           // mb type decision quality
                                { 0 - none

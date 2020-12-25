@@ -745,6 +745,7 @@ var
   i: integer;
 begin
   frame := f.lowres^;
+  frame.qp := f.qp;
   for i := 0 to f.num_ref_frames - 1 do
       frame.refs[i] := f.refs[i]^.lowres;
 end;
