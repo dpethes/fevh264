@@ -66,6 +66,7 @@ end;
 destructor TDeblockThread.Destroy;
 begin
   _new_frame_event.Free;
+  _finished_frame_event.Free;
   _row_processed_event.Free;
   _abort_lock.Free;
 end;

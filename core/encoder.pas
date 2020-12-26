@@ -429,5 +429,9 @@ initialization
   frame_init(flags);
   intra_pred_init(flags);
   dsp := TDsp.Create(flags);
+
+finalization
+  dsp.Free;
+
 end.
 
