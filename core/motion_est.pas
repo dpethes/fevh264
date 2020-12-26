@@ -45,7 +45,6 @@ type
       ref_count: integer;
       _subme: integer;
 
-      scoreList: array of TScoreListItem;
       SearchRegion: TRegionSearch;
       InterCost: TInterPredCost;
 
@@ -131,7 +130,6 @@ procedure TMotionEstimator.SetNumReferences(AValue: integer);
 begin
   if ref_count = AValue then Exit;
   ref_count := AValue;
-  SetLength(scoreList, ref_count);
 end;
 
 procedure TMotionEstimator.SetSubMELevel(AValue: integer);
@@ -161,7 +159,6 @@ end;
 destructor TMotionEstimator.Free;
 begin
   freemem(mv_field);
-  scoreList := nil;
   SearchRegion.Free;
 end;
 
@@ -240,35 +237,15 @@ end;
 
 
 procedure TMotionEstimator.EstimateMultiRef(var mb: macroblock_t; var fenc: frame_t);
-
-//lowest score to lowest index
-procedure SortList;
-var
-  i, j: integer;
-begin
-  for i := 0 to Length(scoreList) - 1 do
-      for j := 0 to Length(scoreList) - 2 do
-          if scoreList[j].score > scoreList[j+1].score then
-              swapItem(scoreList[j], scoreList[j+1]);
-end;
-
-function CountLower(const cutoff_score: integer): integer;
-begin
-  result := 0;
-  while scoreList[result].score < cutoff_score do begin
-      result += 1;
-      if result = Length(scoreList) then break;
-  end;
-end;
-
 var
   i: integer;
   score: integer;
   mv: motionvec_t;
   best_refidx, best_score: integer;
   fref: frame_p;
-  tested_ref_count: integer;
   min_score: integer;
+  fpel_scores: array[0..15] of TScoreListItem;
+  refine_candidates: array of TScoreListItem;
 
 begin
   mb.fref := fenc.refs[0];
@@ -279,23 +256,27 @@ begin
   for i := 0 to ref_count - 1 do begin
       fref := fenc.refs[i];
       SearchRegion.PickFPelStartingPoint(fref, predicted_mv_list);
-      scoreList[i].mv := SearchRegion.SearchFPel(mb, fref);
-      scoreList[i].score := SearchRegion.LastSearchScore;
-      scoreList[i].refidx := i;
-      min_score := min(min_score, scoreList[i].score);
+      fpel_scores[i].mv := SearchRegion.SearchFPel(mb, fref);
+      fpel_scores[i].score := SearchRegion.LastSearchScore;
+      fpel_scores[i].refidx := i;
+      min_score := min(min_score, fpel_scores[i].score);
   end;
 
-  //cut off refs with far worse score than best
-  SortList;
-  tested_ref_count := CountLower(min_score * 2);
+  min_score := min_score * 2;
+  if min_score = 0 then
+      min_score := 1;
+  for i := 0 to ref_count - 1 do begin
+      if fpel_scores[i].score < min_score then
+          Insert(fpel_scores[i], refine_candidates, MaxInt);
+  end;
 
   //hpel/qpel
   best_score := MaxInt;
-  best_refidx := scoreList[0].refidx;
-  mv := scoreList[0].mv;
-  for i := 0 to tested_ref_count - 1 do begin
-      mb.mv  := scoreList[i].mv;
-      mb.ref := scoreList[i].refidx;
+  best_refidx := 0;
+  mv := ZERO_MV;
+  for i := 0 to High(refine_candidates) do begin
+      mb.mv  := refine_candidates[i].mv;
+      mb.ref := refine_candidates[i].refidx;
       fref := fenc.refs[mb.ref];
 
       InterCost.SetMVPredAndRefIdx(mb.mvp, mb.ref);
