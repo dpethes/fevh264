@@ -241,32 +241,26 @@ type
   //frame
   frame_t = record
       //info
-      ftype: integer;                 //slice type
-      qp: integer;                    //fixed quant parameter
       num: integer;                   //frame number
+      qp: int8;                       //fixed quant parameter
+      num_ref_frames: int8;           //L0 reference picture count
+      ftype: int8;                    //slice type
+      idr: boolean;                   //IDR flag for I slices (unused)
       mbs: macroblock_p;              //frame macroblocks
-      num_ref_frames: integer;        //L0 reference picture count
 
       //img data
-      w, h: integer;                  //width, height
-      w_cr, h_cr: integer;            //chroma w&h
-      pw, ph: integer;                //padded w&h
       mbw, mbh: integer;              //macroblock width, height
-      mem: array[0..5] of pbyte;      //allocated memory
+      stride, stride_c: integer;      //luma stride, chroma stride
       plane: array[0..2] of pbyte;    //image planes
       luma_mc: array[0..3] of pbyte;  //luma planes for hpel interpolated samples (none, h, v, h+v)
       luma_mc_qpel: array[0..7] of pbyte;  //plane pointers for qpel mc
       plane_dec: array[0..2] of pbyte;//decoded image planes
-      stride, stride_c: integer;      //luma stride, chroma stride
       frame_mem_offset,               //padding to image offset in bytes
       frame_mem_offset_cr: integer;
       blk_offset: array[0..15] of integer;        //4x4 block offsets
-      blk_chroma_offset: array[0..3] of integer;  //4x4 chroma block offsets
-      filter_hv_temp: psmallint;      //temp storage for fir filter
-      refs: array[0..15] of frame_p;  //L0 reference list
 
-      //low resolution frame for fast motion estimation
-      lowres: frame_p;
+      refs: array[0..15] of frame_p;  //L0 reference list
+      lowres: frame_p;                //low resolution frame for fast motion estimation
 
       //mb-adaptive quant data
       aq_table: pbyte;                //qp table
@@ -279,6 +273,12 @@ type
       stats: TFrameStats;
       estimated_framebits: integer;
       qp_adj: integer;
+
+      //rarely used data
+      mem: array[0..5] of pbyte;      //allocated memory
+      filter_hv_temp: psmallint;      //temp storage for fir filter
+      w, h: integer;                  //width, height in 16-pixel granularity
+      pw, ph: int16;                  //padded w&h
   end;
 
 function is_intra(const m: integer): boolean; inline;

@@ -80,8 +80,6 @@ begin
       mbh  := mb_height;
       w    := mbw * 16;
       h    := mbh * 16;
-      w_cr := w div 2;
-      h_cr := h div 2;
       padded_width  := w + FRAME_PADDING_W * 2;
       padded_height := h + FRAME_PADDING_W * 2;
   end;
@@ -151,11 +149,6 @@ begin
       blk_offset[13] := 12 +  8 * stride;
       blk_offset[14] :=  8 + 12 * stride;
       blk_offset[15] := 12 + 12 * stride;
-
-      blk_chroma_offset[ 0] := 0;
-      blk_chroma_offset[ 1] := 4;
-      blk_chroma_offset[ 2] := 0 + 4 * stride_c;
-      blk_chroma_offset[ 3] := 4 + 4 * stride_c;
   end;
 
   //other
@@ -328,7 +321,7 @@ end;
 procedure frame_img2frame_copy(var frame: frame_t; const img: TPlanarImage);
 var
   w, h, i, j: integer;
-  dstride, sstride, edge_width: integer;
+  dstride, sstride, edge_width, chroma_height: integer;
   s, d: pbyte;
 begin
   w := img.Width;
@@ -361,9 +354,10 @@ begin
       edge_width := 16 - (img.Width and $f);
       paint_edge_vert(frame.plane[0] + w - 1, frame.plane[0] + w,
                       frame.stride, frame.h, edge_width);
+      chroma_height := frame.h div 2;
       for i := 1 to 2 do
           paint_edge_vert(frame.plane[i] + w div 2 - 1, frame.plane[i] + w div 2,
-                          frame.stride_c, frame.h_cr, edge_width div 2);
+                          frame.stride_c, chroma_height, edge_width div 2);
   end;
   if (h and $f) > 0 then begin
       edge_width := 16 - (img.Height and $f);
@@ -390,11 +384,13 @@ end;
 
 procedure frame_paint_edges(var frame: frame_t);
 var
-  i: integer;
+  i, chroma_width, chroma_height: integer;
 begin
   plane_paint_edges(frame.plane_dec[0], frame.w, frame.h, frame.stride, 16);
+  chroma_width := frame.w div 2;
+  chroma_height := frame.h div 2;
   for i := 1 to 2 do
-      plane_paint_edges(frame.plane_dec[i], frame.w_cr, frame.h_cr, frame.stride_c, 8);
+      plane_paint_edges(frame.plane_dec[i], chroma_width, chroma_height, frame.stride_c, 8);
 end;
 
 
