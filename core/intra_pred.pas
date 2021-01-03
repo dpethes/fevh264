@@ -65,8 +65,8 @@ type
 
       //Get best mode for i4x4 prediction. Also stores the predicted pixels
       function  Analyse_4x4(const ref: pbyte; const n: integer): integer;
-      procedure Analyse_8x8_chroma(refU, refV: pbyte; out mode: integer);
-      procedure Analyse_16x16(out mode: integer);
+      function  Analyse_8x8_chroma(refU, refV: pbyte): integer;
+      function  Analyse_16x16(): integer;
   end;
 
 var
@@ -763,10 +763,11 @@ begin
 end;
 
 
-procedure TIntraPredictor.Analyse_8x8_chroma(refU, refV: pbyte; out mode: integer);
+function TIntraPredictor.Analyse_8x8_chroma(refU, refV: pbyte): integer;
 var
   mscore, cscore, mby, mbx: integer;
   cmp: mbcmp_func_t;
+  mode: integer;
 
 procedure ipmode(m: byte);
 begin
@@ -812,13 +813,15 @@ begin
 
   //restore best mode
   Predict_8x8_cr(mode, refU, refV, mbx, mby);
+  result := mode;
 end;
 
 
-procedure TIntraPredictor.Analyse_16x16(out mode: integer);
+function TIntraPredictor.Analyse_16x16(): integer;
 var
   mscore, cscore, mbx, mby: integer;
   cmp: mbcmp_func_t;
+  mode: integer;
 
 procedure ipmode(m: byte);
 begin
@@ -855,6 +858,7 @@ begin
   end;
 
   LastScore := mscore;
+  result := mode;
 end;
 
 

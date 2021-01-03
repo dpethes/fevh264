@@ -421,7 +421,7 @@ begin
   sad_tresh := SAD_DECIMATE_TRESH[mb.qpc+3];
 
   if intra then
-      intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1], mb.chroma_pred_mode);
+      mb.chroma_pred_mode := intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1]);
 
   for j := 0 to 1 do begin
       if intra then
