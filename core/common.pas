@@ -166,11 +166,11 @@ type
   //macroblock
   macroblock_p = ^macroblock_t;
   macroblock_t = record
-      x, y: integer;          //position
-      mbtype: integer;
+      x, y: int16;            //position
+      mbtype: int8;
       qp,
       qpc: byte;
-      chroma_qp_offset: shortint;
+      chroma_qp_offset: int8;
 
       i4_pred_mode: array[0..23] of uint8_t;
                               { intra prediction mode for luma 4x4 blocks
@@ -178,15 +178,15 @@ type
                                 16..19 - top mb bottom row
                                 20..23 - left mb right column
                               }
-      i16_pred_mode: integer;    //intra 16x16 pred mode
-      chroma_pred_mode: integer; //chroma intra pred mode
+      i16_pred_mode: int8;    //intra 16x16 pred mode
+      chroma_pred_mode: int8; //chroma intra pred mode
 
       mvp,
       mv_skip,
       mv: motionvec_t;        //mvs: predicted, skip, coded
+      ref: int8;              //reference frame L0 index
+      cbp: int8;              //cpb bitmask: 0..3 luma, 4..5 chroma u/v
       fref: frame_p;          //reference frame selected for inter prediction
-      ref: integer;           //reference frame L0 index
-      cbp: integer;           //cpb bitmask: 0..3 luma, 4..5 chroma u/v
 
       //luma
       pfenc,
@@ -206,6 +206,12 @@ type
       mcomp_c,
       pixels_dec_c: array[0..1] of uint8_p;
 
+      //motion estimation, analysis
+      score_skip,
+      score_skip_uv: integer;
+      residual_bits: int16;
+      bitcost: int16;
+
       //coef arrays
       dct: array[0..24] of int16_p;      //0-15 - luma, 16-23 chroma, 24 - luma DC
       chroma_dc: array[0..1, 0..3] of int16;
@@ -222,20 +228,12 @@ type
       nz_coef_cnt: array[0..23] of byte;
       nz_coef_cnt_chroma_ac: array[0..1, 0..7] of byte;
 
-      //me
-      score_skip,
-      score_skip_uv: integer;
-      residual_bits: integer;
-
       //transquant
       quant_ctx_qp, quant_ctx_qpc: TQuantCtx;
 
       //loopfilter
       mba, mbb: macroblock_p;
       bS_vertical, bS_horizontal: TBSarray;
-
-      //analysis
-      bitcost: integer;
   end;
 
   //frame
