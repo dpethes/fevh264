@@ -473,6 +473,7 @@ begin
   if TrySkip then begin
       mb.mbtype := MB_P_SKIP;
       mb_type_bitcost[mb.mbtype] := 0;
+      me.Skipped(mb);
       exit;
   end;
 

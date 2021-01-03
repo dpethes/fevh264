@@ -63,6 +63,7 @@ type
       destructor Free;
       procedure Estimate(var mb: macroblock_t; var fenc: frame_t);
       procedure Refine(var mb: macroblock_t);
+      procedure Skipped(var mb: macroblock_t);
   end;
 
 
@@ -233,6 +234,11 @@ begin
   end;
 
   MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+end;
+
+procedure TMotionEstimator.Skipped(var mb: macroblock_t);
+begin
+  mv_field[mb.y * mb_width + mb.x] := mb.mv;
 end;
 
 
