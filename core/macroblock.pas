@@ -227,7 +227,7 @@ const SAD_DECIMATE_TRESH: array[0..54] of word = (
   640, 704, 800, 900, 1000  //chroma uses qp+3
 );
 
-procedure block_use_zero(var b: block_t);
+procedure block_use_zero(var b: block_t); inline;
 begin
   b.nlevel := 0;
   b.t1 := 0;

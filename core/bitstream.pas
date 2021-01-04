@@ -56,6 +56,7 @@ type
 *******************************************************************************)
 implementation
 
+//fpc has SwapEndian, but it doesn't get inlined
 function bswap(n: longword): longword; inline;
 begin
   result := (n shr 24) or

@@ -78,7 +78,7 @@ type
       cabac: boolean;
       //stats?
 
-      function GetNoPSkip: boolean;
+      function GetNoPSkip: boolean; inline;
       procedure SetChromaQPOffset(const AValue: byte);
       procedure SetKeyInterval(const AValue: word);
       procedure SetNumRefFrames(const AValue: byte);
@@ -95,7 +95,7 @@ type
       procedure write_mb_i_4x4   (var mb: macroblock_t);
       procedure write_mb_i_16x16 (var mb: macroblock_t);
       procedure write_mb_p_16x16 (var mb: macroblock_t);
-      procedure write_mb_p_skip;
+      procedure write_mb_p_skip; inline;
       function mb_intrapred_bits(const mb: macroblock_t): integer;
       function mb_residual_bits (const mb: macroblock_t): integer;
       function mb_i_4x4_bits   (const mb: macroblock_t): integer;
