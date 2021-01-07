@@ -35,17 +35,13 @@ type
   TPlanarImage = class
     private
       w, h: integer;
-      qp: byte;
       function GetHeight: integer;
-      function GetQParam: byte;
       function GetWidth: integer;
-      procedure SetQParam(const AValue: byte);
     public
       frame_num: integer;
       plane: array[0..2] of pbyte; //pointers to image planes (0 - luma; 1,2 - chroma U/V)
       stride, stride_c: integer;   //plane strides (0 - luma; 1,2 - chroma U/V)
 
-      property QParam: byte read GetQParam write SetQParam;
       property Width: integer read GetWidth;
       property Height: integer read GetHeight;
 
@@ -60,11 +56,6 @@ implementation
 
 { TPlanarImage }
 
-function TPlanarImage.GetQParam: byte;
-begin
-  result := qp;
-end;
-
 function TPlanarImage.GetHeight: integer;
 begin
   result := h;
@@ -73,14 +64,6 @@ end;
 function TPlanarImage.GetWidth: integer;
 begin
   result := w;
-end;
-
-procedure TPlanarImage.SetQParam(const AValue: byte);
-begin
-  if AValue > 51 then
-      qp := QPARAM_AUTO
-  else
-      qp := AValue;
 end;
 
 constructor TPlanarImage.Create(const width_, height_: integer);
@@ -101,7 +84,6 @@ begin
   plane[0] := getmem(memsize);
   plane[1] := plane[0] + stride_p0  * h;
   plane[2] := plane[1] + stride_p12 * (h div 2);
-  qp := QPARAM_AUTO;
 end;
 
 destructor TPlanarImage.Destroy;

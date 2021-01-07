@@ -265,10 +265,7 @@ begin
   result := true;
 
   //init slice bitstream
-  if img.QParam <> QPARAM_AUTO then
-      fenc.qp := img.QParam
-  else
-      fenc.qp := rc.GetQP(frame_num, fenc.ftype);
+  fenc.qp := rc.GetQP(frame_num, fenc.ftype);
   h264s.InitSlice(fenc.ftype, fenc.qp, fenc.num_ref_frames, fenc.bs_buf);
 
   //frame encoding setup

@@ -193,8 +193,8 @@ type
       pfdec,
       pfpred: uint8_p;
       pixels: uint8_p;        //original pixels
-      pred:   uint8_p;        //predicted pixels
-      mcomp:  uint8_p;        //motion-compensated pixels (maps to pred!)
+      pred:   uint8_p;        //intra predicted pixels
+      mcomp:  uint8_p;        //motion-compensated (inter predicted) pixels
       pixels_dec: uint8_p;    //decoded pixels
 
       //chroma
