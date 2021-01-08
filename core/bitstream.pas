@@ -136,7 +136,7 @@ var
   bits_left: longword;
 begin
   assert(bit_count <= 32, 'bit_count over 32');
-  bits := bits and ($ffffffff shr (32 - bit_count)); //safety check
+  assert(bits = bits and ($ffffffff shr (32 - bit_count)), 'more than bit_count bits set');
   if mask > bit_count then begin
       mask -= bit_count;
       cur^ := cur^ or (bits shl mask);
