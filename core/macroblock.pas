@@ -69,7 +69,7 @@ begin
   mb.pixels_dec_c[0] := mb.mcomp_c[0] + 128;
   mb.pixels_dec_c[1] := mb.pixels_dec_c[0] + 8;
 
-  mb.dct[0] := fev_malloc(2 * 16 * 25);
+  mb.dct[0] := fev_malloc(MB_DCT_ARRAY_SIZE);
   for i := 1 to 24 do
       mb.dct[i] := mb.dct[i - 1] + 16;
 end;
@@ -409,15 +409,11 @@ var
   i, j, n: integer;
   block: int16_p;
   pred: pbyte;
-  cbp_ac: byte;
   sad, sad_tresh: integer;
+  overall_ac_coefs, block_ac_coefs: integer;
 
 begin
-  cbp_ac := 0;
-  for i := 0 to 3 do begin
-     mb.chroma_dc[0, i] := 0;
-     mb.chroma_dc[1, i] := 0;
-  end;
+  overall_ac_coefs := 0;
   sad_tresh := SAD_DECIMATE_TRESH[mb.qpc+3];
 
   if intra then
@@ -440,14 +436,15 @@ begin
               mb.chroma_dc[j, i] := block[0];
               block[0] := 0;
               cavlc_analyse_block(mb.block[n], block, 15);
+
+              block_ac_coefs := mb.block[n].nlevel;
+              overall_ac_coefs += block_ac_coefs;
+              mb.nz_coef_cnt_chroma_ac[j, i] := block_ac_coefs;
           end else begin
               block_use_zero(mb.block[n]);
               mb.chroma_dc[j, i] := 0;
+              mb.nz_coef_cnt_chroma_ac[j, i] := 0
           end;
-
-          mb.nz_coef_cnt_chroma_ac[j, i] := mb.block[n].nlevel;
-          if mb.nz_coef_cnt_chroma_ac[j, i] > 0 then
-              cbp_ac += 1;
       end;
   end;
 
@@ -458,7 +455,7 @@ begin
   end;
 
   //cbp
-  if cbp_ac > 0 then
+  if overall_ac_coefs > 0 then
       mb.cbp := mb.cbp or (1 shl 5)
   else
       if (mb.block[25].nlevel + mb.block[26].nlevel > 0) then

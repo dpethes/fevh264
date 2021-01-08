@@ -74,6 +74,8 @@ const
   EG_MAX_ABS = 2047; // = 2^12 / 2 - 1 (abs.maximum for exp-golomb encoding)
   MB_SKIP_MAX = EG_MAX_ABS * 2;
 
+  MB_DCT_ARRAY_SIZE = 2 * 16 * 25;
+
 { ordering of 8x8 luma blocks
   1 | 2
   --+--
@@ -185,7 +187,7 @@ type
       mv_skip,
       mv: motionvec_t;        //mvs: predicted, skip, coded
       ref: int8;              //reference frame L0 index
-      cbp: int8;              //cpb bitmask: 0..3 luma, 4..5 chroma u/v
+      cbp: int8;              //cpb bitmask: 0..3 luma, 4 chroma DC only, 5 chroma AC
       fref: frame_p;          //reference frame selected for inter prediction
 
       //luma
@@ -213,7 +215,7 @@ type
       bitcost: int16;
 
       //coef arrays
-      dct: array[0..24] of int16_p;      //0-15 - luma, 16-23 chroma, 24 - luma DC
+      dct: array[0..24] of int16_p;      //0-15 - luma, 16-23 - chroma, 24 - luma DC
       chroma_dc: array[0..1, 0..3] of int16;
       block: array[0..26] of block_t;    //0-24 as in dct, 25/26 chroma_dc u/v
 

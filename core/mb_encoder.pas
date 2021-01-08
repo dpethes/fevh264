@@ -406,7 +406,7 @@ begin
       nz_coef_cnt_chroma_ac := mb.nz_coef_cnt_chroma_ac;
       block          := mb.block;
   end;
-  move(mb.dct[0]^, mb_cache[mb.mbtype].dct[0]^, 2 * 16 * 25);
+  move(mb.dct[0]^, mb_cache[mb.mbtype].dct[0]^, MB_DCT_ARRAY_SIZE);
 end;
 
 procedure TMBEncoderRDoptAnalyse.CacheLoad;
@@ -421,7 +421,7 @@ begin
       mb.nz_coef_cnt_chroma_ac := nz_coef_cnt_chroma_ac;
       mb.block                 := block;
   end;
-  move(mb_cache[mb.mbtype].dct[0]^, mb.dct[0]^, 2 * 16 * 25);
+  move(mb_cache[mb.mbtype].dct[0]^, mb.dct[0]^, MB_DCT_ARRAY_SIZE);
 end;
 
 function TMBEncoderRDoptAnalyse.MBCost: integer;
