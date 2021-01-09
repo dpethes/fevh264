@@ -212,7 +212,7 @@ type
       score_skip,
       score_skip_uv: integer;
       residual_bits: int16;
-      bitcost: int16;
+      bitcost: int16;                    //currently unused
 
       //coef arrays
       dct: array[0..24] of int16_p;      //0-15 - luma, 16-23 - chroma, 24 - luma DC
