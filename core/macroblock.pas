@@ -218,13 +218,13 @@ end;
 (*******************************************************************************
 intra coding
 *)
-const SAD_DECIMATE_TRESH: array[0..54] of word = (
+const SAD_DECIMATE_TRESH: array[0..51] of word = (
     3,   3,   3,   3,   3,   3,   4,   4,   5,   5,
     6,   7,   8,   9,  10,  11,  13,  14,  16,  18,
    20,  22,  26,  28,  32,  36,  40,  44,  52,  56,
    64,  72,  80,  88, 104, 112, 128, 144, 160, 176,
   208, 224, 256, 288, 320, 352, 416, 448, 512, 576,
-  640, 704, 800, 900, 1000  //chroma uses qp+3
+  640, 704
 );
 
 procedure block_use_zero(var b: block_t); inline;
@@ -423,7 +423,7 @@ var
 
 begin
   overall_ac_coefs := 0;
-  sad_tresh := SAD_DECIMATE_TRESH[mb.qpc+3];
+  sad_tresh := SAD_DECIMATE_TRESH[mb.qpc];
 
   if intra then
       mb.chroma_pred_mode := intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1]);
