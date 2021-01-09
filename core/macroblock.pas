@@ -239,43 +239,50 @@ procedure encode_mb_intra_i4
 var
   i: integer;
   block: int16_p;
-  cbp: array[0..3] of byte;
+  overall_coefs: array[0..3] of integer;
   sad, sad_tresh: integer;
+  block_offset: integer;
+  block_coefs: integer;
 
 begin
-  for i := 0 to 3 do cbp[i] := 0;
+  for i := 0 to 3 do overall_coefs[i] := 0;
   sad_tresh := SAD_DECIMATE_TRESH[mb.qp];
 
   intrapred.LastScore := 0;
   for i := 0 to 15 do begin
       block := mb.dct[i];
+      block_offset := BLOCK_OFFSET_4[i];
 
       mb.i4_pred_mode[i] := intrapred.Analyse_4x4(mb.pfdec + frame.blk_offset[i], i);
-      sad := dsp.sad_4x4(mb.pixels + block_offset4[i], mb.pred + block_offset4[i], 16);
+      sad := dsp.sad_4x4(mb.pixels + block_offset, mb.pred + block_offset, 16);
       if sad >= sad_tresh then begin
-          dsp.pixel_sub_4x4(mb.pixels + block_offset4[i], mb.pred + block_offset4[i], block);
+          dsp.pixel_sub_4x4(mb.pixels + block_offset, mb.pred + block_offset, block);
           transqt(block, mb.quant_ctx_qp, true);
           cavlc_analyse_block(mb.block[i], block, 16);
-      end else
-          block_use_zero(mb.block[i]);
 
-      mb.nz_coef_cnt[i] := mb.block[i].nlevel;
-      cbp[i shr 2] += mb.nz_coef_cnt[i];
+          block_coefs := mb.block[i].nlevel;
+          mb.nz_coef_cnt[i] := block_coefs;
+          overall_coefs[i shr 2] += block_coefs;
+      end else begin
+          block_use_zero(mb.block[i]);
+          mb.nz_coef_cnt[i] := 0;
+          block_coefs := 0;
+      end;
 
       //decode block
-      if mb.nz_coef_cnt[i] > 0 then begin
+      if block_coefs > 0 then begin
           itransqt(block, mb.quant_ctx_qp);
-          dsp.pixel_add_4x4 (mb.pixels_dec + block_offset4[i], mb.pred + block_offset4[i], block);
-      end else
-          pixel_load_4x4(mb.pixels_dec + block_offset4[i], mb.pred + block_offset4[i], 16);
+          dsp.pixel_add_4x4 (mb.pixels_dec + block_offset, mb.pred + block_offset, block);
+      end else begin
+          pixel_load_4x4(mb.pixels_dec + block_offset, mb.pred + block_offset, 16);
+      end;
 
-      pixel_save_4x4(mb.pixels_dec + block_offset4[i],
-                     mb.pfdec  + frame.blk_offset[i], frame.stride);
+      pixel_save_4x4(mb.pixels_dec + block_offset, mb.pfdec  + frame.blk_offset[i], frame.stride);
   end;
 
   mb.cbp := 0;
   for i := 0 to 3 do
-      if cbp[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
+      if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
 end;
 
 
@@ -283,15 +290,15 @@ procedure encode_mb_intra_i16(var mb: macroblock_t);
 var
   i: integer;
   block: int16_p;
-  cbp: byte;
+  overall_coefs: integer;
 
 begin
-  cbp := 0;
+  overall_coefs := 0;
 
   for i := 0 to 15 do begin
       block := mb.dct[i];
 
-      dsp.pixel_sub_4x4(mb.pixels + block_offset4[i], mb.pred + block_offset4[i], block);
+      dsp.pixel_sub_4x4(mb.pixels + BLOCK_OFFSET_4[i], mb.pred + BLOCK_OFFSET_4[i], block);
       transqt(block, mb.quant_ctx_qp, true, 1);
 
       mb.dct[24][ block_dc_order[i] ] := block[0];
@@ -299,15 +306,15 @@ begin
 
       cavlc_analyse_block(mb.block[i], block, 15);
       mb.nz_coef_cnt[i] := mb.block[i].nlevel;
-      cbp += mb.nz_coef_cnt[i];
+      overall_coefs += mb.nz_coef_cnt[i];
   end;
 
   //dc transform
   transqt_dc_4x4(mb.dct[24], mb.qp);
   cavlc_analyse_block(mb.block[24], mb.dct[24], 16);
 
-  //cbp: only 0 or 15
-  if cbp = 0 then
+  //overall_coefs: only 0 or 15
+  if overall_coefs = 0 then
       mb.cbp := 0
   else
       mb.cbp := %1111;
@@ -333,7 +340,7 @@ begin
       else
           itrans_dc(block);
 
-      dsp.pixel_add_4x4 (mb.pixels_dec + block_offset4[i], mb.pred + block_offset4[i], block);
+      dsp.pixel_add_4x4 (mb.pixels_dec + BLOCK_OFFSET_4[i], mb.pred + BLOCK_OFFSET_4[i], block);
   end;
 end;
 
@@ -346,31 +353,33 @@ procedure encode_mb_inter(var mb: macroblock_t);
 var
   i: integer;
   block: int16_p;
-  cbp: array[0..3] of byte;
+  overall_coefs: array[0..3] of integer;
   sad, sad_tresh: integer;
+  block_offset: integer;
 
 begin
-  for i := 0 to 3 do cbp[i] := 0;
+  for i := 0 to 3 do overall_coefs[i] := 0;
   sad_tresh := SAD_DECIMATE_TRESH[mb.qp];
 
   for i := 0 to 15 do begin
       block := mb.dct[i];
+      block_offset := BLOCK_OFFSET_4[i];
 
-      sad := dsp.sad_4x4(mb.pixels + block_offset4[i], mb.mcomp + block_offset4[i], 16);
+      sad := dsp.sad_4x4(mb.pixels + block_offset, mb.mcomp + block_offset, 16);
       if sad >= sad_tresh then begin
-          dsp.pixel_sub_4x4(mb.pixels + block_offset4[i], mb.mcomp + block_offset4[i], block);
+          dsp.pixel_sub_4x4(mb.pixels + block_offset, mb.mcomp + block_offset, block);
           transqt(block, mb.quant_ctx_qp, false);
           cavlc_analyse_block(mb.block[i], block, 16);
       end else
           block_use_zero(mb.block[i]);
 
       mb.nz_coef_cnt[i] := mb.block[i].nlevel;
-      cbp[i shr 2] += mb.nz_coef_cnt[i];
+      overall_coefs[i shr 2] += mb.nz_coef_cnt[i];
   end;
 
   mb.cbp := 0;
   for i := 0 to 3 do
-      if cbp[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
+      if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
 end;
 
 
@@ -384,9 +393,9 @@ begin
 
       if mb.nz_coef_cnt[i] > 0 then begin
           itransqt(block, mb.quant_ctx_qp);
-          dsp.pixel_add_4x4 (mb.pixels_dec + block_offset4[i], mb.mcomp + block_offset4[i], block);
+          dsp.pixel_add_4x4 (mb.pixels_dec + BLOCK_OFFSET_4[i], mb.mcomp + BLOCK_OFFSET_4[i], block);
       end else
-          pixel_save_4x4(mb.mcomp + block_offset4[i], mb.pixels_dec + block_offset4[i], 16);
+          pixel_save_4x4(mb.mcomp + BLOCK_OFFSET_4[i], mb.pixels_dec + BLOCK_OFFSET_4[i], 16);
   end;
 end;
 

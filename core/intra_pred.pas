@@ -642,9 +642,9 @@ procedure TIntraPredictor.Predict_4x4(mode: integer; ref: pbyte; mbx, mby, n: in
 begin
   Assert(mode <= 8, 'unknown predict mode');
   if mode = INTRA_PRED_DC then
-      predict_dc4(ref, prediction + block_offset4[n], frame_stride, mbx, mby, n)
+      predict_dc4(ref, prediction + BLOCK_OFFSET_4[n], frame_stride, mbx, mby, n)
   else
-      Predict4x4Funcs[mode](ref, prediction + block_offset4[n], frame_stride);
+      Predict4x4Funcs[mode](ref, prediction + BLOCK_OFFSET_4[n], frame_stride);
 end;
 
 
@@ -706,7 +706,7 @@ var
   has_top, has_left, has_tl, has_inside_ttr, has_outside_ttr: Boolean;
   predicted_mode: Byte;
 begin
-  pix := pixels + block_offset4[n];
+  pix := pixels + BLOCK_OFFSET_4[n];
   mbx := mb^.x;
   mby := mb^.y;
 
@@ -759,7 +759,7 @@ begin
   LastScore += min_score;
 
   //restore best mode's prediction from cache
-  pixel_load_4x4(prediction + block_offset4[n], pred4_cache[result], I4x4CACHE_STRIDE);
+  pixel_load_4x4(prediction + BLOCK_OFFSET_4[n], pred4_cache[result], I4x4CACHE_STRIDE);
 end;
 
 

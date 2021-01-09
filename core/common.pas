@@ -90,7 +90,7 @@ const
   ---+----+----+---
   10 | 11 | 14 | 15
 }
-  block_offset4: array[0..15] of byte = (
+  BLOCK_OFFSET_4: array[0..15] of byte = (
        0,   4,  64,  68,
        8,  12,  72,  76,
      128, 132, 192, 196,
