@@ -171,8 +171,8 @@ LEVEL_DPB: array[0..14, 0..1] of integer = (
   (51, 69120)
 );
 
-
-function get_level(const w, h, refcount: integer): byte;
+//skip levels <= 3.0, so we don't have to restrict vertical mv max to level specs
+function ApproximateLevel(const w, h, refcount: integer): byte;
 var
   dpb, i: integer;
 begin
@@ -185,6 +185,8 @@ begin
           i += 1;
       result := byte( LEVEL_DPB[i, 0] );
   end;
+  if result <= 30 then
+      result := 31;
 end;
 
 
@@ -277,19 +279,24 @@ profile: baseline
 procedure TH264Stream.WriteParamSetsToNAL(var nalstream: TBitstreamWriter);
 const
   sei_uuid = '2011012520091007';
+  PROFILE_BASELINE = 66;
+  PROFILE_MAIN = 77;
 var
   b: TBitstreamWriter;
   rbsp: array[0..255] of byte;
   i: integer;
   sei_text: string;
-  level: byte;
+  level, profile: byte;
 begin
-  level := get_level(sps.mb_width * 16, sps.mb_height * 16, sps.num_ref_frames);
+  profile := PROFILE_BASELINE;
+  if cabac then
+      profile := PROFILE_MAIN;  //cabac is not allowed in baseline
+  level := ApproximateLevel(sps.mb_width * 16, sps.mb_height * 16, sps.num_ref_frames);
 
   //SPS
   b := TBitstreamWriter.Create(@rbsp);
 
-  b.Write(66, 8);             //profile_idc u(8) (annex A)
+  b.Write(profile, 8);        //profile_idc u(8) (annex A)
   b.Write(1);                 //constraint_set0_flag u(1)
   b.Write(0);                 //constraint_set1_flag u(1)
   b.Write(0);                 //constraint_set2_flag u(1)

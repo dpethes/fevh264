@@ -51,7 +51,7 @@ type
       procedure EstimateMultiRef(var mb: macroblock_t; var fenc: frame_t);
       procedure EstimateSingleRef(var mb: macroblock_t; var fenc: frame_t);
       procedure LoadMVPredictors(const mbx, mby: integer);
-      class function ClipMVRange(const mv: motionvec_t; range: integer): motionvec_t; inline;
+      class function ClipMVRange(const mv: motionvec_t): motionvec_t; inline;
       procedure SetNumReferences(AValue: integer);
       procedure SetSubMELevel(AValue: integer);
 
@@ -122,9 +122,15 @@ begin
   end;
 end;
 
-class function TMotionEstimator.ClipMVRange(const mv: motionvec_t; range: integer): motionvec_t;
+{ Vertical range depends on level; 3.1 and higher is -2048..2047 in qpel units,
+  horizontal range is -8192..8191 in qpel units.
+  However the max delta(mv, mvp) is limited by EG codes table size used for vlc writing.
+}
+class function TMotionEstimator.ClipMVRange(const mv: motionvec_t): motionvec_t;
+const
+  RANGE = EG_MAX_ABS div 2;
 begin
-  result := XYToMVec(clip3(-range, mv.x, range), clip3(-range, mv.y, range));
+  result := XYToMVec(clip3(-RANGE, mv.x, RANGE), clip3(-RANGE, mv.y, RANGE));
 end;
 
 procedure TMotionEstimator.SetNumReferences(AValue: integer);
@@ -215,7 +221,7 @@ begin
   if _subme > 1 then
       mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
 
-  mb.mv := ClipMVRange(mb.mv, 512);
+  mb.mv := ClipMVRange(mb.mv);
   MotionCompensation.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
 end;
 
@@ -229,7 +235,7 @@ begin
   mv := mb.mv;
   SearchRegion.SearchQPelRDO(mb, mb.fref);
   if mv <> mb.mv then begin
-      ClipMVRange(mb.mv, 512);
+      ClipMVRange(mb.mv);
       mv_field[mb.y * mb_width + mb.x] := mb.mv;
   end;
 
@@ -303,7 +309,7 @@ begin
   mb.fref := fref;
   InterPredLoadMvs(mb, fenc, ref_count);
 
-  mb.mv := ClipMVRange(mv, 512);
+  mb.mv := ClipMVRange(mv);
   MotionCompensation.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
 end;
 

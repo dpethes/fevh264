@@ -115,6 +115,7 @@ begin
       n := -2 * n
   else
       n := 2 * n - 1;
+  assert(n < VLC_TAB_SIZE, 'vlc code exceeds range');
   bs.Write(n + 1, ue_code_length_table[n]);
 end;
 
