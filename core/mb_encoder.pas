@@ -38,8 +38,10 @@ type
       frame: frame_t;
       stats: TFrameStats;
       intrapred: TIntraPredictor;
+      mb_can_use_pskip: boolean;
 
       procedure InitMB(mbx, mby: integer);
+      procedure InitForInter;
       procedure FinalizeMB;
       procedure AdvanceFramePointers;
       procedure EncodeCurrentType;
@@ -271,21 +273,13 @@ end;
 const
   MIN_XY = -FRAME_EDGE_W * 4;
 
-{ PSkip test, based on SSD treshold. Also stores SATD luma & SSD chroma score
-  true = PSkip is acceptable
-}
-function TMacroblockEncoder.TrySkip(const use_satd: boolean = true): boolean;
-const
-  SKIP_SSD_TRESH = 256;
-  SKIP_SSD_CHROMA_TRESH = 96;
+procedure TMacroblockEncoder.InitForInter;
 var
   mv: motionvec_t;
-  score, score_c: integer;
 begin
-  result := false;
-  mb.score_skip := MaxInt;
+  InterPredLoadMvs(mb, frame, num_ref_frames);
+  mb_can_use_pskip := false;
   if h264s.NoPSkipAllowed then exit;
-
   if (mb.y < frame.mbh - 1) or (mb.x < frame.mbw - 1) then begin
       mv := mb.mv_skip;
 
@@ -295,23 +289,40 @@ begin
       if mv.x + mb.x * 64 < MIN_XY then exit;
       if mv.y + mb.y * 64 < MIN_XY then exit;
 
-      mb.mv := mv;
-      MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
-      score := dsp.ssd_16x16(mb.pixels, mb.mcomp, 16);
-      if use_satd then
-          mb.score_skip := dsp.satd_16x16(mb.pixels, mb.mcomp, 16)
-      else
-          mb.score_skip := dsp.sad_16x16 (mb.pixels, mb.mcomp, 16);
-      score_c := 0;
-      if chroma_coding then begin
-          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
-          score_c += GetChromaMcSSD;
-      end;
-      mb.score_skip_uv := score_c;
-
-      if (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH) then
-          result := true;
+      mb_can_use_pskip := true;
   end;
+end;
+
+{ PSkip test, based on SSD treshold. Also stores SATD luma & SSD chroma score
+  true = PSkip is acceptable
+}
+function TMacroblockEncoder.TrySkip(const use_satd: boolean = true): boolean;
+const
+  SKIP_SSD_TRESH = 256;
+  SKIP_SSD_CHROMA_TRESH = 96;
+var
+  score, score_c: integer;
+begin
+  result := false;
+  mb.score_skip := MaxInt;
+  if not mb_can_use_pskip then exit;
+
+  mb.mv := mb.mv_skip;
+  MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  score := dsp.ssd_16x16(mb.pixels, mb.mcomp, 16);
+  if use_satd then
+      mb.score_skip := dsp.satd_16x16(mb.pixels, mb.mcomp, 16)
+  else
+      mb.score_skip := dsp.sad_16x16 (mb.pixels, mb.mcomp, 16);
+  score_c := 0;
+  if chroma_coding then begin
+      MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+      score_c := GetChromaMcSSD;
+  end;
+  mb.score_skip_uv_ssd := score_c;
+
+  if (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH) then
+      result := true;
 end;
 
 
@@ -326,7 +337,7 @@ begin
   if score_inter >= mb.score_skip - skip_bias then begin
       if chroma_coding then begin
         skip_bias := mb.qp;
-        if GetChromaMcSSD >= mb.score_skip_uv - skip_bias then
+        if GetChromaMcSSD >= mb.score_skip_uv_ssd - skip_bias then
             result := true;
       end else
           result := true;
@@ -336,31 +347,20 @@ end;
 
 //test if mb can be changed to skip
 procedure TMacroblockEncoder.MakeSkip;
-var
-  mv: motionvec_t;
 begin
-  if h264s.NoPSkipAllowed then exit;
-  mv := mb.mv_skip;
+  if not mb_can_use_pskip then exit;
 
-  //can't handle out-of-frame mvp, don't skip
-  if mv.x + mb.x * 64 >= frame.w * 4 - 34 then exit;
-  if mv.y + mb.y * 64 >= frame.h * 4 - 34 then exit;
-  if mv.x + mb.x * 64 < MIN_XY then exit;
-  if mv.y + mb.y * 64 < MIN_XY then exit;
-
-  if (mb.cbp = 0) and ( (mb.y < frame.mbh - 1) or (mb.x < frame.mbw - 1) ) then begin
-      //restore skip ref/mv
-      if (mb.ref <> 0) or (mb.mbtype <> MB_P_16x16) then begin
-          mb.fref := frame.refs[0];
-          mb.ref := 0;
-          InterPredLoadMvs(mb, frame, num_ref_frames);
-      end;
-      mb.mbtype := MB_P_SKIP;
-      mb.mv     := mb.mv_skip;
-      MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
-      if chroma_coding then
-          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+  //restore skip ref/mv
+  if (mb.ref <> 0) or (mb.mbtype <> MB_P_16x16) then begin
+      mb.fref := frame.refs[0];
+      mb.ref := 0;
+      InterPredLoadMvs(mb, frame, num_ref_frames);
   end;
+  mb.mbtype := MB_P_SKIP;
+  mb.mv     := mb.mv_skip;
+  MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  if chroma_coding then
+      MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
 end;
 
 
@@ -439,6 +439,7 @@ begin
   intrapred.UseSATDCompare;
   for i := 0 to 2 do
       mb_cache[i].dct[0] := fev_malloc(2 * 16 * 25);
+  mb_type_bitcost[MB_P_SKIP] := 0;
 end;
 
 destructor TMBEncoderRDoptAnalyse.Free;
@@ -461,18 +462,25 @@ const
     24, 24, 24, 24, 24, 24, 24, 24, 24, 24,
     32, 32
   );
+  //todo merge both tables; lambda+4 gains results closer to the old lambda at qp18-24+
+  LAMBDA_MBTYPE_PSKIP: array[0..51] of byte = (
+     1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 2, 2, 2, 2,  // 0..19
+     3, 3, 3, 4, 4, 4, 5, 6, 6, 7,  8, 9,10,11,13,14,16,18,20,23,  //20..39
+    25,29,32,36,40,45,51,57,64,72, 81,91                           //40..51
+  ); //lx = pow(2, qp/6.0 - 2)
 var
   score_i4, score_intra, score_p: integer;
   bits_i4, bits_intra, bits_inter: integer;
   mode_lambda: integer;
+  score_p_chroma: integer;
+  can_switch_to_skip: boolean;
 begin
   mb.mbtype := MB_P_16x16;
-  InterPredLoadMvs(mb, frame, num_ref_frames);
+  InitForInter;
 
   //early PSkip
   if TrySkip then begin
       mb.mbtype := MB_P_SKIP;
-      mb_type_bitcost[mb.mbtype] := 0;
       me.Skipped(mb);
       exit;
   end;
@@ -481,16 +489,26 @@ begin
   me.Estimate(mb, frame);
   score_p := dsp.satd_16x16(mb.pixels, mb.mcomp, 16);
   EncodeCurrentType;
-
-  //if there were no coeffs left after quant, try if PSkip is suitable; otherwise just exit with P16x16
-  if (mb.cbp = 0) and TryPostInterEncodeSkip(score_p) then begin
-      MakeSkip;
-      //makeskip may fail in turning the MB to skip, so technically not correct; but it's used only in analysis
-      mb_type_bitcost[mb.mbtype] := 0;
-      exit;
-  end;
-
   bits_inter := MBCost;
+
+  mode_lambda := LAMBDA_MBTYPE_PSKIP[mb.qp];
+
+  //encode as PSkip if inter doesn't improve things much; MB_P_16x16 costs at least 4 bits (5 if multiref)
+  if (mb.cbp = 0) and mb_can_use_pskip then begin
+      can_switch_to_skip := mb.score_skip <= score_p + mode_lambda * bits_inter;
+
+      //compare chroma as well, in case the pskip chroma was bad
+      if can_switch_to_skip and chroma_coding then begin
+          score_p_chroma := GetChromaMcSSD;
+          can_switch_to_skip := mb.score_skip_uv_ssd <= score_p_chroma + (mode_lambda * bits_inter div 4);
+      end;
+
+      if can_switch_to_skip then begin
+          MakeSkip;
+          me.Skipped(mb);
+          exit;
+      end;
+  end;
 
   //encode as intra if prediction score isn't much worse
   mb.i16_pred_mode := intrapred.Analyse_16x16();
@@ -579,7 +597,7 @@ begin
   //encode
   if frame.ftype = SLICE_P then begin
       mb.mbtype := MB_P_16x16;
-      InterPredLoadMvs(mb, frame, num_ref_frames);
+      InitForInter;
 
       //skip
       if TrySkip then begin
@@ -648,7 +666,7 @@ begin
   //encode
   if frame.ftype = SLICE_P then begin
       mb.mbtype := MB_P_16x16;
-      InterPredLoadMvs(mb, frame, num_ref_frames);
+      InitForInter;
 
       //skip
       if TrySkip(true) then begin
@@ -708,7 +726,7 @@ begin
 
   if frame.ftype = SLICE_P then begin
       mb.mbtype := MB_P_16x16;
-      InterPredLoadMvs(mb, frame, num_ref_frames);
+      InitForInter;
       //skip
       if TrySkip(false) then begin
           mb.mbtype := MB_P_SKIP;

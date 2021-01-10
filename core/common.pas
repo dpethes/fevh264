@@ -210,7 +210,7 @@ type
 
       //motion estimation, analysis
       score_skip,
-      score_skip_uv: integer;
+      score_skip_uv_ssd: integer;
       residual_bits: int16;
       bitcost: int16;                    //currently unused
 
