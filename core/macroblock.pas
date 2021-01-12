@@ -388,14 +388,14 @@ var
   i: integer;
   block: int16_p;
 begin
+  move(mb.mcomp^, mb.pixels_dec^, 256);  //prefill, so empty blocks are a no-op
   for i := 0 to 15 do begin
       block := mb.dct[i];
 
       if mb.nz_coef_cnt[i] > 0 then begin
           itransqt(block, mb.quant_ctx_qp);
           dsp.pixel_add_4x4 (mb.pixels_dec + BLOCK_OFFSET_4[i], mb.mcomp + BLOCK_OFFSET_4[i], block);
-      end else
-          pixel_save_4x4(mb.mcomp + BLOCK_OFFSET_4[i], mb.pixels_dec + BLOCK_OFFSET_4[i], 16);
+      end;
   end;
 end;
 
@@ -404,6 +404,7 @@ procedure decode_mb_inter_pskip(var mb: macroblock_t);
 begin
   move(mb.mcomp^, mb.pixels_dec^, 256);
   FillByte(mb.nz_coef_cnt, 16, 0);
+  FillByte(mb.nz_coef_cnt_chroma_ac, 16, 0);
   mb.cbp := 0;
 end;
 
@@ -479,16 +480,14 @@ var
   block: int16_p;
   pred: pbyte;
 begin
+  if intra then
+      pred := mb.pred_c[0]
+  else
+      pred := mb.mcomp_c[0];
+
   if mb.cbp shr 4 = 0 then begin
       //shortcut for no chroma residual case
-      if intra then
-          move(mb.pred_c[0]^,  mb.pixels_dec_c[0]^, 128)
-      else begin
-          move(mb.mcomp_c[0]^, mb.pixels_dec_c[0]^, 128);
-
-          if (mb.mbtype = MB_P_SKIP) then
-              FillByte(mb.nz_coef_cnt_chroma_ac, 16, 0);
-      end;
+      move(pred^, mb.pixels_dec_c[0]^, 128);
 
   end else begin
 
@@ -496,11 +495,6 @@ begin
           itransqt_dc_2x2(mb.chroma_dc[j], mb.qpc);
 
       for j := 0 to 1 do begin
-          if intra then
-              pred := mb.pred_c[j]
-          else
-              pred := mb.mcomp_c[j];
-
           for i := 0 to 3 do begin
               block := mb.dct[16 + i + j * 4];
               block[0] := mb.chroma_dc[j, i];
@@ -513,6 +507,7 @@ begin
               dsp.pixel_add_4x4 (mb.pixels_dec_c[j] + block_offset_chroma[i],
                                  pred + block_offset_chroma[i], block);
           end;
+          pred += 8;  //second chroma plane block offset
       end;
 
   end;
