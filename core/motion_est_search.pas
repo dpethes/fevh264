@@ -420,10 +420,21 @@ var
   min_score: integer;
   lambda: integer;
   mv,
-  mv_prev_pass: motionvec_t;
+  mv_prev_pass, initial_mv: motionvec_t;
   range: integer;
   iter: integer;
   check_bounds: boolean;
+
+function GetCost: integer;
+begin
+  //bitcost first, decoding modifies dct coefs in-place
+  result := h264s.GetBitCost(mb) * lambda;
+  decode_mb_inter(mb);
+  decode_mb_chroma(mb, false);
+  result += dsp.ssd_16x16(mb.pixels, mb.pixels_dec, 16);
+  result += dsp.ssd_8x8(mb.pixels_c[0], mb.pixels_dec_c[0], 16)
+          + dsp.ssd_8x8(mb.pixels_c[1], mb.pixels_dec_c[1], 16);
+end;
 
 procedure check_pattern_qpel;
 var
@@ -435,21 +446,16 @@ begin
       nx := x + pt_dia_small[i][0];
       ny := y + pt_dia_small[i][1];
 
+      mb.mv := XYToMVec(nx - mbx, ny - mby);
+      if (mb.mv = initial_mv) then
+          continue;
+
       MotionCompensation.CompensateQPelXY(fref, nx, ny, mb.mcomp);
       MotionCompensation.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
       encode_mb_inter(mb);
       encode_mb_chroma(mb, nil, false);
 
-      //bitcost first, decoding modifies dct coefs in-place
-      mb.mv := XYToMVec(nx - mbx, ny - mby);
-      score := h264s.GetBitCost(mb) * lambda;
-
-      decode_mb_inter(mb);
-      decode_mb_chroma(mb, false);
-      score += dsp.ssd_16x16(mb.pixels, mb.pixels_dec, 16);
-      score += dsp.ssd_8x8(mb.pixels_c[0], mb.pixels_dec_c[0], 16)
-             + dsp.ssd_8x8(mb.pixels_c[1], mb.pixels_dec_c[1], 16);
-
+      score := GetCost;
       if score < min_score then begin
           min_score := score;
           mv := mb.mv
@@ -465,12 +471,13 @@ begin
   max_x  := _max_x_qpel;
   max_y  := _max_y_qpel;
   range  := 2;
+  initial_mv := mb.mv;
 
   mv := mb.mv;
   x := mbx + mv.x;
   y := mby + mv.y;
   lambda := LAMBDA_ME[mb.qp];
-  min_score := MaxInt;
+  min_score := GetCost;
 
   iter := 0;
   check_bounds := (x - range < MIN_XY_QPEL) or (x + range > max_x) or

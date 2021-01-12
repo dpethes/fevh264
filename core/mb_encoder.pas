@@ -541,11 +541,13 @@ begin
       if mode_lambda * bits_inter + score_p < mode_lambda * bits_intra + score_intra then begin
           mb.mbtype := MB_P_16x16;
           CacheLoad;
-          if me.Subme > 4 then begin
-              me.Refine(mb);
-              EncodeCurrentType;
-          end;
       end;
+  end;
+
+  //apply rdo refinement only if there is residual to work with to save some time at negligible quality cost
+  if (mb.mbtype = MB_P_16x16) and (mb.cbp > 0) and (me.Subme > 4) then begin
+      me.Refine(mb);
+      EncodeCurrentType;
   end;
 end;
 
