@@ -169,6 +169,15 @@ begin
           end;
       end;
 
+      MB_P_16x8: begin
+          encode_mb_inter(mb);
+          if chroma_coding then begin
+              MotionCompensation.CompensateChroma_8x4(mb.fref, mb.mv,  mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], 0);
+              MotionCompensation.CompensateChroma_8x4(mb.fref, mb.mv1, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], 1);
+              encode_mb_chroma(mb, intrapred, false);
+          end;
+      end;
+
       MB_I_PCM: begin
           //necessary for proper cavlc initialization for neighboring blocks
           FillByte(mb.nz_coef_cnt, 16, 16);

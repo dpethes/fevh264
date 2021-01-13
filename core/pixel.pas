@@ -44,12 +44,14 @@ var
   var_16x16: mbstat_func_t;
   pixel_load_16x16,
   pixel_loadu_16x16,
+  pixel_loadu_16x8,
   pixel_load_8x8,
   pixel_save_16x16,
   pixel_save_8x8: pixmove_func_t;
   pixel_add_4x4,
   pixel_sub_4x4: pixoper_func_t;
-  pixel_avg_16x16: pixavg_func_t;
+  pixel_avg_16x16,
+  pixel_avg_16x8: pixavg_func_t;
   pixel_downsample_row: pixdownsample_func_t;
 
 
@@ -286,6 +288,17 @@ begin
   end;
 end;
 
+procedure pixel_load_16x8_pas (dest, src: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+var
+  i: integer;
+begin
+  for i := 0 to 7 do begin
+      move(src^, dest^, 16);
+      src  += stride;
+      dest += 16;
+  end;
+end;
+
 
 procedure pixel_load_8x8_pas (dest, src: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 var
@@ -362,6 +375,19 @@ var
   x, y: integer;
 begin
   for y := 0 to 15 do begin
+      for x := 0 to 15 do
+          dest[x] := (src1[x] + src2[x] + 1) shr 1;
+      src1 += stride;
+      src2 += stride;
+      dest += 16;
+  end;
+end;
+
+procedure pixel_avg_16x8_pas(src1, src2, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+var
+  x, y: integer;
+begin
+  for y := 0 to 7 do begin
       for x := 0 to 15 do
           dest[x] := (src1[x] + src2[x] + 1) shr 1;
       src1 += stride;
@@ -453,12 +479,14 @@ begin
 
   pixel_load_16x16  := @pixel_load_16x16_pas;
   pixel_loadu_16x16 := @pixel_load_16x16_pas;
+  pixel_loadu_16x8 := @pixel_load_16x8_pas;
   pixel_load_8x8   := @pixel_load_8x8_pas;
   pixel_save_16x16 := @pixel_save_16x16_pas;
   pixel_save_8x8   := @pixel_save_8x8_pas;
   pixel_add_4x4    := @pixel_add_4x4_pas;
   pixel_sub_4x4    := @pixel_sub_4x4_pas;
   pixel_avg_16x16  := @pixel_avg_16x16_pas;
+  pixel_avg_16x8  := @pixel_avg_16x8_pas;
 
   pixel_downsample_row := @pixel_downsample_row_pas;
 

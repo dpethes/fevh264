@@ -79,10 +79,13 @@ TDsp = class
     pixel_add_4x4,
     pixel_sub_4x4: pixoper_func_t;
     pixel_avg_16x16: pixavg_func_t;
+    pixel_avg_16x8: pixavg_func_t;
     pixel_downsample_row: pixdownsample_func_t;
 
     pixel_loadu_16x16: pixmove_func_t; //unaligned memory load
+    pixel_loadu_16x8: pixmove_func_t;
     mc_chroma_8x8: mc_chroma_func_t;
+    mc_chroma_8x4: mc_chroma_func_t;
 
     constructor Create(flags: TDsp_init_flags);
     procedure FpuReset;
@@ -189,6 +192,8 @@ begin
   var_16x16 := pixel.var_16x16;
 
   pixel_loadu_16x16 := pixel.pixel_loadu_16x16;
+  pixel_loadu_16x8 := pixel.pixel_loadu_16x8;
+
   pixel_load_16x16 := pixel.pixel_load_16x16;
   pixel_load_8x8   := pixel.pixel_load_8x8;
   pixel_save_16x16 := pixel.pixel_save_16x16;
@@ -196,9 +201,11 @@ begin
   pixel_add_4x4  := pixel.pixel_add_4x4;
   pixel_sub_4x4  := pixel.pixel_sub_4x4;
   pixel_avg_16x16  := pixel.pixel_avg_16x16;
+  pixel_avg_16x8  := pixel.pixel_avg_16x8;
   pixel_downsample_row := pixel.pixel_downsample_row;
 
   mc_chroma_8x8 := motion_comp.mc_chroma_8x8;
+  mc_chroma_8x4 := motion_comp.mc_chroma_8x4;
 end;
 
 {$ifdef CPUI386} {$define X86_COMPAT} {$endif}
