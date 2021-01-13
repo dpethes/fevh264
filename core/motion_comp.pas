@@ -332,6 +332,7 @@ procedure mc_chroma_8x8_sse2(src, dst: pbyte; const stride: integer; coef: pbyte
 {$endif}
 {$ifdef CPUX86_64}
 procedure mc_chroma_8x8_sse2(src, dst: pbyte; const stride: integer; coef: pbyte); external name 'mc_chroma_8x8_sse2';
+procedure mc_chroma_8x4_sse2(src, dst: pbyte; const stride: integer; coef: pbyte); external name 'mc_chroma_8x4_sse2';
 {$endif}
 
 procedure motion_compensate_init(const flags: TDsp_init_flags);
@@ -347,6 +348,7 @@ begin
   {$ifdef CPUX86_64}
   if flags.sse2 then begin
       mc_chroma_8x8 := @mc_chroma_8x8_sse2;
+      mc_chroma_8x4 := @mc_chroma_8x4_sse2;
   end;
   {$endif}
 end;

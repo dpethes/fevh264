@@ -49,14 +49,18 @@ cglobal pixel_downsample_row_sse2
 
 cglobal satd_4x4_mmx
 cglobal satd_8x8_mmx
+cglobal satd_8x4_mmx
 cglobal satd_16x16_sse2
+cglobal satd_16x8_sse2
 
 ; for profiling
 cglobal ssd_16x16_sse2.loop
 cglobal ssd_8x8_sse2.loop
 cglobal var_16x16_sse2.loop
 cglobal satd_8x8_mmx.loop
+cglobal satd_8x4_mmx.loop
 cglobal satd_16x16_sse2.loop
+cglobal satd_16x8_sse2.loop
 
 
 ; SAD
@@ -553,6 +557,25 @@ satd_8x8_mmx:
     jnz   .loop
     SUM2DW mm4, r0
     ret
+    
+; function satd_8x4_mmx  (pix1, pix2: pbyte; stride: integer): integer;
+ALIGN 16
+satd_8x4_mmx:
+    mov   r4, 2
+    pxor  mm4,mm4  ; sum
+.loop:
+    %assign i 0
+    %rep 2
+        mSUB4x4 r1, r2, r3, i
+        mHADAMARD4
+        TRANSPOSE_4x4_int16
+        mHADAMARD4
+        mSUM
+        paddd   mm4, mm0
+        %assign i i + 4
+    %endrep
+    SUM2DW mm4, r0
+    ret
 
 
 ; function satd_16x16_sse2  (pix1, pix2: pbyte; stride: integer): integer;
@@ -591,3 +614,27 @@ satd_16x16_sse2:
     POP_XMM_REGS 2
     ret
 
+; function satd_16x8_sse2  (pix1, pix2: pbyte; stride: integer): integer;
+ALIGN 16
+satd_16x8_sse2:
+    mov   r4, 2
+    pxor  mm4, mm4  ; sum
+    PUSH_XMM_REGS 2
+.loop:
+    %assign i 0
+    %rep 2
+        mSUB4x4 r1, r2, r3, i
+        mHADAMARD4
+        mTRANSPOSE4x2_xmm
+        mHADAMARD4
+        mSUM
+        paddd   mm4, mm0
+        %assign i i + 8
+    %endrep
+    lea   r1, [r1 + 4 * 16]
+    lea   r2, [r2 + 4 * r3]
+    dec   r4
+    jnz   .loop
+    SUM4DW mm4, r0
+    POP_XMM_REGS 2
+    ret

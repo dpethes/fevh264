@@ -472,7 +472,9 @@ function ssd_16x16_sse2(pix1, pix2: pbyte; stride: integer): integer;  external 
 function ssd_8x8_sse2  (pix1, pix2: pbyte; stride: integer): integer;  external name 'ssd_8x8_sse2';
 
 function satd_16x16_sse2 (pix1, pix2: pbyte; stride: integer): integer; external name 'satd_16x16_sse2';
+function satd_16x8_sse2 (pix1, pix2: pbyte; stride: integer): integer; external name 'satd_16x8_sse2';
 function satd_8x8_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external name 'satd_8x8_mmx';
+function satd_8x4_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external name 'satd_8x4_mmx';
 function satd_4x4_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external name 'satd_4x4_mmx';
 
 function var_16x16_sse2(pix: pbyte): uint32; external name 'var_16x16_sse2';
@@ -557,7 +559,9 @@ begin
       ssd_8x8   := @ssd_8x8_sse2;
 
       satd_4x4   := @satd_4x4_mmx;
+      satd_8x4   := @satd_8x4_mmx;
       satd_8x8   := @satd_8x8_mmx;
+      satd_16x8  := @satd_16x8_sse2;
       satd_16x16 := @satd_16x16_sse2;
 
       var_16x16 := @var_16x16_sse2;
