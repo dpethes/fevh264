@@ -644,11 +644,27 @@ begin
       write_ue_code(bs, mb.ref);  //te() = ue()
   end;
 
+  if mb.mbtype = MB_P_16x8 then begin  //no mixed refs in this encoder
+      case slice.num_ref_frames of
+        1: ;
+        2: bs.Write(1 - mb.ref);      //te() = !value; value = <0,1>
+      else
+          write_ue_code(bs, mb.ref);  //te() = ue()
+      end;
+  end;
+
   //mvd L0
   x := mb.mv.x - mb.mvp.x;
   y := mb.mv.y - mb.mvp.y;
   write_se_code(bs, x);
   write_se_code(bs, y);
+
+  if mb.mbtype = MB_P_16x8 then begin
+      x := mb.mv1.x - mb.mvp1.x;
+      y := mb.mv1.y - mb.mvp1.y;
+      write_se_code(bs, x);
+      write_se_code(bs, y);
+  end;
 end;
 
 
@@ -845,11 +861,16 @@ end;
 
 
 procedure TH264Stream.write_mb_p_16x16(var mb: macroblock_t);
+var
+  mb_type: integer;
 begin
   //skip run, mbtype
   write_ue_code(bs, mb_skip_count);
   mb_skip_count := 0;
-  write_ue_code(bs, 0);  //P_L0_16x16 - tab. 7-10
+  mb_type := 0;         //P_L0_16x16 - tab. 7-10
+  if mb.mbtype = MB_P_16x8 then
+      mb_type := 1;
+  write_ue_code(bs, mb_type);
   //mb_pred
   write_mb_pred_inter(mb);
   //cbp
@@ -872,7 +893,7 @@ begin
           write_mb_i_4x4(mb);
       MB_I_16x16:
           write_mb_i_16x16(mb);
-      MB_P_16x16:
+      MB_P_16x16, MB_P_16x8:
           write_mb_p_16x16(mb);
       MB_P_SKIP:
           write_mb_p_skip;

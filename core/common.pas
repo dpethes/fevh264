@@ -51,6 +51,7 @@ const
   MB_P_16x16 = 2;
   MB_P_SKIP  = 3;
   MB_I_PCM   = 4;
+  MB_P_16x8  = 5;
 
   INTRA_PRED_TOP   = 0;
   INTRA_PRED_LEFT  = 1;
@@ -186,6 +187,7 @@ type
       mvp,
       mv_skip,
       mv: motionvec_t;        //mvs: predicted, skip, coded
+      mvp1, mv1: motionvec_t; //partition mvp/mv for P16x8 mbPartIdx=1
       ref: int8;              //reference frame L0 index
       cbp: int8;              //cpb bitmask: 0..3 luma, 4 chroma DC only, 5 chroma AC
       fref: frame_p;          //reference frame selected for inter prediction
@@ -330,7 +332,7 @@ end;
 
 function is_inter(const m: integer): boolean; inline;
 begin
-  result := m in [MB_P_16x16, MB_P_SKIP];
+  result := m in [MB_P_16x16, MB_P_SKIP, MB_P_16x8];
 end;
 
 { TMotionVectorList }

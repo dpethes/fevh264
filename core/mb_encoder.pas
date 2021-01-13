@@ -189,7 +189,7 @@ begin
       //MB_I_4x4: decoded during encode
       MB_I_16x16:
           decode_mb_intra_i16(mb, intrapred);
-      MB_P_16x16:
+      MB_P_16x16, MB_P_16x8:
           decode_mb_inter(mb);
       MB_P_SKIP:
           decode_mb_inter_pskip(mb);
@@ -351,7 +351,7 @@ begin
   if not mb_can_use_pskip then exit;
 
   //restore skip ref/mv
-  if (mb.ref <> 0) or (mb.mbtype <> MB_P_16x16) then begin
+  if (mb.ref <> 0) or not is_inter(mb.mbtype) then begin
       mb.fref := frame.refs[0];
       mb.ref := 0;
       InterPredLoadMvs(mb, frame, num_ref_frames);

@@ -31,7 +31,7 @@ procedure InterPredLoadMvs (var mb: macroblock_t; const frame: frame_t; const nu
 var
   num_available: integer;
 
-procedure assign_mb_info(var m: mb_interpred_info; const idx: integer);
+procedure assign_mb_info(var m: mb_interpred_info; const idx: integer; const mbPartIdx: integer = 0);
 var
   t: macroblock_p;
 begin
@@ -41,6 +41,9 @@ begin
       exit;
 
   m.mv     := t^.mv;
+  if (t^.mbtype = MB_P_16x8) and (mbPartIdx = 1) then
+      m.mv := t^.mv1;
+
   m.refidx := t^.ref;
   num_available += 1;
 end;
@@ -50,7 +53,7 @@ var
   i: integer;
   same_ref_n: integer;
   same_ref_i: integer;
-  top_idx: integer;
+  left_idx, top_idx: integer;
 
 begin
   if frame.ftype = SLICE_I then
@@ -64,18 +67,19 @@ begin
   end;
 
   //left mb - A
+  left_idx := mb.y * frame.mbw + mb.x - 1;
   if mb.x > 0 then
-      assign_mb_info(mbs[0], mb.y * frame.mbw + mb.x - 1);
+      assign_mb_info(mbs[0], left_idx);
 
   //top mbs - B, C/D
   if mb.y > 0 then begin
       top_idx := (mb.y - 1) * frame.mbw + mb.x;
-      assign_mb_info(mbs[1], top_idx);
+      assign_mb_info(mbs[1], top_idx, 1);
 
       if mb.x < frame.mbw - 1 then
-          assign_mb_info(mbs[2], top_idx + 1)  //C
+          assign_mb_info(mbs[2], top_idx + 1, 1)  //C
       else
-          assign_mb_info(mbs[2], top_idx - 1); //D
+          assign_mb_info(mbs[2], top_idx - 1, 1); //D
   end;
 
   case num_available of
@@ -109,6 +113,25 @@ begin
               if same_ref_n = 1 then
                   mb.mvp := mbs[same_ref_i].mv;
           end;
+      end;
+
+  end;
+  mb.mvp1 := mb.mvp;
+
+  if mb.mbtype = MB_P_16x8 then begin
+      //8.4.1.3 Derivation process for luma motion vector prediction
+
+      //mbPartIdx=0: mvpLX = mvLXB   (top)
+      if mbs[1].avail and (mbs[1].refidx = mb.ref) then
+          mb.mvp := mbs[1].mv;
+
+      //mbPartIdx=1: mvpLX = mvLXA   (left)
+      if mbs[0].avail and (mbs[0].refidx = mb.ref) then begin
+          assign_mb_info(mbs[0], left_idx, 1);  //I need the bottom subpart if it's 16x8 as well, so reload
+          mb.mvp1 := mbs[0].mv;
+      end else begin
+          //use mv from top subpart
+          mb.mvp1 := mb.mv;
       end;
 
   end;
