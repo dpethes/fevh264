@@ -101,6 +101,7 @@ type
       function mb_i_4x4_bits   (const mb: macroblock_t): integer;
       function mb_i_16x16_bits (const mb: macroblock_t): integer;
       function mb_p_16x16_bits (const mb: macroblock_t): integer;
+      function mb_p_16x8_bits (const mb: macroblock_t): integer;
       function mb_p_skip_bits: integer;
       function mb_interpred_bits (const mb: macroblock_t): integer;
 
@@ -909,6 +910,8 @@ begin
           result := mb_i_16x16_bits(mb);
       MB_P_16x16:
           result := mb_p_16x16_bits(mb);
+      MB_P_16x8:
+          result := mb_p_16x8_bits(mb);
       MB_P_SKIP:
           result := mb_p_skip_bits;
   else
@@ -929,9 +932,17 @@ begin
   else
       result += ue_code_len(mb.ref);
   end;
+  if mb.mbtype = MB_P_16x8 then
+      result *= 2;
+
   x := mb.mv.x - mb.mvp.x;
   y := mb.mv.y - mb.mvp.y;
   result += se_code_len(x) + se_code_len(y);
+  if mb.mbtype = MB_P_16x8 then begin
+      x := mb.mv1.x - mb.mvp1.x;
+      y := mb.mv1.y - mb.mvp1.y;
+      result += se_code_len(x) + se_code_len(y);
+  end;
 end;
 
 function TH264Stream.InterPredCost: TInterPredCost;
@@ -1020,6 +1031,14 @@ end;
 function TH264Stream.mb_p_16x16_bits(const mb: macroblock_t): integer;
 begin
   result := 1 + mb_interpred_bits(mb);
+  result += ue_code_len(tab_cbp_inter_4x4_to_codenum[mb.cbp]);
+  if mb.cbp > 0 then
+      result += mb_residual_bits(mb);
+end;
+
+function TH264Stream.mb_p_16x8_bits(const mb: macroblock_t): integer;
+begin
+  result := 3 + mb_interpred_bits(mb);
   result += ue_code_len(tab_cbp_inter_4x4_to_codenum[mb.cbp]);
   if mb.cbp > 0 then
       result += mb_residual_bits(mb);

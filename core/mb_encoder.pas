@@ -96,7 +96,7 @@ type
   TMBEncoderRDoptAnalyse = class(TMacroblockEncoder)
     private
       mb_cache: array[0..2] of macroblock_t; //todo init in constructor
-      mb_type_bitcost: array[MB_I_4x4..MB_P_SKIP] of integer;
+      mb_type_bitcost: array[MB_I_4x4..MB_P_16x8] of integer;
       procedure CacheStore;
       procedure CacheLoad;
       procedure EncodeInter;
@@ -243,7 +243,7 @@ begin
           stats.pred_8x8_chroma[mb.chroma_pred_mode] += 1;
           stats.itex_bits += mb.residual_bits;
       end;
-      MB_P_16x16: begin
+      MB_P_16x16, MB_P_16x8: begin
           stats.mb_p_count += 1;
           stats.ref[mb.ref] += 1;
           stats.ptex_bits += mb.residual_bits;
@@ -483,6 +483,11 @@ var
   mode_lambda: integer;
   score_p_chroma: integer;
   can_switch_to_skip: boolean;
+
+  score_psub, bits_inter_sub: integer;
+  sub_16x16: boolean;
+  MB_P_16x16_mv: motionvec_t;
+
 begin
   mb.mbtype := MB_P_16x16;
   InitForInter;
@@ -550,6 +555,32 @@ begin
       if mode_lambda * bits_inter + score_p < mode_lambda * bits_intra + score_intra then begin
           mb.mbtype := MB_P_16x16;
           CacheLoad;
+      end;
+  end;
+
+  sub_16x16 := true;
+  if (mb.mbtype = MB_P_16x16) and sub_16x16 then begin
+
+      MB_P_16x16_mv := mb.mv; //save
+      mb.mbtype := MB_P_16x8;
+
+      me.Estimate_16x8(mb);
+      InterPredLoadMvs(mb, frame, num_ref_frames);  //mvp can differ and mvp1 can change based on surrounding MBs and top mv
+
+      score_psub := dsp.satd_16x16(mb.pixels, mb.mcomp, 16);
+      EncodeCurrentType;
+      bits_inter_sub := MBCost;
+
+      mode_lambda := LAMBDA_MBTYPE_PSKIP[mb.qp];
+      if (me.Subme > 4) then  //bias somewhat against MB_P_16x8, as it does not have qpel rdo refinement
+          mode_lambda *= 4;
+      if (mb.mv = mb.mv1) or (bits_inter*mode_lambda + score_p < bits_inter_sub*mode_lambda + score_psub) then begin
+          mb.mbtype := MB_P_16x16;
+          mb.mv := MB_P_16x16_mv;  //restore
+          //mocomp for 16x16 - todo cache?
+          MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+          InterPredLoadMvs(mb, frame, num_ref_frames);  //reload mvp
+          EncodeCurrentType;  //CacheLoad is not enough, mocomp data is gone
       end;
   end;
 
@@ -669,7 +700,9 @@ const
   INTRA_MODE_PENALTY = 10;
 
 var
-  score_i, score_p: integer;
+  score_i, score_p, score_psub: integer;
+  sub_16x16: boolean;
+  MB_P_16x16_mv: motionvec_t;
 
 begin
   InitMB(mbx, mby);
@@ -702,13 +735,33 @@ begin
           mb.ref := 0;
       end;
 
-      //encode mb
-      EncodeCurrentType;
-
       //if there were no coeffs left, try skip
       if is_inter(mb.mbtype) and (mb.cbp = 0) and TryPostInterEncodeSkip(score_p) then begin
           MakeSkip;
       end;
+
+      sub_16x16 := true;
+      if (mb.mbtype = MB_P_16x16) and sub_16x16 then begin
+
+          MB_P_16x16_mv := mb.mv; //save
+
+          me.Estimate_16x8(mb);
+          InterPredLoadMvs(mb, frame, num_ref_frames);  //mvp can differ and mvp1 can change based on surrounding MBs and top mv
+          score_psub := dsp.satd_16x16(mb.pixels, mb.mcomp, 16);
+          score_psub += 2 * (InterCost.Bits(mb.mv - mb.mvp) + InterCost.Bits(mb.mv1 - mb.mvp1));
+
+          //no refinement possible
+          if (mb.mv = mb.mv1) or (score_p < score_psub) then begin
+              mb.mbtype := MB_P_16x16;
+              mb.mv := MB_P_16x16_mv;  //restore
+              //mocomp for 16x16 - todo cache?
+              MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+              InterPredLoadMvs(mb, frame, num_ref_frames);  //reload mvp
+          end;
+      end;
+
+      //encode mb
+      EncodeCurrentType;
 
   end else begin
       mb.i16_pred_mode := intrapred.Analyse_16x16();
