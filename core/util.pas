@@ -68,7 +68,9 @@ TDsp = class
     ssd_16x16,
     ssd_8x8,
     satd_4x4,
+    satd_8x4,
     satd_8x8,
+    satd_16x8,
     satd_16x16: mbcmp_func_t;
     var_16x16: mbstat_func_t;
 
@@ -185,7 +187,9 @@ begin
   sad_8x8   := pixel.sad_8x8;
   sad_4x4   := pixel.sad_4x4;
   satd_16x16 := pixel.satd_16x16;
+  satd_16x8  := pixel.satd_16x8;
   satd_8x8   := pixel.satd_8x8;
+  satd_8x4   := pixel.satd_8x4;
   satd_4x4   := pixel.satd_4x4;
   ssd_16x16 := pixel.ssd_16x16;
   ssd_8x8   := pixel.ssd_8x8;

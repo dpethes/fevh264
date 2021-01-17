@@ -39,7 +39,9 @@ var
   ssd_16x16,
   ssd_8x8,
   satd_4x4,
+  satd_8x4,
   satd_8x8,
+  satd_16x8,
   satd_16x16: mbcmp_func_t;
   var_16x16: mbstat_func_t;
   pixel_load_16x16,
@@ -206,6 +208,16 @@ begin
   for i := 0 to 15 do result += abs( psmallint(@t)[i] );
 end;
 
+function satd_8x4_pas(pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
+var
+  i: integer;
+begin
+  result := 0;
+  result += satd_4x4_pas(pix1,      pix2,      stride);
+  result += satd_4x4_pas(pix1 +  4, pix2 +  4, stride);
+  pix1 += 4 * 16;
+  pix2 += 4 * stride;
+end;
 
 function satd_8x8_pas(pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
 var
@@ -220,6 +232,20 @@ begin
   end
 end;
 
+function satd_16x8_pas(pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
+var
+  i: integer;
+begin
+  result := 0;
+  for i := 0 to 1 do begin
+      result += satd_4x4_pas(pix1,      pix2,      stride);
+      result += satd_4x4_pas(pix1 +  4, pix2 +  4, stride);
+      result += satd_4x4_pas(pix1 +  8, pix2 +  8, stride);
+      result += satd_4x4_pas(pix1 + 12, pix2 + 12, stride);
+      pix1 += 4 * 16;
+      pix2 += 4 * stride;
+  end
+end;
 
 function satd_16x16_pas(pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
 var
@@ -474,7 +500,9 @@ begin
   var_16x16 := @var_16x16_pas;
 
   satd_4x4   := @satd_4x4_pas;
+  satd_8x4   := @satd_8x4_pas;
   satd_8x8   := @satd_8x8_pas;
+  satd_16x8  := @satd_16x8_pas;
   satd_16x16 := @satd_16x16_pas;
 
   pixel_load_16x16  := @pixel_load_16x16_pas;

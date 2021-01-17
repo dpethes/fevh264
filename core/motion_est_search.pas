@@ -52,6 +52,7 @@ type
       function SearchHPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchQPel(var mb: macroblock_t; const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
       procedure SearchQPelRDO(var mb: macroblock_t; const fref: frame_p);
+      function SearchQPel_16x8_partition(var mb: macroblock_t; idx: integer; const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
  end;
 
 (*******************************************************************************
@@ -493,6 +494,108 @@ begin
 
   _last_search_score := min_score;
   mb.mv := mv;
+end;
+  
+
+//mb.mcomp isn't adjusted, as it gets properly written at end of ME
+//cur needs to be offset, but maybe do it differently?
+function TRegionSearch.SearchQPel_16x8_partition(var mb: macroblock_t; idx: integer;
+  const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
+var
+  mbcmp: mbcmp_func_t;
+  max_x, max_y: integer;
+  mbx, mby,              //macroblock qpel x,y position
+  x, y: integer;         //currently searched qpel x,y position
+  min_score: integer;
+  mv,
+  mv_prev_pass: motionvec_t;
+  range: integer;
+  iter: integer;
+  check_bounds: boolean;
+  chroma_subpart_offset: integer;
+
+
+function chroma_score: integer; inline;
+begin
+  result := dsp.satd_8x4(mb.pixels_c[0], mb.mcomp_c[0] + chroma_subpart_offset, 16);
+  result += dsp.satd_8x4(mb.pixels_c[1], mb.mcomp_c[1] + chroma_subpart_offset, 16);
+end;
+
+procedure check_pattern_qpel;
+var
+  i: integer;
+  nx, ny,
+  score: integer;
+begin
+  if check_bounds then
+      if (x - 1 < MIN_XY_QPEL) or (x + 1 > max_x) or
+         (y - 1 < MIN_XY_QPEL) or (y + 1 > max_y) then exit;
+  for i := 0 to 3 do begin
+      nx := x + pt_dia_small[i][0];
+      ny := y + pt_dia_small[i][1];
+
+      //offset to current sub-block
+      MotionCompensation.CompensateQPelXY_16x8(fref, nx + XY_qpel_offset_16x8[idx, 0], ny + XY_qpel_offset_16x8[idx, 1], mb.mcomp);
+      score := mbcmp(cur, mb.mcomp, 16)
+               + InterCost.Bits(XYToMVec(nx - mbx, ny - mby));
+
+      if chroma_me then begin
+          MotionCompensation.CompensateChroma_8x4(fref, XYToMVec(nx - mbx, ny - mby), mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], idx);
+          score += chroma_score();
+      end;
+
+      if score < min_score then begin
+          min_score := score;
+          mv := XYToMVec(nx - mbx, ny - mby);
+      end;
+  end;
+  x := mbx + mv.x;
+  y := mby + mv.y;
+end;
+
+begin
+  mbx    := _mbx * 4;
+  mby    := _mby * 4;
+
+  cur += MB_pixel_offset_16x8[idx, 0] + MB_pixel_offset_16x8[idx, 1] * 16;  //MB_STRIDE
+  chroma_subpart_offset := (MB_pixel_offset_16x8[idx, 0] div 2) + (MB_pixel_offset_16x8[idx, 1] div 2) * 16;  //MB_STRIDE
+
+  max_x  := _max_x_qpel;
+  max_y  := _max_y_qpel;
+  if satd then
+      mbcmp := dsp.satd_16x8
+  else
+      mbcmp := dsp.satd_16x8;  //todo SAD
+  range  := ME_RANGES[mpQpel]*2;
+
+  mv := mb.mv;
+  x := mbx + mv.x;
+  y := mby + mv.y;
+
+  min_score := MaxInt;  //reset score, mbcmp may be different
+
+  iter := 0;
+  check_bounds := (x - range < MIN_XY_QPEL) or (x + range > max_x) or
+                  (y - range < MIN_XY_QPEL) or (y + range > max_y);
+  repeat
+      mv_prev_pass := mv;
+      check_pattern_qpel();
+      iter += 1;
+  until (mv = mv_prev_pass) or (iter >= range);
+
+  if min_score = MaxInt then begin    //return valid score if no searches were done (rare cases at the padded edge of a frame)
+      MotionCompensation.CompensateQPelXY_16x8(fref, x + XY_qpel_offset_16x8[idx, 0], y + XY_qpel_offset_16x8[idx, 1], mb.mcomp);
+      min_score := mbcmp(cur, mb.mcomp, 16) + InterCost.Bits(mv);
+      if chroma_me then begin
+          MotionCompensation.CompensateChroma_8x4(fref, XYToMVec(x - mbx, y - mby), mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], 1);
+          min_score += chroma_score();
+      end;
+  end;
+
+  _last_search_score := min_score;
+  result := mv;
+
+  cur -= MB_pixel_offset_16x8[idx, 0] + MB_pixel_offset_16x8[idx, 1] * 16;  //MB_STRIDE
 end;
 
 end.

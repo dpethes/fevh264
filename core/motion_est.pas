@@ -62,6 +62,7 @@ type
       constructor Create(const w, h, mbw, mbh: integer; h264stream: TH264Stream);
       destructor Free;
       procedure Estimate(var mb: macroblock_t; var fenc: frame_t);
+      procedure Estimate_16x8(var mb: macroblock_t);
       procedure Refine(var mb: macroblock_t);
       procedure Skipped(var mb: macroblock_t);
   end;
@@ -311,6 +312,26 @@ begin
 
   mb.mv := ClipMVRange(mv);
   MotionCompensation.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
+end;
+
+
+procedure TMotionEstimator.Estimate_16x8(var mb: macroblock_t);
+var
+  mv0, mv1: motionvec_t;
+begin
+  //mb.mv is used as a starting point for both partitions, so don't overwrite it just yet
+  mb.mv1 := mb.mv;
+  mv0 := SearchRegion.SearchQPel_16x8_partition(mb, 0, mb.fref, _subme > 2, _subme > 3);
+  mv1 := SearchRegion.SearchQPel_16x8_partition(mb, 1, mb.fref, _subme > 2, _subme > 3);
+
+  ClipMVRange(mv0);
+  ClipMVRange(mv1);
+  mb.mv  := mv0;
+  mb.mv1 := mv1;
+  mv_field[mb.y * mb_width + mb.x] := mv1;
+
+  MotionCompensation.Compensate_16x8(mb.fref, mb.mv,  mb.x, mb.y, mb.mcomp, 0);
+  MotionCompensation.Compensate_16x8(mb.fref, mb.mv1, mb.x, mb.y, mb.mcomp, 1);
 end;
 
 
