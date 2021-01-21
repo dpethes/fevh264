@@ -505,7 +505,6 @@ var
   i, first_nz_index, zeros, n: integer;
   p: array[0..15] of int16_t;
   coef: integer;
-  count_t1: boolean;
 begin
   block.ncoef := ncoef;
   block.nlevel := 0;
@@ -529,7 +528,6 @@ begin
 
   n := 0;      //index for nonzero values
   zeros := 0;  //length of zero runs before nonzero
-  count_t1 := true;
 
   for i := first_nz_index downto 0 do begin
       coef := p[i];
@@ -537,15 +535,6 @@ begin
           zeros += 1;
       end else begin
           block.level[n] := coef;   //store coef, if it's a t1, then store the sign separately
-
-          //trailing 1s
-          if count_t1 and (block.t1 < 3) and (abs(coef) = 1) then begin
-              if coef < 0 then
-                  block.t1_signs := block.t1_signs or (1 shl block.t1);
-              block.t1 += 1;
-          end else
-              count_t1 := false;
-
           if n > 0 then
               block.run_before[n-1] := zeros;  //save run_before
           zeros := 0;
@@ -555,6 +544,28 @@ begin
   if n < 16 then
       block.run_before[n-1] := zeros;
   block.nlevel := n;
+
+  if n > 0 then begin
+       if abs(block.level[0]) = 1 then begin
+           if block.level[0] < 0 then
+               block.t1_signs := 1;
+           block.t1 += 1;
+
+           if (n > 1) then begin
+               if (abs(block.level[1]) = 1) then begin
+                   if block.level[1] < 0 then
+                       block.t1_signs := block.t1_signs or (1 shl 1);
+                   block.t1 += 1;
+
+                   if (n > 2) and (abs(block.level[2]) = 1) then begin
+                       if block.level[2] < 0 then
+                           block.t1_signs := block.t1_signs or (1 shl 2);
+                       block.t1 += 1;
+                   end;
+               end;
+           end;
+       end;
+   end;
 end;
 
 
@@ -563,7 +574,6 @@ var
   p: array[0..3] of int16_t;
   i, zeros, n: integer;
   coef: integer;
-  count_t1: boolean;
 begin
   pint64(@p)^ := pint64(dct_coefs)^;
   block.ncoef := 4;
@@ -577,7 +587,6 @@ begin
 
   n := 0;      //index for nonzero values
   zeros := 0;  //length of zero runs before nonzero
-  count_t1 := true;
 
   for i := 3 downto 0 do begin
       coef := p[i];
@@ -585,15 +594,6 @@ begin
           zeros += 1;
       end else begin
           block.level[n] := coef;   //store coef, if it's a t1, then store the sign separately
-
-          //trailing 1s
-          if count_t1 and (block.t1 < 3) and (abs(coef) = 1) then begin
-              if coef < 0 then
-                  block.t1_signs := block.t1_signs or (1 shl block.t1);
-              block.t1 += 1;
-          end else
-              count_t1 := false;
-
           if n > 0 then
               block.run_before[n-1] := zeros  //save run_before
           else
@@ -604,6 +604,28 @@ begin
   end;
   block.run_before[n-1] := zeros;
   block.nlevel := n;
+
+  if n > 0 then begin
+        if abs(block.level[0]) = 1 then begin
+            if block.level[0] < 0 then
+                block.t1_signs := 1;
+            block.t1 += 1;
+
+            if (n > 1) then begin
+                if (abs(block.level[1]) = 1) then begin
+                    if block.level[1] < 0 then
+                        block.t1_signs := block.t1_signs or (1 shl 1);
+                    block.t1 += 1;
+
+                    if (n > 2) and (abs(block.level[2]) = 1) then begin
+                        if block.level[2] < 0 then
+                            block.t1_signs := block.t1_signs or (1 shl 2);
+                        block.t1 += 1;
+                    end;
+                end;
+            end;
+        end;
+    end;
 end;
 
 
