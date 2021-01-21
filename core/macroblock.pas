@@ -113,6 +113,11 @@ begin
   for i := 0 to 15 do dst[i+18] := src[i * 16];
 end;
 
+procedure fill_all_nonzero_counts(var mb: macroblock_t; value: byte); inline;
+begin
+  FillByte(mb.nz_coef_cnt, 24+8+8, value);  //write-combine with nz_coef_cnt_chroma_ac
+end;
+
 
 (*******************************************************************************
 initialize mb structure:
@@ -129,12 +134,9 @@ begin
   FillByte(mb.i4_pred_mode, 24, INTRA_PRED_NA);
   mb.chroma_pred_mode := INTRA_PRED_CHROMA_DC;
 
-  FillByte(mb.nz_coef_cnt, 24, NZ_COEF_CNT_NA);
-  for i := 0 to 7 do mb.nz_coef_cnt_chroma_ac[0, i] := NZ_COEF_CNT_NA;
-  for i := 0 to 7 do mb.nz_coef_cnt_chroma_ac[1, i] := NZ_COEF_CNT_NA;
-
   mb.mba := nil;
   mb.mbb := nil;
+  fill_all_nonzero_counts(mb, NZ_COEF_CNT_NA);
 
   //top mb
   if mb.y > 0 then begin
@@ -403,8 +405,7 @@ end;
 procedure decode_mb_inter_pskip(var mb: macroblock_t);
 begin
   move(mb.mcomp^, mb.pixels_dec^, 256);
-  FillByte(mb.nz_coef_cnt, 16, 0);
-  FillByte(mb.nz_coef_cnt_chroma_ac, 16, 0);
+  fill_all_nonzero_counts(mb, 0);
   mb.cbp := 0;
 end;
 
