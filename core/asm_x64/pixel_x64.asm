@@ -52,15 +52,17 @@ cglobal satd_8x8_mmx
 cglobal satd_8x4_mmx
 cglobal satd_16x16_sse2
 cglobal satd_16x8_sse2
+cglobal satd_8x8_sse2
+cglobal satd_8x4_sse2
 
 ; for profiling
 cglobal ssd_16x16_sse2.loop
 cglobal ssd_8x8_sse2.loop
 cglobal var_16x16_sse2.loop
 cglobal satd_8x8_mmx.loop
-cglobal satd_8x4_mmx.loop
 cglobal satd_16x16_sse2.loop
 cglobal satd_16x8_sse2.loop
+cglobal satd_8x8_sse2.loop
 
 
 ; SAD
@@ -487,6 +489,8 @@ pixel_downsample_row_sse2:
     psubw  mm6, %2
     pmaxsw %1, mm7
     pmaxsw %2, mm6
+;    pabsw %1, %1  ; todo SSSE3, cycle or two faster
+;    pabsw %2, %2
 %endmacro
 
 
@@ -522,15 +526,18 @@ pixel_downsample_row_sse2:
 ; SATD mmx
 %define mov_m  movq
 %define mov_m2 movd
+%macro SATD_CORE 0
+    mHADAMARD4
+    TRANSPOSE_4x4_int16
+    mHADAMARD4
+    mSUM
+%endmacro
 
 ; function satd_4x4_mmx  (pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 satd_4x4_mmx:
     mSUB4x4 r1, r2, r3, 0
-    mHADAMARD4
-    TRANSPOSE_4x4_int16
-    mHADAMARD4
-    mSUM
+    SATD_CORE
     SUM2DW mm0, r0
     ret
 
@@ -544,10 +551,7 @@ satd_8x8_mmx:
     %assign i 0
     %rep 2
         mSUB4x4 r1, r2, r3, i
-        mHADAMARD4
-        TRANSPOSE_4x4_int16
-        mHADAMARD4
-        mSUM
+        SATD_CORE
         paddd   mm4, mm0
         %assign i i + 4
     %endrep
@@ -563,14 +567,10 @@ ALIGN 16
 satd_8x4_mmx:
     mov   r4, 2
     pxor  mm4,mm4  ; sum
-.loop:
     %assign i 0
     %rep 2
         mSUB4x4 r1, r2, r3, i
-        mHADAMARD4
-        TRANSPOSE_4x4_int16
-        mHADAMARD4
-        mSUM
+        SATD_CORE
         paddd   mm4, mm0
         %assign i i + 4
     %endrep
@@ -589,6 +589,12 @@ satd_8x4_mmx:
 %define mm5 xmm5
 %define mm6 xmm6
 %define mm7 xmm7
+%macro SATD_COREx2 0
+    mHADAMARD4
+    mTRANSPOSE4x2_xmm
+    mHADAMARD4
+    mSUM
+%endmacro
 
 ALIGN 16
 satd_16x16_sse2:
@@ -599,10 +605,7 @@ satd_16x16_sse2:
     %assign i 0
     %rep 2
         mSUB4x4 r1, r2, r3, i
-        mHADAMARD4
-        mTRANSPOSE4x2_xmm
-        mHADAMARD4
-        mSUM
+        SATD_COREx2
         paddd   mm4, mm0
         %assign i i + 8
     %endrep
@@ -624,10 +627,7 @@ satd_16x8_sse2:
     %assign i 0
     %rep 2
         mSUB4x4 r1, r2, r3, i
-        mHADAMARD4
-        mTRANSPOSE4x2_xmm
-        mHADAMARD4
-        mSUM
+        SATD_COREx2
         paddd   mm4, mm0
         %assign i i + 8
     %endrep
@@ -636,5 +636,33 @@ satd_16x8_sse2:
     dec   r4
     jnz   .loop
     SUM4DW mm4, r0
+    POP_XMM_REGS 2
+    ret
+    
+; function satd_8x8_sse2  (pix1, pix2: pbyte; stride: integer): integer;
+ALIGN 16
+satd_8x8_sse2:
+    mov   r4, 2
+    pxor  mm4, mm4  ; sum
+    PUSH_XMM_REGS 2
+.loop:
+    mSUB4x4 r1, r2, r3, 0
+    SATD_COREx2
+    paddd   mm4, mm0
+    lea   r1, [r1 + 4 * 16]
+    lea   r2, [r2 + 4 * r3]
+    dec   r4
+    jnz   .loop
+    SUM4DW mm4, r0
+    POP_XMM_REGS 2
+    ret
+
+; function satd_8x4_sse2  (pix1, pix2: pbyte; stride: integer): integer;
+ALIGN 16
+satd_8x4_sse2:
+    PUSH_XMM_REGS 2
+    mSUB4x4 r1, r2, r3, 0
+    SATD_COREx2
+    SUM4DW mm0, r0
     POP_XMM_REGS 2
     ret
