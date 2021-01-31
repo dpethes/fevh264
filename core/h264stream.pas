@@ -118,7 +118,7 @@ type
       procedure DisableLoopFilter;
       procedure InitSlice(slicetype, slice_qp, ref_frame_count: integer; bs_buffer: pbyte);
       procedure AbortSlice;
-      procedure GetSliceBitstream(var buffer: pbyte; out size: longword);
+      procedure GetSliceBytes(var buffer: pbyte; out size: longword);
       procedure WriteMB (var mb: macroblock_t);
       function GetBitCost (const mb: macroblock_t): integer;
       function InterPredCost: TInterPredCost;
@@ -224,16 +224,12 @@ occur at any byte-aligned position:
 – 0x00000302
 – 0x00000303
 }
-//NAL encapsulate RBSP (raw byte seq.payload)
 procedure NAL_encapsulate(var rbsp: TBitstreamWriter; var nalstream: TBitstreamWriter; const naltype: integer);
 var
   nal_ref_idc: integer = 3;
   i, len: integer;
   a: pbyte;
 begin
-  //rbsp_trailing_bits
-  rbsp.Write(1);
-  rbsp.ByteAlign;
   rbsp.Close;
   a   := rbsp.DataStart;
   len := rbsp.ByteSize;
@@ -259,6 +255,11 @@ begin
   end;
 end;
 
+procedure RBSP_TrailingBits(var rbsp: TBitstreamWriter);
+begin
+  rbsp.Write(1);
+  rbsp.ByteAlign;
+end;
 
 
 {
@@ -288,10 +289,14 @@ var
   i: integer;
   sei_text: string;
   level, profile: byte;
+  cabac_flag: byte;
 begin
   profile := PROFILE_BASELINE;
-  if cabac then
+  cabac_flag := 0;
+  if cabac then begin
       profile := PROFILE_MAIN;  //cabac is not allowed in baseline
+      cabac_flag := 1;
+  end;
   level := ApproximateLevel(sps.mb_width * 16, sps.mb_height * 16, sps.num_ref_frames);
 
   //SPS
@@ -350,6 +355,7 @@ begin
   end else
       b.Write(0);
 
+  RBSP_TrailingBits(b);
   NAL_encapsulate(b, nalstream, NAL_SPS);
   b.Free;
 
@@ -358,8 +364,7 @@ begin
 
   write_ue_code(b, 0);        //pic_parameter_set_id   ue(v)
   write_ue_code(b, 0);        //seq_parameter_set_id   ue(v)
-  if cabac then b.Write(1) else b.Write(0);
-                              //entropy_coding_mode_flag  u(1)
+  b.Write(cabac_flag);        //entropy_coding_mode_flag  u(1)
   b.Write(0);                 //pic_order_present_flag    u(1)
   write_ue_code(b, 0);        //num_slice_groups_minus1   ue(v)
 
@@ -385,6 +390,7 @@ begin
   write_se_code(b, -3);       //second chroma qp offset
 }
 
+  RBSP_TrailingBits(b);
   NAL_encapsulate(b, nalstream, NAL_PPS);
   b.Free;
 
@@ -406,6 +412,7 @@ begin
       for i := 1 to Length(sei_text) do
           b.Write(byte( sei_text[i] ), 8);
 
+      RBSP_TrailingBits(b);
       NAL_encapsulate(b, nalstream, NAL_SEI);
       b.Free;
   end;
@@ -480,28 +487,14 @@ begin
           bs.Write(0);                       //adaptive_ref_pic_marking_mode_flag u(1)
       end;
   end;
+  if cabac then  //cabac_init_idc ue(v)
+      write_ue_code(bs, 0);
   write_se_code(bs, slice.slice_qp_delta);   //slice_qp_delta se(v)
   if pps.deblocking_filter_control_present_flag > 0 then begin
       write_ue_code(bs, 1);                  //disable_deblocking_filter_idc ue(v)
   end;
 end;
 
-
-
-{ close slice data bitstream, encapsulate in NAL
-}
-procedure h264s_write_slice_to_nal (const slice: slice_header_t; var slice_bs, nal_bs: TBitstreamWriter);
-var
-  nal_unit_type: byte;
-begin
-  if slice.is_idr then begin
-      if slice.type_ <> SLICE_I then
-          writeln('[h264s_write_slice_to_nal] IDR NAL for slicetype <> SLICE_I!');
-      nal_unit_type := NAL_IDR;
-  end else
-      nal_unit_type := NAL_NOIDR;
-  NAL_encapsulate(slice_bs, nal_bs, nal_unit_type);
-end;
 
 { TH264Stream }
 
@@ -748,8 +741,6 @@ end;
 
 procedure TH264Stream.InitSlice(slicetype, slice_qp, ref_frame_count: integer; bs_buffer: pbyte);
 begin
-  bs := TBitstreamWriter.Create(bs_buffer);
-
   slice.type_ := slicetype;
   slice.qp    := slice_qp;
   slice.slice_qp_delta := slice.qp - pps.qp;
@@ -761,11 +752,15 @@ begin
       slice.is_idr    := false;
       slice.frame_num += 1;
   end;
-
-  WriteSliceHeader;
-
   mb_skip_count := 0;
   last_mb_qp := slice.qp;
+
+  bs := TBitstreamWriter.Create(bs_buffer);
+  WriteSliceHeader;
+  //slice_data starts here
+  if cabac then   //slice_data contains cabac_alignment_one_bit
+      while not bs.IsByteAligned do
+          bs.Write(1);
 end;
 
 procedure TH264Stream.AbortSlice;
@@ -773,12 +768,14 @@ begin
   bs.Free;
 end;
 
-
-procedure TH264Stream.GetSliceBitstream(var buffer: pbyte; out size: longword);
+//close slice data bitstream, write sps+pps if SLICE_I, convert to NAL
+procedure TH264Stream.GetSliceBytes(var buffer: pbyte; out size: longword);
 var
   nalstream: TBitstreamWriter;
+  nal_unit_type: byte;
 begin
-  //convert to nal, write sps/pps
+  if cabac then  //end_of_slice_flag
+      ;  //todo
   nalstream := TBitstreamWriter.Create(buffer);
   if slice.type_ = SLICE_I then begin
       WriteParamSetsToNAL(nalstream);
@@ -787,7 +784,18 @@ begin
       else
           slice.idr_pic_id += 1;
   end;
-  h264s_write_slice_to_nal(slice, bs, nalstream);
+  if slice.is_idr then begin
+      Assert(slice.type_ = SLICE_I, '[slice bitstream] IDR NAL for slicetype != SLICE_I');
+      nal_unit_type := NAL_IDR;
+  end else
+      nal_unit_type := NAL_NOIDR;
+
+  //rbsp_slice_trailing_bits
+  RBSP_TrailingBits(bs);
+  if cabac then  //cabac_zero_word
+      bs.Write(0, 16);
+  NAL_encapsulate(bs, nalstream, nal_unit_type);
+
   nalstream.Close;
   size := nalstream.ByteSize;
 

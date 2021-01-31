@@ -210,7 +210,7 @@ begin
   end;
 
   //convert bitstream to bytestream of NAL units
-  h264s.GetSliceBitstream(buffer, stream_size);
+  h264s.GetSliceBytes(buffer, stream_size);
 
   //prepare reference frame for ME
   LoopfilterDone;
