@@ -126,6 +126,7 @@ implementation
 
 const
   MIN_I_4x4_BITCOST = 27;
+  MB_I_PCM_BITCOST = 8*384 + 9;
 
 { TMacroblockEncoder }
 
@@ -246,6 +247,10 @@ begin
           stats.mb_i16_count += 1;
           stats.pred16[mb.i16_pred_mode] += 1;
           stats.pred_8x8_chroma[mb.chroma_pred_mode] += 1;
+          stats.itex_bits += mb.residual_bits;
+      end;
+      MB_I_PCM: begin
+          stats.mb_ipcm_count += 1;
           stats.itex_bits += mb.residual_bits;
       end;
       MB_P_16x16, MB_P_16x8: begin
@@ -571,6 +576,9 @@ begin
       if mode_lambda * bits_inter + score_p < mode_lambda * bits_intra + score_intra then begin
           mb.mbtype := MB_P_16x16;
           CacheLoad;
+      end else if bits_intra > MB_I_PCM_BITCOST then begin
+          mb.mbtype := MB_I_PCM;
+          EncodeCurrentType;
       end;
   end;
 
@@ -621,6 +629,9 @@ begin
   if bits_i16 < bits_i4 then begin
       mb.mbtype := MB_I_16x16;
       CacheLoad;
+  end else if bits_i4 > MB_I_PCM_BITCOST then begin
+      mb.mbtype := MB_I_PCM;
+      EncodeCurrentType;
   end;
 end;
 

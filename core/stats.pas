@@ -39,6 +39,7 @@ type
       mb_skip_count,
       mb_i4_count,
       mb_i16_count,
+      mb_ipcm_count,
       mb_p_count: int64;
       size_bytes: int64;
       ssd: array[0..2] of int64;
@@ -138,6 +139,7 @@ begin
   writeln( f, 'mb counts:' );
   writeln( f, '  I4x4:  ', mb_i4_count:10);
   writeln( f, '  I16x16:', mb_i16_count:10);
+  writeln( f, '  I_PCM:',  mb_ipcm_count:10);
   writeln( f, '  P_L0:  ', mb_p_count:10);
   writeln( f, '  skip:  ', mb_skip_count:10);
   writeln( f, 'residual bits:' );

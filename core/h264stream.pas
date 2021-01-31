@@ -808,6 +808,7 @@ end;
 procedure TH264Stream.write_mb_i_pcm(var mb: macroblock_t);
 var
   i, j, chroma_idx: integer;
+  bits: integer;
 begin
   //skip run, mbtype
   if slice.type_ = SLICE_P then begin
@@ -817,12 +818,14 @@ begin
   end else
       write_ue_code(bs, 25);  //I_PCM - tab. 7-8
 
+  bits := bs.BitSize;  //count alignment as residual
   bs.ByteAlign;
   for i := 0 to 255 do bs.Write(mb.pixels[i], 8);
   for chroma_idx := 0 to 1 do
       for i := 0 to 7 do
           for j := 0 to 7 do
               bs.Write(mb.pixels_c[chroma_idx][i*16 + j], 8);
+  mb.residual_bits := bs.BitSize - bits;
 end;
 
 
