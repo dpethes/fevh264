@@ -37,6 +37,7 @@ procedure cavlc_encode
   (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t; var bs: TBitstreamWriter);
 function cavlc_block_bits
   (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t): integer;
+function cavlc_block_bits_DC (const blok: block_t): integer;
 procedure cavlc_analyse_block (var block: block_t; dct_coefs: int16_p; const ncoef: integer);
 procedure cavlc_analyse_block_2x2(var block: block_t; dct_coefs: int16_p);
 
@@ -419,27 +420,24 @@ var
 
   tab: byte;
   suffix_length: byte;
-  vlc: vlc_bits_len;
 
 begin
-  result := 0;
+  Assert(res <> RES_DC);  //chroma DC is handled in cavlc_block_bits_DC
   t1 := blok.t1;
   nz := blok.nlevel;
 
   //coef_token
-  if res <> RES_DC then begin
-      case res of
-          RES_AC_U:
-              tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[0], blk_idx, true);
-          RES_AC_V:
-              tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[1], blk_idx, true);
-          else  //RES_LUMA, RES_LUMA_AC, RES_LUMA_DC:
-              tab := predict_nz_count_to_tab(mb.nz_coef_cnt, blk_idx);
-      end;
-      result += tab_coef_num[tab, nz, t1][1];
-  end else
-      result += tab_coef_num_chroma_dc[nz, t1][1];
-  if nz = 0 then exit;  //no coefs
+  case res of
+      RES_AC_U:
+          tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[0], blk_idx, true);
+      RES_AC_V:
+          tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[1], blk_idx, true);
+      else  //RES_LUMA, RES_LUMA_AC, RES_LUMA_DC:
+          tab := predict_nz_count_to_tab(mb.nz_coef_cnt, blk_idx);
+  end;
+  result := tab_coef_num[tab, nz, t1][1];
+  if nz = 0 then
+      exit;
 
   //trailing 1s signs
   result += t1;
@@ -469,14 +467,10 @@ begin
   //total number of zeros in runs
   total_zeros := blok.ncoef - nz - blok.t0;
   if nz < blok.ncoef then begin
-      if res <> RES_DC then begin
-          if nz < 8 then
-              vlc := tab_total_zeros0[nz, total_zeros]
-          else
-              vlc := tab_total_zeros1[nz, total_zeros];
-      end else
-          vlc := tab_total_zeros_chroma_dc[nz, total_zeros];
-      result += vlc[1];
+      if nz < 8 then
+          result += tab_total_zeros0[nz, total_zeros][1]
+      else
+          result += tab_total_zeros1[nz, total_zeros][1];
   end;
 
   //run_before
@@ -496,6 +490,39 @@ begin
            if zeros_left <= 0 then break;
       end;
   end;
+end;
+
+
+function cavlc_block_bits_DC(const blok: block_t): integer;
+var
+  i: integer;
+  coef: integer;
+  nz, t1: integer;
+  suffix_length, run_before: byte;
+begin
+  t1 := blok.t1;
+  nz := blok.nlevel;
+  result := tab_coef_num_chroma_dc[nz, t1][1];
+  if nz = 0 then
+      exit;
+
+  result += t1;
+  suffix_length := 0;
+  for i := t1 to nz - 1 do begin
+      coef := blok.level[i];
+      if (i = t1) and (t1 < 3) then
+          if coef > 0 then coef -= 1 else coef += 1;
+      result += level_cost(coef, suffix_length);
+
+      if suffix_length = 0 then
+          suffix_length := 1;
+      if ( abs(blok.level[i]) > (3 shl (suffix_length - 1)) ) and (suffix_length < 6) then
+          suffix_length += 1;
+  end;
+
+  //approximate bits for total number of zeros in runs to save some branching
+  //can be off by 1 bit except in nz=1 case, when it overshoots by 3 bits, but it doesn't make much - if any - difference
+  result += (blok.ncoef - nz - blok.t0) * 2;
 end;
 
 

@@ -1003,7 +1003,7 @@ begin
 
   if mb.cbp shr 4 > 0 then begin
       for i := 0 to 1 do
-          result += cavlc_block_bits(mb, mb.block[25 + i], i, RES_DC);
+          result += cavlc_block_bits_DC(mb.block[25 + i]);
       if mb.cbp shr 5 > 0 then begin
           for i := 0 to 3 do
               result += cavlc_block_bits(mb, mb.block[16 + i], i, RES_AC_U);
