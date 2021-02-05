@@ -59,6 +59,14 @@ type
 
   TInterPredCost = class;
 
+  { TNALStream }
+  TNALStream = object
+    public
+      _current: pbyte;
+      procedure WriteDword(dw: integer); inline;
+      procedure WriteByte(b: integer); inline;
+  end;
+
   { TH264Stream }
 
   TH264Stream = class
@@ -86,7 +94,7 @@ type
       function  GetSEI: string;
       procedure SetSEI(const AValue: string);
       procedure WriteSliceHeader;
-      procedure WriteParamSetsToNAL(var nalstream: TBitstreamWriter);
+      procedure WriteParamSetsToNAL(var nalstream: TNALStream);
 
       procedure write_mb_pred_intra(const mb: macroblock_t);
       procedure write_mb_pred_inter(const mb: macroblock_t);
@@ -190,6 +198,20 @@ begin
       result := 31;
 end;
 
+{ TNALStream }
+
+procedure TNALStream.WriteByte(b: integer);
+begin
+  _current^ := b;
+  _current += 1;
+end;
+
+procedure TNALStream.WriteDWord(dw: integer);
+begin
+  PLongWord(_current)^ := SwapEndian(dw);
+  _current += 4;
+end;
+
 
 {
 3.104 raw byte sequence payload (RBSP): A syntax structure containing an integer number of bytes that is
@@ -224,7 +246,7 @@ occur at any byte-aligned position:
 – 0x00000302
 – 0x00000303
 }
-procedure NAL_encapsulate(var rbsp: TBitstreamWriter; var nalstream: TBitstreamWriter; const naltype: integer);
+procedure NAL_encapsulate(var rbsp: TBitstreamWriter; var nalstream: TNALStream; const naltype: integer);
 var
   nal_ref_idc: integer = 3;
   i, len: integer;
@@ -237,19 +259,21 @@ begin
   if naltype = NAL_SEI then nal_ref_idc := 0;
 
   //annex B:  0x00000001
-  nalstream.Write(1, 32);
+  nalstream.WriteDword(1);
   //nal: forbidden_zero_bit | nal_ref_idc | nal_unit_type
-  nalstream.Write((nal_ref_idc shl 5) or naltype, 8);
+  nalstream.WriteByte((nal_ref_idc shl 5) or naltype);
   //emulation prevention
   i := 0;
   while i < len do begin
       //cycle to catch repeated occurences
-      while (i + 2 < len) and (a[0] = 0) and (a[1] = 0) and (a[2] in [0,1,2,3]) do begin
-          nalstream.Write(3, 24); //0x000003
+      while (i + 2 < len) and (pword(a)^ = 0) and (a[2] in [0,1,2,3]) do begin
+          nalstream.WriteByte(0);
+          nalstream.WriteByte(0);
+          nalstream.WriteByte(3);
           a += 2;
           i += 2;
       end;
-      nalstream.Write(a^, 8);
+      nalstream.WriteByte(a^);
       a += 1;
       i += 1;
   end;
@@ -278,7 +302,7 @@ significant bit.
 profile: baseline
 }
 
-procedure TH264Stream.WriteParamSetsToNAL(var nalstream: TBitstreamWriter);
+procedure TH264Stream.WriteParamSetsToNAL(var nalstream: TNALStream);
 const
   sei_uuid = '2011012520091007';
   PROFILE_BASELINE = 66;
@@ -771,12 +795,12 @@ end;
 //close slice data bitstream, write sps+pps if SLICE_I, convert to NAL
 procedure TH264Stream.GetSliceBytes(var buffer: pbyte; out size: longword);
 var
-  nalstream: TBitstreamWriter;
+  nalstream: TNALStream;
   nal_unit_type: byte;
 begin
   if cabac then  //end_of_slice_flag
       ;  //todo
-  nalstream := TBitstreamWriter.Create(buffer);
+  nalstream._current := buffer;
   if slice.type_ = SLICE_I then begin
       WriteParamSetsToNAL(nalstream);
       if slice.idr_pic_id = 65535 then
@@ -796,10 +820,7 @@ begin
       bs.Write(0, 16);
   NAL_encapsulate(bs, nalstream, nal_unit_type);
 
-  nalstream.Close;
-  size := nalstream.ByteSize;
-
-  nalstream.Free;
+  size := nalstream._current - buffer;
   bs.Free;
 end;
 
