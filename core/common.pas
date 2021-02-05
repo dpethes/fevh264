@@ -228,7 +228,7 @@ type
         18..33 - pixels from left column
       }
 
-      //non-zero coef count of surrounding blocks for I4x4/I16x16/chroma ac blocks
+      //non-zero coef count of surrounding blocks for I4x4/I16x16/chroma ac blocks; write-combined in mb_init
       nz_coef_cnt: array[0..23] of byte;
       nz_coef_cnt_chroma_ac: array[0..1, 0..7] of byte;
 

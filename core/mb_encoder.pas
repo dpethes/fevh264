@@ -419,6 +419,7 @@ begin
   frame := f;
   intrapred.SetFrame(@frame);
   stats := f.stats;
+  mb_init_frame_invariant(mb, frame);
 end;
 
 

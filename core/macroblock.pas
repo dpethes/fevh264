@@ -30,6 +30,7 @@ uses
 procedure mb_alloc(var mb: macroblock_t);
 procedure mb_free(var mb: macroblock_t);
 procedure mb_init_row_ptrs(var mb: macroblock_t; const frame: frame_t; const y: integer);
+procedure mb_init_frame_invariant(var mb: macroblock_t; var frame: frame_t);
 procedure mb_init(var mb: macroblock_t; var frame: frame_t; const adaptive_quant: boolean = false);
 
 procedure encode_mb_intra_i4(var mb: macroblock_t; var frame: frame_t; const intrapred: TIntraPredictor);
@@ -91,52 +92,57 @@ begin
   mb.pfdec_c[1] := frame.plane_dec[2] + y * 8 * frame.stride_c;
 end;
 
-
-{ fill I16x16 prediction pixel cache
-    0,17 - top left pixel
-   1..16 - pixels from top
-  18..33 - pixels from left
-}
-procedure fill_intra_pred_cache(var mb: macroblock_t; var frame: frame_t);
-var
-  i: integer;
-  src, dst: pbyte;
+procedure fill_all_nonzero_counts(var mb: macroblock_t; value: int64); inline;
 begin
-  dst := @mb.intra_pixel_cache;
-  //top - use pixels from decoded frame
-  src := mb.pfdec - frame.stride - 1;
-  move(src^, dst^, 17);
-  //top left
-  dst[17] := dst[0];
-  //left - use rightmost pixel row from previously decoded mb
-  src := mb.pixels_dec + 15;
-  for i := 0 to 15 do dst[i+18] := src[i * 16];
-end;
-
-procedure fill_all_nonzero_counts(var mb: macroblock_t; value: byte); inline;
-begin
-  FillByte(mb.nz_coef_cnt, 24+8+8, value);  //write-combine with nz_coef_cnt_chroma_ac
+  pint64(@mb.nz_coef_cnt[0])^  := value;  //equal to FillByte(mb.nz_coef_cnt, 24+8+8, value);
+  pint64(@mb.nz_coef_cnt[8])^  := value;
+  pint64(@mb.nz_coef_cnt[16])^ := value;
+  pint64(@mb.nz_coef_cnt_chroma_ac[0, 0])^ := value;
+  pint64(@mb.nz_coef_cnt_chroma_ac[1, 0])^ := value;
 end;
 
 
 (*******************************************************************************
 initialize mb structure:
--intra prediction
--non-zero count
--qp
--mvd, skip mv
+-intra prediction mode, block non-zero counts for cavlc
+-qp related parts
+-intra pred pixel cache
+
+ There's some write-combine action going on - it needs to be re-checked if
+ macroblock_t layout is modified
 *)
+
+procedure mb_init_qp_struct(var mb: macroblock_t);
+begin
+  if mb.qp < 30 then
+      mb.qpc := mb.qp
+  else
+      mb.qpc := tab_qp_chroma[mb.qp];
+  mb.qpc += mb.chroma_qp_offset;
+  transqt_init_for_qp(mb.quant_ctx_qp,  mb.qp);
+  transqt_init_for_qp(mb.quant_ctx_qpc, mb.qpc);
+end;
+
+procedure mb_init_frame_invariant(var mb: macroblock_t; var frame: frame_t);
+begin
+  mb.qp := frame.qp;
+  mb_init_qp_struct(mb);
+end;
+
 procedure mb_init(var mb: macroblock_t; var frame: frame_t; const adaptive_quant: boolean = false);
 var
   mbb, mba: macroblock_p;
+  src, dst: pbyte;
   i: integer;
 begin
-  FillByte(mb.i4_pred_mode, 24, INTRA_PRED_NA);
+  pint64(@mb.i4_pred_mode[0])^  := -1;  //equal to FillByte(mb.i4_pred_mode, 24, INTRA_PRED_NA);
+  pint64(@mb.i4_pred_mode[8])^  := -1;
+  pint64(@mb.i4_pred_mode[16])^ := -1;
   mb.chroma_pred_mode := INTRA_PRED_CHROMA_DC;
 
   mb.mba := nil;
   mb.mbb := nil;
-  fill_all_nonzero_counts(mb, NZ_COEF_CNT_NA);
+  fill_all_nonzero_counts(mb, -1);  //NZ_COEF_CNT_NA
 
   //top mb
   if mb.y > 0 then begin
@@ -196,19 +202,24 @@ begin
 
   //qp
   mb.qp := frame.qp;
-  if adaptive_quant then
+  if adaptive_quant then begin
       mb.qp := frame.aq_table[mb.y * frame.mbw + mb.x];
-  if mb.qp < 30 then
-      mb.qpc := mb.qp
-  else
-      mb.qpc := tab_qp_chroma[mb.qp];
-  mb.qpc += mb.chroma_qp_offset;
+      mb_init_qp_struct(mb);
+  end;
 
-  transqt_init_for_qp(mb.quant_ctx_qp,  mb.qp);
-  transqt_init_for_qp(mb.quant_ctx_qpc, mb.qpc);
-
-  //intra cache
-  fill_intra_pred_cache(mb, frame);
+  { fill I16x16 prediction pixel cache
+      0,17 - top left pixel
+     1..16 - pixels from top
+    18..33 - pixels from left
+  }
+  dst := @mb.intra_pixel_cache;
+  src := mb.pfdec - frame.stride - 1;  //top - use 16 pixels from decoded frame
+  pint64(dst)^   := pint64(src)^;
+  pint64(dst+8)^ := pint64(src+8)^;
+  dst[16] := src[16];
+  dst[17] := dst[0];                   //top left
+  src := mb.pixels_dec + 15;           //left - use rightmost pixel row from previously decoded mb
+  for i := 0 to 15 do dst[i+18] := src[i * 16];
 
   //debug: clear some data areas that don't need clearing under normal circumstances
   {
