@@ -212,24 +212,25 @@ begin
   //convert bitstream to bytestream of NAL units
   h264s.GetSliceBytes(buffer, stream_size);
 
-  //prepare reference frame for ME
-  LoopfilterDone;
-  frame_paint_edges(fenc);
-  if _param.SubpixelMELevel > 0 then
-      frame_hpel_interpolate(fenc);
-  frame_lowres_from_decoded(fenc);
-
   //stats
   rc.Update(frame_num, stream_size * 8, fenc);
   fenc.stats.size_bytes := stream_size;
   if _param.WriteStatsFile then
       frame_write_stats(stats_file, fenc);
   UpdateStats;
-  if dump_decoded_frames then DumpFrame;
 
-  //advance
+  //prepare reference frame for ME
   frames.InsertRef(fenc);
+  LoopfilterDone;
+  frame_paint_edges(fenc);
+  if _param.SubpixelMELevel > 0 then
+      frame_hpel_interpolate(fenc);
+  frame_lowres_from_decoded(fenc);
+
+  //done
   frame_num += 1;
+  if dump_decoded_frames then
+      DumpFrame;
   dsp.FpuReset;
 end;
 
