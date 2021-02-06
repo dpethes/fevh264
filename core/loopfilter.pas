@@ -99,6 +99,11 @@ procedure CalculateBStrength (const mb: macroblock_p);
   procedure zero16bytes(p: pint64); inline;
       begin p^ := 0; (p+1)^ := 0; end;
 
+  function is_bS_sum_zero(pv, ph: pint64): boolean; inline;
+  begin
+    result := pv^ + (pv+1)^ + ph^ + (ph+1)^ = 0;
+  end;
+
 const
   intra_bs_vert:  TBSarray = ( (4, 4, 4, 4), (3, 3, 3, 3), (3, 3, 3, 3), (3, 3, 3, 3) );
   intra_bs_horiz: TBSarray = ( (4, 3, 3, 3), (4, 3, 3, 3), (4, 3, 3, 3), (4, 3, 3, 3) );
@@ -112,6 +117,7 @@ begin
   if is_intra(mb^.mbtype) then begin
       mb^.bS_vertical := intra_bs_vert;
       mb^.bS_horizontal := intra_bs_horiz;
+      mb^.bS_zero := false;
       exit;
   end;
 
@@ -157,6 +163,8 @@ begin
           mb^.bS_horizontal[3, 0] := edge_bs(mb, mbb, 5, 15, bS_min);
       end;
   end;
+
+  mb^.bS_zero := is_bS_sum_zero(@mb^.bS_vertical, @mb^.bS_horizontal);
 end;
 
 
@@ -167,7 +175,7 @@ procedure DeblockMBRow(
   const cqp: boolean = true;
   const offset_a: integer = 0; const offset_b: integer = 0);
 var
-  p, q: array[0..3] of integer;
+  p, q: array[0..3] of int16;
   bS_vertical, bS_horizontal: TBSarray;
   filterLeftMbEdgeFlag, filterTopMbEdgeFlag: boolean;
 
@@ -263,9 +271,7 @@ end;
 
 function UseFilter(alpha, beta: integer): boolean; inline;
 begin
-  result := (Abs( p[0] - q[0] ) < alpha)
-            and (Abs( p[1] - p[0] ) < beta)
-            and (Abs( q[1] - q[0] ) < beta);
+  result := (Abs( p[1] - p[0] ) < beta) and (Abs( q[1] - q[0] ) < beta) and (Abs( p[0] - q[0] ) < alpha)
 end;
 
 procedure FilterLuma16x16(const pixel: pbyte; const indexA, alpha, beta: integer);
@@ -447,24 +453,26 @@ var
   mb: macroblock_p;
 
 begin
+  filterTopMbEdgeFlag := mby > 0;
+  filterLeftMbEdgeFlag := false;
+  mb := @f.mbs[mby * f.mbw];
+
   if cqp then begin
-      //DeblockMBRow params are the same for all mbs
-      mb := @f.mbs[0];
-      SetupParams(mb);
-      filterTopMbEdgeFlag := mby > 0;
+      SetupParams(mb);  //filter params depend on qp
       for mbx := 0 to f.mbw - 1 do begin
-          filterLeftMbEdgeFlag := mbx > 0;
-          mb := @f.mbs[mby * f.mbw + mbx];
-          FilterMB(mb);
+          if not mb^.bS_zero then
+              FilterMB(mb);
+          mb += 1;
+          filterLeftMbEdgeFlag := true;
       end;
   end else begin
-      //DeblockMBRow params change according to current mb's qp
-      filterTopMbEdgeFlag := mby > 0;
       for mbx := 0 to f.mbw - 1 do begin
-          filterLeftMbEdgeFlag := mbx > 0;
-          mb := @f.mbs[mby * f.mbw + mbx];
-          SetupParams(mb);
-          FilterMB(mb);
+          if not mb^.bS_zero then begin
+              SetupParams(mb);
+              FilterMB(mb);
+          end;
+          mb += 1;
+          filterLeftMbEdgeFlag := true;
       end;
   end;
 end;

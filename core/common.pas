@@ -237,7 +237,8 @@ type
 
       //loopfilter
       mba, mbb: macroblock_p;
-      bS_vertical, bS_horizontal: TBSarray;
+      bS_vertical, bS_horizontal: TBSarray;  //TODO invert indexing
+      bS_zero: boolean;
   end;
 
   //frame
