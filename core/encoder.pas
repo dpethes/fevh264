@@ -76,7 +76,7 @@ type
       procedure SetISlice;
       procedure SetPSlice;
       procedure RunLowresME;
-      function TryEncodeFrame(const img: TPlanarImage): boolean;
+      function TryEncodeFrame(): boolean;
       function SceneCut(const mbrow: integer): boolean;
       procedure WriteStats;
       procedure UpdateStats;
@@ -206,9 +206,9 @@ begin
   end;
 
   //encode frame (or reencode P as I)
-  if TryEncodeFrame(img) = false then begin
+  if TryEncodeFrame() = false then begin
       SetISlice;
-      TryEncodeFrame(img);
+      TryEncodeFrame();
   end;
 
   //convert bitstream to bytestream of NAL units
@@ -244,8 +244,8 @@ end;
 
 procedure TFevh264Encoder.SetPSlice;
 begin
-  fenc.num_ref_frames := min(num_ref_frames, frame_num - last_keyframe_num);
   fenc.ftype := SLICE_P;
+  fenc.num_ref_frames := min(num_ref_frames, frame_num - last_keyframe_num);
   frames.SetRefs(fenc, frame_num, fenc.num_ref_frames);
   me.NumReferences := fenc.num_ref_frames;
 end;
@@ -261,15 +261,21 @@ begin
   end;
 end;
 
-function TFevh264Encoder.TryEncodeFrame(const img: TPlanarImage): boolean;
+function TFevh264Encoder.TryEncodeFrame(): boolean;
 var
   x, y: integer;
+  slice: TH264Slice;
 begin
   result := true;
 
   //init slice bitstream
   fenc.qp := rc.GetQP(frame_num, fenc.ftype);
-  h264s.InitSlice(fenc.ftype, fenc.qp, fenc.num_ref_frames, fenc.bs_buf);
+  with slice do begin
+      type_ := fenc.ftype;
+      qp := fenc.qp;
+      num_ref_frames := fenc.num_ref_frames;
+  end;
+  h264s.InitSlice(slice, fenc.bs_buf);
 
   //frame encoding setup
   fenc.stats.Clear;

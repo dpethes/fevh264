@@ -4,7 +4,7 @@ unit loopfilter_threading;
 interface
 
 uses
-  common, frame, classes, sysutils, syncobjs, loopfilter, macroblock;
+  common, frame, classes, sysutils, syncobjs, loopfilter;
 
 type
 

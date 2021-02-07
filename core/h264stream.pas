@@ -29,6 +29,15 @@ uses
   util, stdint, common, vlc, bitstream, h264tables;
 
 type
+  //Table 7-1 – NAL unit type codes
+  TNALUnitType = (
+    NAL_NOIDR = 1, //Coded slice of a non-IDR picture
+    NAL_IDR = 5,   //Coded slice of an IDR picture
+    NAL_SEI = 6,
+    NAL_SPS = 7,
+    NAL_PPS = 8
+  );
+
   //SPS
   sps_t = record
       width, height: integer;
@@ -47,14 +56,12 @@ type
   end;
 
   //slice
-  slice_header_t = record
-      type_: byte;
-      is_idr: boolean;
-      idr_pic_id: word;
+  TH264Slice = record
+      type_: byte;                  //in
+      qp: byte;                     //in
+      num_ref_frames: byte;         //in
+      nal_unit_type: TNALUnitType;
       frame_num: integer;
-      qp: integer;
-      slice_qp_delta: integer;
-      num_ref_frames: byte;
   end;
 
   TInterPredCost = class;
@@ -71,23 +78,23 @@ type
 
   TH264Stream = class
     private
+      bs: TBitstreamWriter;
+      interPredCostEval: TInterPredCost;
+      mb_skip_count: integer;
+      last_mb_qp: byte;
+
       sps: sps_t;
       pps: pps_t;
+      slice: TH264Slice;
       write_sei: boolean;
       write_vui: boolean;
       sei_string: string;
-
-      mb_skip_count: integer;
-      bs: TBitstreamWriter;
-      slice: slice_header_t;
-      last_mb_qp: byte;
-
-      interPredCostEval: TInterPredCost;
       cabac: boolean;
       loopfilter_control: record
           enable: boolean;
           ab_offset_div2: int8;
       end;
+      idr_pic_id: word;
 
       function GetNoPSkip: boolean; inline;
       procedure SetChromaQPOffset(const AValue: byte);
@@ -117,7 +124,7 @@ type
       function mb_interpred_bits (const mb: macroblock_t): integer;
 
     public
-      property NumRefFrames: byte read slice.num_ref_frames write SetNumRefFrames;
+      property NumRefFrames: byte read sps.num_ref_frames write SetNumRefFrames;
       property QP: byte             write SetQP;
       property ChromaQPOffset: byte write SetChromaQPOffset;
       property KeyInterval: word    write SetKeyInterval;
@@ -127,7 +134,7 @@ type
       constructor Create(w, h, mbw, mbh: integer);
       destructor Free;
       procedure LoopFilter(enable: boolean; ab_offset_div2: int8);
-      procedure InitSlice(slicetype, slice_qp, ref_frame_count: integer; bs_buffer: pbyte);
+      procedure InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
       procedure AbortSlice;
       procedure GetSliceBytes(var buffer: pbyte; out size: longword);
       procedure WriteMB (var mb: macroblock_t);
@@ -157,12 +164,6 @@ type
 implementation
 
 const
-//Table 7-1 – NAL unit type codes
-NAL_NOIDR = 1;  //Coded slice of a non-IDR picture
-NAL_IDR = 5;    //non-partitioned
-NAL_SEI = 6;
-NAL_SPS = 7;
-NAL_PPS = 8;
 
 //Table A-1 – Level limits
 LEVEL_DPB: array[0..14, 0..1] of integer = (
@@ -249,9 +250,9 @@ occur at any byte-aligned position:
 – 0x00000302
 – 0x00000303
 }
-procedure NAL_encapsulate(var rbsp: TBitstreamWriter; var nalstream: TNALStream; const naltype: integer);
+procedure NAL_encapsulate(var rbsp: TBitstreamWriter; var nalstream: TNALStream; const naltype: TNALUnitType);
 var
-  nal_ref_idc: integer = 3;
+  nal_ref_idc: integer;
   i, len: integer;
   a: pbyte;
 begin
@@ -264,7 +265,7 @@ begin
   //annex B:  0x00000001
   nalstream.WriteDword(1);
   //nal: forbidden_zero_bit | nal_ref_idc | nal_unit_type
-  nalstream.WriteByte((nal_ref_idc shl 5) or naltype);
+  nalstream.WriteByte((nal_ref_idc shl 5) or byte(naltype));
   //emulation prevention
   i := 0;
   while i < len do begin
@@ -470,24 +471,18 @@ if slicetype > 4: all slicetypes in current frame will be equal
 frame_num
 is used as an identifier for pictures and shall be represented by log2_max_frame_num_minus4 + 4 bits in the bitstream.
 frame_num = 0 for IDR slices
+nal_ref_idc = 0 only for non-reference picture
 }
 procedure TH264Stream.WriteSliceHeader;
-var
-  nal_unit_type,
-  nal_ref_idc: byte;
+const
+  nal_ref_idc = 1;
 begin
-  nal_ref_idc := 1;
-  if slice.is_idr then
-      nal_unit_type := NAL_IDR
-  else
-      nal_unit_type := NAL_NOIDR;
-
   write_ue_code(bs, 0);                      //first_mb_in_slice   ue(v)
   write_ue_code(bs, slice.type_);            //slice_type          ue(v)
   write_ue_code(bs, 0);                      //pic_parameter_set_id  ue(v)
   bs.Write(slice.frame_num, 4 + sps.log2_max_frame_num_minus4);
-  if nal_unit_type = NAL_IDR {5} then
-      write_ue_code(bs, slice.idr_pic_id);   //idr_pic_id 2 ue(v)
+  if slice.nal_unit_type = NAL_IDR then
+      write_ue_code(bs, idr_pic_id);         //idr_pic_id  ue(v)
   if sps.pic_order_cnt_type = 0 then begin
       bs.Write(slice.frame_num * 2, 4 + sps.log2_max_pic_order_cnt_lsb_minus4);
                                              //pic_order_cnt_lsb u(v)
@@ -507,7 +502,7 @@ begin
   end;
   //dec_ref_pic_marking( )
   if nal_ref_idc <> 0 then begin
-      if nal_unit_type = NAL_IDR then begin
+      if slice.nal_unit_type = NAL_IDR then begin
           bs.Write(0);                       //no_output_of_prior_pics_flag  u(1)
           bs.Write(0);                       //long_term_reference_flag  u(1)
       end else begin
@@ -516,7 +511,7 @@ begin
   end;
   if cabac then  //cabac_init_idc ue(v)
       write_ue_code(bs, 0);
-  write_se_code(bs, slice.slice_qp_delta);   //slice_qp_delta se(v)
+  write_se_code(bs, int8(slice.qp) - pps.qp);  //slice_qp_delta se(v)
   if pps.deblocking_filter_control_present_flag > 0 then begin
       if not loopfilter_control.enable then  //disable_deblocking_filter_idc ue(v)
           write_ue_code(bs, 1)
@@ -549,7 +544,8 @@ end;
 
 procedure TH264Stream.SetNumRefFrames(const AValue: byte);
 begin
-   sps.num_ref_frames := AValue;
+  Assert(AValue <= 16);
+  sps.num_ref_frames := AValue;
 end;
 
 procedure TH264Stream.SetQP(const AValue: byte);
@@ -748,14 +744,7 @@ begin
   pps.chroma_qp_offset := 0;
   pps.deblocking_filter_control_present_flag := 0;
 
-  slice.frame_num := 0;
-  slice.is_idr    := true;
-  slice.idr_pic_id := 0;
-  slice.type_ := SLICE_I;
-  slice.qp    := QP_DEFAULT;
-  slice.slice_qp_delta := 0;
-  slice.num_ref_frames := 1;
-
+  idr_pic_id := 0;
   cabac := false;
 
   interPredCostEval := TInterPredCost.Create(self);
@@ -775,19 +764,21 @@ begin
 end;
 
 
-procedure TH264Stream.InitSlice(slicetype, slice_qp, ref_frame_count: integer; bs_buffer: pbyte);
+procedure TH264Stream.InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
 begin
-  slice.type_ := slicetype;
-  slice.qp    := slice_qp;
-  slice.slice_qp_delta := slice.qp - pps.qp;
-  slice.num_ref_frames := ref_frame_count;
+  with slice_params do begin
+      slice.type_ := type_;
+      slice.qp    := qp;
+      slice.num_ref_frames := num_ref_frames;
+  end;
   if slice.type_ = SLICE_I then begin
-      slice.is_idr    := true;
+      slice.nal_unit_type := NAL_IDR;
       slice.frame_num := 0;
   end else begin
-      slice.is_idr    := false;
+      slice.nal_unit_type := NAL_NOIDR;
       slice.frame_num += 1;
   end;
+
   mb_skip_count := 0;
   last_mb_qp := slice.qp;
 
@@ -808,29 +799,23 @@ end;
 procedure TH264Stream.GetSliceBytes(var buffer: pbyte; out size: longword);
 var
   nalstream: TNALStream;
-  nal_unit_type: byte;
 begin
   if cabac then  //end_of_slice_flag
       ;  //todo
   nalstream._current := buffer;
-  if slice.type_ = SLICE_I then begin
+  if (slice.type_ = SLICE_I) and (slice.nal_unit_type = NAL_IDR) then begin
       WriteParamSetsToNAL(nalstream);
-      if slice.idr_pic_id = 65535 then
-          slice.idr_pic_id := 0
+      if idr_pic_id = 65535 then
+          idr_pic_id := 0
       else
-          slice.idr_pic_id += 1;
+          idr_pic_id += 1;
   end;
-  if slice.is_idr then begin
-      Assert(slice.type_ = SLICE_I, '[slice bitstream] IDR NAL for slicetype != SLICE_I');
-      nal_unit_type := NAL_IDR;
-  end else
-      nal_unit_type := NAL_NOIDR;
 
   //rbsp_slice_trailing_bits
   RBSP_TrailingBits(bs);
   if cabac then  //cabac_zero_word
       bs.Write(0, 16);
-  NAL_encapsulate(bs, nalstream, nal_unit_type);
+  NAL_encapsulate(bs, nalstream, slice.nal_unit_type);
 
   size := nalstream._current - buffer;
   bs.Free;
@@ -1109,7 +1094,7 @@ procedure TInterPredCost.SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: i
 begin
   _mvp := mvp;
   _ref_idx := idx;
-  case _h264stream.NumRefFrames of
+  case _h264stream.slice.num_ref_frames of
       1: _ref_frame_bits := 0;
       2: _ref_frame_bits := 1;
   else
