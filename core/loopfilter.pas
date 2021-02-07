@@ -169,7 +169,8 @@ procedure DeblockMBRow(
 var
   p, q: array[0..3] of int16;
   bS_vertical, bS_horizontal: TBSarray;
-  filterLeftMbEdgeFlag, filterTopMbEdgeFlag: boolean;
+  edge_start_idx_vert,
+  edge_start_idx_horiz: integer;
 
 procedure FilterSamplesLuma(const strength, indexA, alpha, beta: integer);
 var
@@ -271,22 +272,21 @@ var
   edge, blk, samples: integer;
   i: integer;
   bs: integer;
-  starting_edge: integer;
   pix: pbyte;
   stride: integer;
+  bstrengths: array[0..3] of byte;
 begin
   stride := f.stride;
 
-  //verticals  - edge = x, blk = y
-  starting_edge := 0;
-  if not filterLeftMbEdgeFlag then
-      starting_edge += 1;
-
-  for edge := starting_edge to 3 do begin
+  //vertical
+  for edge := edge_start_idx_vert to 3 do begin
       pix := pixel + edge * 4;
+      bstrengths := bS_vertical[edge];
+      if pinteger(@bstrengths)^ = 0 then
+          continue;
 
       for blk := 0 to 3 do begin
-          bs := bS_vertical[edge, blk];
+          bs := bstrengths[blk];
           if bs = 0 then begin
               pix += 4 * f.stride;
               continue;
@@ -307,16 +307,15 @@ begin
       end;
   end;
 
-  //horizontals  - edge = y, blk = x
-  starting_edge := 0;
-  if not filterTopMbEdgeFlag then
-      starting_edge += 1;
-
-  for edge := starting_edge to 3 do begin
+  //horizontal
+  for edge := edge_start_idx_horiz to 3 do begin
       pix := pixel + edge * 4 * stride;
+      bstrengths := bS_horizontal[edge];
+      if pinteger(@bstrengths)^ = 0 then
+        continue;
 
       for blk := 0 to 3 do begin
-          bs := bS_horizontal[edge, blk];
+          bs := bstrengths[blk];
           if bs = 0 then begin
               pix += 4;
               continue;
@@ -332,7 +331,7 @@ begin
                   for i := 0 to 2 do pix[-(i+1) * stride] := p[i];
               end;
 
-              pix += 1;
+              pix += 1;  //next pixel column
           end;
       end;
   end;
@@ -341,62 +340,56 @@ end;
 
 procedure FilterChroma8x8(const pixel: pbyte; const indexA_c, alpha_c, beta_c: integer);
 var
-  edge, blk, samples: integer;
-  i: integer;
-  starting_edge: integer;
+  edge: integer;
+  i, k: integer;
   bs: integer;
   pix: pbyte;
   stride: integer;
+  bstrengths: array[0..3] of byte;
 begin
   stride := f.stride_c;
 
-  //verticals  - edge = x, blk = y
-  starting_edge := 0;
-  if not filterLeftMbEdgeFlag then
-      starting_edge += 1;
+  for edge := edge_start_idx_vert to 1 do begin
+      bstrengths := bS_vertical[edge];
+      if pinteger(@bstrengths)^ = 0 then
+          continue;
 
-  for edge := starting_edge to 1 do begin
       pix := pixel + edge * 4;
-
-      for blk := 0 to 1 do begin
-          for samples := 0 to 3 do begin
+      for k := 0 to 7 do begin
+          bs := bstrengths[k >> 1];
+          if (bs > 0) then begin
               for i := 0 to 1 do q[i] := pix[     i];
               for i := 0 to 1 do p[i] := pix[-(i+1)];
-              bs := bS_vertical[edge, blk * 2 + samples div 2];
 
-              if (bs > 0) and UseFilter(alpha_c, beta_c) then begin
+              if UseFilter(alpha_c, beta_c) then begin
                   FilterSamplesChroma(bs, indexA_c);
-                  pix[ 0] := q[0];
                   pix[-1] := p[0];
+                  pix[ 0] := q[0];
               end;
-
-              pix += stride;  //next pixel row
           end;
+          pix += stride;  //next pixel row
       end;
   end;
 
-  //horizontals  - edge = y, blk = x
-  starting_edge := 0;
-  if not filterTopMbEdgeFlag then
-      starting_edge += 1;
+  for edge := edge_start_idx_horiz to 1 do begin
+      bstrengths := bS_horizontal[edge];
+      if pinteger(@bstrengths)^ = 0 then
+          continue;
 
-  for edge := starting_edge to 1 do begin
       pix := pixel + edge * 4 * stride;
-
-      for blk := 0 to 1 do begin
-          for samples := 0 to 3 do begin
+      for k := 0 to 7 do begin
+          bs := bstrengths[k >> 1];
+          if (bs > 0) then begin
               for i := 0 to 1 do q[i] := pix[     i * stride];
               for i := 0 to 1 do p[i] := pix[-(i+1) * stride];
-              bs := bS_horizontal[edge, blk * 2 + samples div 2];
 
-              if (bs > 0) and UseFilter(alpha_c, beta_c) then begin
+              if UseFilter(alpha_c, beta_c) then begin
                   FilterSamplesChroma(bs, indexA_c);
                   pix[      0] := q[0];
                   pix[-stride] := p[0];
               end;
-
-              pix += 1;
           end;
+          pix += 1;  //next pixel column
       end;
   end;
 end;
@@ -408,6 +401,7 @@ var
   alpha, beta: integer;
   alpha_c, beta_c: integer;
 
+//TODO won't work with adapt QP and I_PCM, where QP is decided by averaging with surrounding MBs
 procedure SetupParams(const mb: macroblock_p);
 var
   qp, qpc: integer;
@@ -445,17 +439,20 @@ var
   mb: macroblock_p;
 
 begin
-  filterTopMbEdgeFlag := mby > 0;
-  filterLeftMbEdgeFlag := false;
+  edge_start_idx_horiz := 0;
+  if mby = 0 then
+      edge_start_idx_horiz := 1;
+  edge_start_idx_vert := 1;
   mb := @f.mbs[mby * f.mbw];
 
   if cqp then begin
       SetupParams(mb);  //filter params depend on qp
       for mbx := 0 to f.mbw - 1 do begin
-          if not mb^.bS_zero then
+          if not mb^.bS_zero then begin
               FilterMB(mb);
+          end;
           mb += 1;
-          filterLeftMbEdgeFlag := true;
+          edge_start_idx_vert := 0;
       end;
   end else begin
       for mbx := 0 to f.mbw - 1 do begin
@@ -464,7 +461,7 @@ begin
               FilterMB(mb);
           end;
           mb += 1;
-          filterLeftMbEdgeFlag := true;
+          edge_start_idx_vert := 0;
       end;
   end;
 end;
