@@ -233,7 +233,7 @@ begin
   result := '';
   for option in options do begin
       left := format('  -%s, --%s %s', [option.ShortName, option.LongName, ArgTypeToString(option.ArgumentType)]);
-      result += format('%-28s', [left]) + option.Description + LineEnding;
+      result += format('%-28s ', [left]) + option.Description + LineEnding;
   end;
 end;
 

@@ -84,7 +84,10 @@ type
 
       interPredCostEval: TInterPredCost;
       cabac: boolean;
-      //stats?
+      loopfilter_control: record
+          enable: boolean;
+          ab_offset_div2: int8;
+      end;
 
       function GetNoPSkip: boolean; inline;
       procedure SetChromaQPOffset(const AValue: byte);
@@ -123,7 +126,7 @@ type
 
       constructor Create(w, h, mbw, mbh: integer);
       destructor Free;
-      procedure DisableLoopFilter;
+      procedure LoopFilter(enable: boolean; ab_offset_div2: int8);
       procedure InitSlice(slicetype, slice_qp, ref_frame_count: integer; bs_buffer: pbyte);
       procedure AbortSlice;
       procedure GetSliceBytes(var buffer: pbyte; out size: longword);
@@ -515,7 +518,13 @@ begin
       write_ue_code(bs, 0);
   write_se_code(bs, slice.slice_qp_delta);   //slice_qp_delta se(v)
   if pps.deblocking_filter_control_present_flag > 0 then begin
-      write_ue_code(bs, 1);                  //disable_deblocking_filter_idc ue(v)
+      if not loopfilter_control.enable then  //disable_deblocking_filter_idc ue(v)
+          write_ue_code(bs, 1)
+      else begin
+          write_ue_code(bs, 0);
+          write_se_code(bs, loopfilter_control.ab_offset_div2);  //slice_alpha_c0_offset_div2
+          write_se_code(bs, loopfilter_control.ab_offset_div2);  //slice_beta_offset_div2
+      end;
   end;
 end;
 
@@ -757,9 +766,12 @@ begin
   interPredCostEval.Free;
 end;
 
-procedure TH264Stream.DisableLoopFilter;
+procedure TH264Stream.LoopFilter(enable: boolean; ab_offset_div2: int8);
 begin
-  pps.deblocking_filter_control_present_flag := 1;
+  loopfilter_control.enable := enable;
+  loopfilter_control.ab_offset_div2 := ab_offset_div2;
+  if (not enable) or (ab_offset_div2 <> 0) then
+      pps.deblocking_filter_control_present_flag := 1;
 end;
 
 

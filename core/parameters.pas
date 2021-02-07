@@ -62,6 +62,7 @@ type
       key_interval: word;      // maximum keyframe interval
       loopfilter: boolean;     // deblocking
       filter_thread: boolean;  // deblocking in separate thread
+      filter_offset_div2: int8;// alpha/beta offset div 2
       aq: boolean;             // mb-level adaptive quantization
       luma_only: boolean;      // ignore chroma
 
@@ -71,6 +72,7 @@ type
       end;
       procedure SetAnalysisLevel(const AValue: byte);
       procedure SetChromaQParamOffset(const AValue: shortint);
+      procedure SetFilterOffset(AValue: int8);
       procedure SetFilterThreadEnabled(AValue: boolean);
       procedure SetKeyFrameInterval(const AValue: word);
       procedure SetNumReferenceFrames(const AValue: byte);
@@ -96,7 +98,9 @@ type
       property KeyFrameInterval: word read key_interval write SetKeyFrameInterval;
 
       property LoopFilterEnabled: boolean read loopfilter write loopfilter;
-      property FilterThreadEnabled: boolean read filter_thread write SetFilterThreadEnabled ;
+      property FilterThreadEnabled: boolean read filter_thread write SetFilterThreadEnabled;
+      property FilterOffsetDiv2: int8 read filter_offset_div2 write SetFilterOffset;
+
       property AnalysisLevel: byte read analyse write SetAnalysisLevel;
       property SubpixelMELevel: byte read subme write SetSubpixelMELevel;
       property NumReferenceFrames: byte read ref write SetNumReferenceFrames;
@@ -126,10 +130,15 @@ begin
   ValidateQParams;
 end;
 
+procedure TEncodingParameters.SetFilterOffset(AValue: int8);
+begin
+  filter_offset_div2 := clip3(-3, AValue, 3);
+end;
+
 procedure TEncodingParameters.SetFilterThreadEnabled(AValue: boolean);
 begin
   filter_thread := AValue;
-  if AValue and not loopfilter then
+  if AValue then
       LoopFilterEnabled := true;
 end;
 
@@ -192,6 +201,7 @@ begin
   aq := false;
   loopfilter := false;
   filter_thread := false;
+  filter_offset_div2 := 0;
   luma_only := false;
   WriteStatsFile := false;
   stats_filename := 'fevh264log.txt';

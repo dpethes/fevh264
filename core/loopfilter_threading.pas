@@ -18,6 +18,7 @@ type
 
       _frame: frame_p;
       _encoded_mb_rows: integer;
+      _filter_ab_offset: int8;
       _cqp: boolean;
       _abort: boolean;
 
@@ -25,7 +26,7 @@ type
       procedure DeblockRows;
 
     public
-      constructor Create();
+      constructor Create(const filter_offset: int8);
       destructor Destroy; override;
 
       procedure Execute; override;
@@ -42,7 +43,7 @@ type
     private
       dthread: TDeblockThread;
     public
-      constructor Create();
+      constructor Create(const filter_offset: int8);
       destructor Destroy; override;
       procedure BeginFrame(const frame: frame_t; const cqp: boolean = true);
       procedure MBRowFinished;
@@ -54,13 +55,14 @@ implementation
 
 { TDeblockThread }
 
-constructor TDeblockThread.Create();
+constructor TDeblockThread.Create(const filter_offset: int8);
 begin
   inherited Create(true);
   _new_frame_event := TSimpleEvent.Create;
   _finished_frame_event := TSimpleEvent.Create;
   _row_processed_event := TSimpleEvent.Create;
   _abort_lock := TCriticalSection.Create;
+  _filter_ab_offset := filter_offset;
 end;
 
 destructor TDeblockThread.Destroy;
@@ -87,7 +89,7 @@ begin
   _new_frame_event.SetEvent;
 end;
 
-procedure TDeblockThread.WaitEndFrame;
+procedure TDeblockThread.WaitEndFrame();
 begin
   _finished_frame_event.WaitFor(INFINITE);
   _finished_frame_event.ResetEvent;
@@ -132,7 +134,7 @@ begin
       //run in a loop: several rows may have been decoded since the last run (event was set multiple times),
       //or the frame is fully decoded
       while (mby < row_deblock_limit) do begin
-          DeblockMBRow(mby, _frame^, _cqp);
+          DeblockMBRow(mby, _frame^, _cqp, _filter_ab_offset, _filter_ab_offset);
           if mby > 0 then
               frame_decoded_macroblock_row_ssd(_frame, mby - 1);
           mby += 1;
@@ -152,9 +154,9 @@ end;
 
 { TDeblocker }
 
-constructor TDeblocker.Create();
+constructor TDeblocker.Create(const filter_offset: int8);
 begin
-  dthread := TDeblockThread.Create;
+  dthread := TDeblockThread.Create(filter_offset);
   dthread.Start;
 end;
 

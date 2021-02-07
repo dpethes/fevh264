@@ -94,12 +94,14 @@ begin
       AddOption('c', atInt,    'chroma-qp-offset', 'chroma QP adjustment [0]');
       AddOption('k', atInt,    'keyint', 'maximum keyframe interval [300]');
       AddOption('m', atInt,    'subme',  'subpixel ME refinement level [3]'
-                                         + ' (0=none; 1=hpel; 2=qpel; 3=qpel SATD; 4=qpel chroma SATD; 5=qpel RD');
+                                         + ' (0=none; 1=hpel; 2=qpel; 3=qpel SATD; 4=qpel chroma SATD; 5=qpel RD)');
       AddOption('a', atInt,    'analyse','mb type decision quality [2]'
                                          + ' (0=worst; 3=best)');
       AddOption('r', atInt,    'ref',    'reference frame count [1]');
-      AddOption('l', atNone,   'loopfilter', 'enable in-loop deblocking filter');
-      AddOption('t', atNone,   'filterthread', 'use separate thread for deblocking filter');
+      AddOption('l', atNone,   'loopfilter',    'enable in-loop deblocking filter');
+      AddOption('t', atNone,   'filterthread',  'run deblocking in separate thread');
+      AddOption('x', atInt,    'offset-filter', 'alpha/beta offset for deblocking [0]'
+                                         + ' (-3=less filtering; 3=more filtering)');
       AddOption('n', atNone,   'no-chroma',  'ignore chroma');
       AddOption('s', atNone,   'stats',  'write statsfile');
       AddOption('S', atString, 'stats-name', 'name for statsfile');
@@ -113,7 +115,9 @@ begin
       if options.IsSet('qp') then
           param.QParam := byte( StrToInt(options['q']) );
       if options.IsSet('chroma-qp-offset') then
-          param.ChromaQParamOffset := byte( StrToInt(options['c']) );
+          param.ChromaQParamOffset := StrToInt(options['c']);
+      if options.IsSet('offset-filter') then
+          param.FilterOffsetDiv2 := StrToInt(options['x']);
       if options.IsSet('keyint') then
           param.KeyFrameInterval := StrToInt(options['k']);
       if options.IsSet('subme') then

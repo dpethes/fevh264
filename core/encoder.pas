@@ -60,6 +60,7 @@ type
       mb_width,
       mb_height,
       mb_count: integer;
+      filter_ab_offset: integer;
 
       //encoder configuration
       _param: TEncodingParameters;
@@ -118,8 +119,7 @@ begin
   h264s.ChromaQPOffset := param.ChromaQParamOffset;
   h264s.KeyInterval := key_interval;
   h264s.NumRefFrames := num_ref_frames;
-  if not param.LoopFilterEnabled then
-      h264s.DisableLoopFilter;
+  h264s.LoopFilter(param.LoopFilterEnabled, param.FilterOffsetDiv2);
 
   //allocate frames
   frames := TFrameManager.Create(num_ref_frames, mb_width, mb_height);
@@ -158,7 +158,9 @@ begin
   mb_enc_lowres := TMBEncoderLowresRun.Create;
   mb_enc_lowres.me := me_lowres;
 
-  deblocker := TDeblocker.Create();
+  //deblocking filter
+  filter_ab_offset := _param.FilterOffsetDiv2 * 2;
+  deblocker := TDeblocker.Create(filter_ab_offset);
 
   //stats
   stats := TStreamStats.Create;
@@ -402,7 +404,7 @@ begin
   end else begin
       cqp := not _param.AdaptiveQuant;
       for mby := 0 to fenc.mbh - 1 do begin
-          DeblockMBRow(mby, fenc, cqp);
+          DeblockMBRow(mby, fenc, cqp, filter_ab_offset, filter_ab_offset);
           //the bottom edge will be filtered in the next iteration, so SSD should be behind by a single row
           if mby > 0 then
               frame_decoded_macroblock_row_ssd(@fenc, mby - 1);
