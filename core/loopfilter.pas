@@ -54,7 +54,7 @@ TAB_TC0: array[1..3, 0..51] of byte = (
    1,2,2,2,2,3,3,3,4,4,4,5,6,6,7,8,9,10,11,13,14,16,18,20,23,25)
 );
 
-XY2IDX: array[0..3, 0..3] of byte = (
+BLOCK_XY_POS_TO_IDX: array[0..3, 0..3] of byte = (
   ( 0,  2,  8, 10),
   ( 1,  3,  9, 11),
   ( 4,  6, 12, 14),
@@ -74,20 +74,21 @@ mixedModeEdgeFlag = 0 (prog)
 procedure CalculateBStrength (const mb: macroblock_p);
 
   //test p/q non-zero coeffs
-  function inner_bs(const a: macroblock_p; na, nb: integer): integer; inline;
+  function inner_edge_bS(const a: macroblock_p; na, nb: integer): integer; inline;
   begin
     result := 0;
     if a^.nz_coef_cnt[na] + a^.nz_coef_cnt[nb] > 0 then result := 2;
   end;
 
-  function edge_bs(const a, b: macroblock_p; na, nb: integer; bS_min: integer): integer; inline;
+  //strength between blocks from two MBs (outer edge)
+  function mb_edge_bS(const a, b: macroblock_p; na, nb: integer; bS_min: integer): integer; inline;
   begin
     result := bS_min;
     if a^.nz_coef_cnt[na] + b^.nz_coef_cnt[nb] > 0 then result := 2;
   end;
 
-  //different ref, mv delta >= 4, diff. partitions
-  function mb_bs(const a, b: macroblock_p): integer; inline;
+  //strength between two MBs, affected by different ref, mv delta >= 4, diff. partitions
+  function mb_bS(const a, b: macroblock_p): integer; inline;
   begin
     result := 0;
     if (a^.ref <> b^.ref) or
@@ -96,17 +97,13 @@ procedure CalculateBStrength (const mb: macroblock_p);
         result := 1;
   end;
 
-  procedure zero16bytes(p: pint64); inline;
-      begin p^ := 0; (p+1)^ := 0; end;
-
   function is_bS_sum_zero(pv, ph: pint64): boolean; inline;
   begin
     result := pv^ + (pv+1)^ + ph^ + (ph+1)^ = 0;
   end;
 
 const
-  intra_bs_vert:  TBSarray = ( (4, 4, 4, 4), (3, 3, 3, 3), (3, 3, 3, 3), (3, 3, 3, 3) );
-  intra_bs_horiz: TBSarray = ( (4, 3, 3, 3), (4, 3, 3, 3), (4, 3, 3, 3), (4, 3, 3, 3) );
+  intra_bS: TBSarray = ( (4,4,4,4), (3,3,3,3), (3,3,3,3), (3,3,3,3) );
 
 var
   i, j: integer;
@@ -115,37 +112,33 @@ var
 
 begin
   if is_intra(mb^.mbtype) then begin
-      mb^.bS_vertical := intra_bs_vert;
-      mb^.bS_horizontal := intra_bs_horiz;
+      mb^.bS_vertical   := intra_bS;
+      mb^.bS_horizontal := intra_bS;
       mb^.bS_zero := false;
       exit;
   end;
 
-  //internal edges
-  if (mb^.mbtype = MB_P_SKIP) or (mb^.cbp = 0) then begin
-      zero16bytes(@mb^.bS_vertical);
-      zero16bytes(@mb^.bS_horizontal);
-  end else begin
-      for i := 1 to 3 do
+  //internal edges: strength depends on luma only, but additional test for rare cases where there's only chroma hurts perf
+  if (mb^.cbp <> 0) then begin
+      for i := 1 to 3 do   //vert edge index
           for j := 0 to 3 do
-              mb^.bS_vertical[i, j] := inner_bs(mb, XY2IDX[i, j], XY2IDX[i-1, j]);
-      for i := 0 to 3 do
-          for j := 1 to 3 do
-              mb^.bS_horizontal[i, j] := inner_bs(mb, XY2IDX[i, j], XY2IDX[i, j-1]);
+              mb^.bS_vertical[i, j] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[i, j], BLOCK_XY_POS_TO_IDX[i-1, j]);
+      for i := 1 to 3 do   //horiz edge index
+          for j := 0 to 3 do
+              mb^.bS_horizontal[i, j] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[j, i], BLOCK_XY_POS_TO_IDX[j, i-1]);
   end;
 
   //vertical edges - left edge
   if mb^.x > 0 then begin
       mba := mb^.mba;
       if is_intra(mba^.mbtype) then begin  //edge shared with intra block
-          for i := 0 to 3 do
-              mb^.bS_vertical[0, i] := 4;
+          mb^.bS_vertical[0] := intra_bS[0];
       end else begin
-          bS_min := mb_bs(mb, mba);
-          mb^.bS_vertical[0, 0] := edge_bs(mb, mba, 0,  5, bS_min);
-          mb^.bS_vertical[0, 1] := edge_bs(mb, mba, 2,  7, bS_min);
-          mb^.bS_vertical[0, 2] := edge_bs(mb, mba, 8, 13, bS_min);
-          mb^.bS_vertical[0, 3] := edge_bs(mb, mba,10, 15, bS_min);
+          bS_min := mb_bS(mb, mba);
+          mb^.bS_vertical[0, 0] := mb_edge_bS(mb, mba, 0,  5, bS_min);
+          mb^.bS_vertical[0, 1] := mb_edge_bS(mb, mba, 2,  7, bS_min);
+          mb^.bS_vertical[0, 2] := mb_edge_bS(mb, mba, 8, 13, bS_min);
+          mb^.bS_vertical[0, 3] := mb_edge_bS(mb, mba,10, 15, bS_min);
       end;
   end;
 
@@ -153,14 +146,13 @@ begin
   if mb^.y > 0 then begin
       mbb := mb^.mbb;
       if is_intra(mbb^.mbtype) then begin  //edge shared with intra block
-          for i := 0 to 3 do
-              mb^.bS_horizontal[i, 0] := 4;
+          mb^.bS_horizontal[0] := intra_bS[0];
       end else begin
-          bS_min := mb_bs(mb, mbb);
-          mb^.bS_horizontal[0, 0] := edge_bs(mb, mbb, 0, 10, bS_min);
-          mb^.bS_horizontal[1, 0] := edge_bs(mb, mbb, 1, 11, bS_min);
-          mb^.bS_horizontal[2, 0] := edge_bs(mb, mbb, 4, 14, bS_min);
-          mb^.bS_horizontal[3, 0] := edge_bs(mb, mbb, 5, 15, bS_min);
+          bS_min := mb_bS(mb, mbb);
+          mb^.bS_horizontal[0, 0] := mb_edge_bS(mb, mbb, 0, 10, bS_min);
+          mb^.bS_horizontal[0, 1] := mb_edge_bS(mb, mbb, 1, 11, bS_min);
+          mb^.bS_horizontal[0, 2] := mb_edge_bS(mb, mbb, 4, 14, bS_min);
+          mb^.bS_horizontal[0, 3] := mb_edge_bS(mb, mbb, 5, 15, bS_min);
       end;
   end;
 
@@ -324,7 +316,7 @@ begin
       pix := pixel + edge * 4 * stride;
 
       for blk := 0 to 3 do begin
-          bs := bS_horizontal[blk, edge];
+          bs := bS_horizontal[edge, blk];
           if bs = 0 then begin
               pix += 4;
               continue;
@@ -395,7 +387,7 @@ begin
           for samples := 0 to 3 do begin
               for i := 0 to 1 do q[i] := pix[     i * stride];
               for i := 0 to 1 do p[i] := pix[-(i+1) * stride];
-              bs := bS_horizontal[blk * 2 + samples div 2, edge];
+              bs := bS_horizontal[edge, blk * 2 + samples div 2];
 
               if (bs > 0) and UseFilter(alpha_c, beta_c) then begin
                   FilterSamplesChroma(bs, indexA_c);
@@ -442,7 +434,7 @@ end;
 
 procedure FilterMB(const mb: macroblock_p);
 begin
-  bS_vertical := mb^.bS_vertical;
+  bS_vertical   := mb^.bS_vertical;
   bS_horizontal := mb^.bS_horizontal;
   FilterLuma16x16   (mb^.pfdec,      indexA,   alpha,   beta);
   FilterChroma8x8   (mb^.pfdec_c[0], indexA_c, alpha_c, beta_c);

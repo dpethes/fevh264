@@ -235,10 +235,12 @@ type
       //transquant
       quant_ctx_qp, quant_ctx_qpc: TQuantCtx;
 
-      //loopfilter
+      //neighboring MBs, used for cavlc NZ counts, intra prediction, filtering strength
       mba, mbb: macroblock_p;
-      bS_vertical, bS_horizontal: TBSarray;  //TODO invert indexing
-      bS_zero: boolean;
+
+      //loopfilter: boundary filtering strength for vertically/horizontally adjacent blocks
+      bS_vertical, bS_horizontal: TBSarray;
+      bS_zero: boolean;                  //shortcut
   end;
 
   //frame

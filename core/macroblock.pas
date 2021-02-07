@@ -101,6 +101,12 @@ begin
   pint64(@mb.nz_coef_cnt_chroma_ac[1, 0])^ := value;
 end;
 
+procedure fill_zero_16x(p: pint64); inline;
+begin
+  p^ := 0;
+  (p+1)^ := 0;
+end;
+
 
 (*******************************************************************************
 initialize mb structure:
@@ -220,6 +226,10 @@ begin
   dst[17] := dst[0];                   //top left
   src := mb.pixels_dec + 15;           //left - use rightmost pixel row from previously decoded mb
   for i := 0 to 15 do dst[i+18] := src[i * 16];
+
+  //loopfilter
+  fill_zero_16x(@mb.bS_vertical);
+  fill_zero_16x(@mb.bS_horizontal);
 
   //debug: clear some data areas that don't need clearing under normal circumstances
   {
