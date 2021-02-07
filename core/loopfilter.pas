@@ -401,19 +401,18 @@ var
   alpha, beta: integer;
   alpha_c, beta_c: integer;
 
-//TODO won't work with adapt QP and I_PCM, where QP is decided by averaging with surrounding MBs
 procedure SetupParams(const mb: macroblock_p);
 var
-  qp, qpc: integer;
+  qpa, qpc: integer;
   indexB, indexB_c: integer;
 begin
-  qp := mb^.qp;
-  indexA := clip3(0, qp + offset_a, 51);
-  indexB := clip3(0, qp + offset_b, 51);
+  qpa := mb^.qp;  //simplified for cqp with no I_PCM
+  indexA := clip3(0, qpa + offset_a, 51);
+  indexB := clip3(0, qpa + offset_b, 51);
   alpha := TAB_ALPHA[indexA];
   beta  := TAB_BETA [indexB];
 
-  if qp < 30 then begin
+  if qpa < 30 then begin
       indexA_c := indexA;
       alpha_c := alpha;
       beta_c  := beta;
@@ -439,6 +438,12 @@ var
   mb: macroblock_p;
 
 begin
+  { limit A/B offset even if spec allows 2x more to avoid filtering on QP<10, when I_PCM can be present,
+    because the simplified setup can't handle it. For I_PCM and for adapt QP, the QPz is decided by averaging
+    with surrounding MBs
+  }
+  Assert((abs(offset_a) <= 6) and (abs(offset_b) <= 6));
+
   edge_start_idx_horiz := 0;
   if mby = 0 then
       edge_start_idx_horiz := 1;

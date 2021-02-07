@@ -40,8 +40,9 @@ type
       intrapred: TIntraPredictor;
       mb_can_use_pskip: boolean;
       cache_motion: record
-        mv, mvp: motionvec_t;
+          mv, mvp: motionvec_t;
       end;
+      enable_I_PCM: boolean;
 
       procedure InitMB(mbx, mby: integer);
       procedure InitForInter;
@@ -406,6 +407,7 @@ begin
   mb.chroma_qp_offset := 0;
   intrapred := TIntraPredictor.Create;
   intrapred.SetMB(@mb);
+  enable_I_PCM := false;
 end;
 
 destructor TMacroblockEncoder.Free;
@@ -420,6 +422,7 @@ begin
   intrapred.SetFrame(@frame);
   stats := f.stats;
   mb_init_frame_invariant(mb, frame);
+  enable_I_PCM := frame.qp < 10;
 end;
 
 
@@ -577,7 +580,7 @@ begin
       if mode_lambda * bits_inter + score_p < mode_lambda * bits_intra + score_intra then begin
           mb.mbtype := MB_P_16x16;
           CacheLoad;
-      end else if bits_intra > MB_I_PCM_BITCOST then begin
+      end else if (enable_I_PCM) and (bits_intra > MB_I_PCM_BITCOST) then begin
           mb.mbtype := MB_I_PCM;
           EncodeCurrentType;
       end;
@@ -630,7 +633,7 @@ begin
   if bits_i16 < bits_i4 then begin
       mb.mbtype := MB_I_16x16;
       CacheLoad;
-  end else if bits_i4 > MB_I_PCM_BITCOST then begin
+  end else if (enable_I_PCM) and (bits_i4 > MB_I_PCM_BITCOST) then begin
       mb.mbtype := MB_I_PCM;
       EncodeCurrentType;
   end;
