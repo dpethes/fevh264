@@ -329,7 +329,7 @@ end;
 }
 function TMacroblockEncoder.TrySkip(const use_satd: boolean = true): boolean;
 const
-  SKIP_SSD_TRESH = 256;
+  SKIP_SSD_TRESH = 256;   //todo variate threshold based on qp/lambda: qp 26 is better with 512 without negative effect
   SKIP_SSD_CHROMA_TRESH = 96;
 var
   score, score_c: integer;
@@ -583,6 +583,14 @@ begin
       end else if (enable_I_PCM) and (bits_intra > MB_I_PCM_BITCOST) then begin
           mb.mbtype := MB_I_PCM;
           EncodeCurrentType;
+      end;
+      //if there's no residual and p16 lost to i16 due to bitcost, pskip can still be an option
+      if (mb.mbtype <> MB_P_16x16) and (mb.cbp = 0) then begin
+          if (mb.score_skip < score_intra + bits_intra) then begin
+              MakeSkip;
+              me.Skipped(mb);
+              exit;
+          end;
       end;
   end;
 

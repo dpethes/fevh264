@@ -283,7 +283,7 @@ begin
       else
           encoding_fps := 1000;
       if (encoding_fps < 10) or (i mod 5 = 0) then
-          write(format('frame: %5d  psnr: %5.2f  kbps: %7.1f  [%3.1f fps]   '#13, [i, psnr_avg[0]/(i+1), kbps, encoding_fps]));
+          write(format('frame: %5d  psnr: %5.3f  kbps: %7.1f  [%3.1f fps]   '#13, [i, psnr_avg[0]/(i+1), kbps, encoding_fps]));
   end;
 
   //stream stats
@@ -295,7 +295,7 @@ begin
   fps  := frame_count / (time_total/1000);
 
   write  ('average psnr / bitrate / speed:    ');
-  writeln(format('%.2f dB / %.1f kbps / %4.1f fps', [psnr_avg[0], kbps, fps]) );
+  writeln(format('%.3f dB / %.1f kbps / %4.1f fps', [psnr_avg[0], kbps, fps]) );
   if not param.IgnoreChroma then
       writeln(format('average psnr chroma: %.2f / %.2f dB', [psnr_avg[1], psnr_avg[2]]) );
 
