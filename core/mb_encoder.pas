@@ -512,6 +512,7 @@ var
 
   score_psub, bits_inter_sub: integer;
   sub_16x16: boolean;
+  p16_cached: boolean;
 
 begin
   mb.mbtype := MB_P_16x16;
@@ -555,6 +556,7 @@ begin
   if score_intra < score_p * 2 then begin
       //I16x16
       CacheStore;
+      p16_cached := true;
       mb.mbtype := MB_I_16x16;
       EncodeCurrentType;
       bits_intra := MBCost;
@@ -592,11 +594,15 @@ begin
               exit;
           end;
       end;
+  end else begin
+      p16_cached := false;
   end;
 
   sub_16x16 := true;
   if (mb.mbtype = MB_P_16x16) and sub_16x16 then begin
       CacheMvStore;
+      if not p16_cached then
+          CacheStore;
       mb.mbtype := MB_P_16x8;
       me.Estimate_16x8(mb);
       InterPredLoadMvs(mb, frame, num_ref_frames);  //mvp can differ and mvp1 can change based on surrounding MBs and top mv
@@ -611,8 +617,9 @@ begin
       if (mb.mv = mb.mv1) or (bits_inter * mode_lambda + score_p < bits_inter_sub * mode_lambda + score_psub) then begin
           mb.mbtype := MB_P_16x16;
           CacheMvLoad;
-          MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
-          EncodeCurrentType;  //TODO cache?
+          CacheLoad;
+          MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);  //MC pixels not cached
+          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
       end;
   end;
 
