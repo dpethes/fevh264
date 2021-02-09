@@ -625,8 +625,13 @@ begin
 
   //apply rdo refinement only if there is residual to work with to save some time at negligible quality cost
   if (mb.mbtype = MB_P_16x16) and (mb.cbp > 0) and (me.Subme > 4) then begin
+      CacheMvStore;
       me.Refine(mb);
-      EncodeCurrentType;
+      if mb.mv = cache_motion.mv then begin  //refinement couldn't find better mv
+          CacheLoad;
+          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);  //chroma MC pixels not restored
+      end else
+          EncodeCurrentType;
   end;
 end;
 
