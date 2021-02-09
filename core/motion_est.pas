@@ -254,7 +254,7 @@ var
   i: integer;
   score: integer;
   mv: motionvec_t;
-  best_refidx, best_score: integer;
+  best_refidx, best_score, best_hpel_score: integer;
   fref: frame_p;
   min_score: integer;
   fpel_scores: array[0..15] of TScoreListItem;
@@ -284,6 +284,7 @@ begin
   end;
 
   //hpel/qpel
+  best_hpel_score := MaxInt;
   best_score := MaxInt;
   best_refidx := 0;
   mv := ZERO_MV;
@@ -294,8 +295,13 @@ begin
 
       InterCost.SetMVPredAndRefIdx(mb.mvp, mb.ref);
       mb.mv := SearchRegion.SearchHPel(mb, fref);
-      mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
+      score := SearchRegion.LastSearchScore;
+      if score < best_hpel_score then
+          best_hpel_score := score;
+      if score > best_hpel_score * 7 div 5 then  //don't try qpel if the hpel is 1,4x worse
+          continue;
 
+      mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
       score := SearchRegion.LastSearchScore;
       if score < best_score then begin
           mv := mb.mv;
@@ -308,7 +314,8 @@ begin
   fref := fenc.refs[best_refidx];
   mb.ref := best_refidx;
   mb.fref := fref;
-  InterPredLoadMvs(mb, fenc, ref_count);
+  if mb.ref > 0 then  //mvp for refidx != 0 can differ from the inital mvp
+      InterPredLoadMvs(mb, fenc, ref_count);
 
   mb.mv := ClipMVRange(mv);
   MotionCompensation.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
