@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <CONFIG>
   <ProjectOptions>
-    <Version Value="10"/>
+    <Version Value="11"/>
     <PathDelim Value="\"/>
     <General>
       <Flags>
@@ -14,7 +14,7 @@
       <MainUnit Value="0"/>
       <UseAppBundle Value="False"/>
     </General>
-    <BuildModes Count="3">
+    <BuildModes Count="4">
       <Item1 Name="Debug" Default="True"/>
       <Item2 Name="Release">
         <CompilerOptions>
@@ -45,9 +45,7 @@
             <LinkSmart Value="True"/>
           </Linking>
           <Other>
-            <Verbosity>
-              <ShowSummary Value="True"/>
-            </Verbosity>
+            <CustomOptions Value="-dHAS_FFMS2"/>
             <ExecuteBefore>
               <Command Value="build_asm_x64.bat"/>
               <ShowAllMessages Value="True"/>
@@ -85,9 +83,6 @@
             <LinkSmart Value="True"/>
           </Linking>
           <Other>
-            <Verbosity>
-              <ShowSummary Value="True"/>
-            </Verbosity>
             <CustomOptions Value="-al -Ayasm"/>
             <ExecuteBefore>
               <Command Value="build_asm_x64.bat"/>
@@ -97,20 +92,67 @@
           </Other>
         </CompilerOptions>
       </Item3>
+      <Item4 Name="Release-profile">
+        <CompilerOptions>
+          <Version Value="11"/>
+          <PathDelim Value="\"/>
+          <Target>
+            <Filename Value="fevh264_cli_x64"/>
+          </Target>
+          <SearchPaths>
+            <OtherUnitFiles Value="..\core"/>
+            <UnitOutputDirectory Value="lib\$(TargetCPU)-$(TargetOS)"/>
+          </SearchPaths>
+          <Parsing>
+            <SyntaxOptions>
+              <AllowLabel Value="False"/>
+            </SyntaxOptions>
+          </Parsing>
+          <CodeGeneration>
+            <SmartLinkUnit Value="True"/>
+            <Optimizations>
+              <OptimizationLevel Value="4"/>
+            </Optimizations>
+          </CodeGeneration>
+          <Linking>
+            <Debugging>
+              <DebugInfoType Value="dsDwarf2"/>
+              <UseLineInfoUnit Value="False"/>
+            </Debugging>
+            <LinkSmart Value="True"/>
+          </Linking>
+          <Other>
+            <CustomOptions Value="-dHAS_FFMS2"/>
+            <ExecuteBefore>
+              <Command Value="build_asm_x64.bat"/>
+              <ShowAllMessages Value="True"/>
+              <CompileReasons Compile="False" Run="False"/>
+            </ExecuteBefore>
+            <ExecuteAfter>
+              <Command Value="cv2pdb fevh264_cli_x64.exe"/>
+              <CompileReasons Compile="False" Run="False"/>
+            </ExecuteAfter>
+          </Other>
+        </CompilerOptions>
+      </Item4>
     </BuildModes>
     <PublishOptions>
       <Version Value="2"/>
-      <IncludeFileFilter Value="*.(pas|pp|inc|lfm|lpr|lrs|lpi|lpk|sh|xml)"/>
-      <ExcludeFileFilter Value="*.(bak|ppu|ppw|o|so);*~;backup"/>
     </PublishOptions>
     <RunParams>
       <local>
-        <FormatVersion Value="1"/>
-        <CommandLineParams Value="-f 100 -q 32 -l r:\park_joy_420_720p50.y4m"/>
         <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
       </local>
+      <FormatVersion Value="2"/>
+      <Modes Count="1">
+        <Mode0 Name="default">
+          <local>
+            <LaunchingApplication PathPlusParams="/usr/X11R6/bin/xterm -T 'Lazarus Run Output' -e $(LazarusDir)/tools/runwait.sh $(TargetCmdLine)"/>
+          </local>
+        </Mode0>
+      </Modes>
     </RunParams>
-    <Units Count="31">
+    <Units Count="30">
       <Unit0>
         <Filename Value="fevh264_cli.pas"/>
         <IsPartOfProject Value="True"/>
@@ -124,118 +166,114 @@
         <IsPartOfProject Value="True"/>
       </Unit2>
       <Unit3>
-        <Filename Value="..\core\stdint.pas"/>
+        <Filename Value="..\core\bitstream.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit3>
       <Unit4>
-        <Filename Value="..\core\bitstream.pas"/>
+        <Filename Value="..\core\vlc.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit4>
       <Unit5>
-        <Filename Value="..\core\vlc.pas"/>
+        <Filename Value="..\core\encoder.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit5>
       <Unit6>
-        <Filename Value="..\core\encoder.pas"/>
+        <Filename Value="..\core\macroblock.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit6>
       <Unit7>
-        <Filename Value="..\core\macroblock.pas"/>
+        <Filename Value="..\core\intra_pred.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit7>
       <Unit8>
-        <Filename Value="..\core\intra_pred.pas"/>
+        <Filename Value="..\core\pixel.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit8>
       <Unit9>
-        <Filename Value="..\core\pixel.pas"/>
+        <Filename Value="..\core\transquant.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit9>
       <Unit10>
-        <Filename Value="..\core\transquant.pas"/>
+        <Filename Value="..\core\h264stream.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit10>
       <Unit11>
-        <Filename Value="..\core\h264stream.pas"/>
+        <Filename Value="..\core\h264tables.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit11>
       <Unit12>
-        <Filename Value="..\core\h264tables.pas"/>
+        <Filename Value="..\core\frame.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit12>
       <Unit13>
-        <Filename Value="..\core\frame.pas"/>
+        <Filename Value="..\core\util.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit13>
       <Unit14>
-        <Filename Value="..\core\util.pas"/>
+        <Filename Value="yuv4mpeg.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit14>
       <Unit15>
-        <Filename Value="yuv4mpeg.pas"/>
+        <Filename Value="..\core\motion_comp.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit15>
       <Unit16>
-        <Filename Value="..\core\motion_comp.pas"/>
+        <Filename Value="..\core\motion_est.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit16>
       <Unit17>
-        <Filename Value="..\core\motion_est.pas"/>
+        <Filename Value="..\core\bench.inc"/>
         <IsPartOfProject Value="True"/>
       </Unit17>
       <Unit18>
-        <Filename Value="..\core\bench.inc"/>
+        <Filename Value="..\core\ratecontrol.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit18>
       <Unit19>
-        <Filename Value="..\core\ratecontrol.pas"/>
+        <Filename Value="..\core\image.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit19>
       <Unit20>
-        <Filename Value="..\core\image.pas"/>
+        <Filename Value="..\core\inter_pred.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit20>
       <Unit21>
-        <Filename Value="..\core\inter_pred.pas"/>
+        <Filename Value="..\core\mb_encoder.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit21>
       <Unit22>
-        <Filename Value="..\core\mb_encoder.pas"/>
+        <Filename Value="..\core\stats.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit22>
       <Unit23>
-        <Filename Value="..\core\stats.pas"/>
+        <Filename Value="..\core\loopfilter.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit23>
       <Unit24>
-        <Filename Value="..\core\loopfilter.pas"/>
+        <Filename Value="..\core\parameters.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit24>
       <Unit25>
-        <Filename Value="..\core\parameters.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit25>
-      <Unit26>
         <Filename Value="cliparamhandler.pas"/>
         <IsPartOfProject Value="True"/>
         <UnitName Value="CliParamHandler"/>
+      </Unit25>
+      <Unit26>
+        <Filename Value="..\core\motion_est_search.pas"/>
+        <IsPartOfProject Value="True"/>
       </Unit26>
       <Unit27>
-        <Filename Value="..\core\motion_est_search.pas"/>
+        <Filename Value="vfw.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit27>
       <Unit28>
-        <Filename Value="vfw.pas"/>
+        <Filename Value="ffms.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit28>
       <Unit29>
-        <Filename Value="ffms.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit29>
-      <Unit30>
         <Filename Value="..\core\loopfilter_threading.pas"/>
         <IsPartOfProject Value="True"/>
-      </Unit30>
+      </Unit29>
     </Units>
   </ProjectOptions>
   <CompilerOptions>
@@ -269,9 +307,7 @@
       </Debugging>
     </Linking>
     <Other>
-      <Verbosity>
-        <ShowSummary Value="True"/>
-      </Verbosity>
+      <CustomOptions Value="-dHAS_FFMS2"/>
       <ExecuteBefore>
         <Command Value="build_asm_x64.bat"/>
         <ShowAllMessages Value="True"/>

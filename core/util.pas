@@ -26,7 +26,7 @@ unit util;
 interface
 
 uses
-  stdint, math;
+  math;
 
 function  fev_malloc (size: longword): pointer;
 procedure fev_free (ptr: pointer);
@@ -44,9 +44,9 @@ type
 mbcmp_func_t = function (pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
 mbstat_func_t = function (pix: pbyte): uint32; {$ifdef CPUI386} cdecl; {$endif}
 pixmove_func_t = procedure (pix1, pix2: pbyte; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
-pixoper_func_t = procedure (pix1, pix2: pbyte; diff: int16_p); {$ifdef CPUI386} cdecl; {$endif}
-pixavg_func_t = procedure (src1, src2, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
-pixdownsample_func_t = procedure (src: uint8_p; src_stride: integer; dst: uint8_p; dst_width: integer); {$ifdef CPUI386} cdecl; {$endif}
+pixoper_func_t = procedure (pix1, pix2: pbyte; diff: PInt16); {$ifdef CPUI386} cdecl; {$endif}
+pixavg_func_t = procedure (src1, src2, dest: PUint8; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+pixdownsample_func_t = procedure (src: PUint8; src_stride: integer; dst: PUint8; dst_width: integer); {$ifdef CPUI386} cdecl; {$endif}
 mc_chroma_func_t = procedure (src, dst: pbyte; const stride: integer; coef: pbyte); {$ifdef CPUI386} cdecl; {$endif}
 core_xform_func_t = procedure (block: pInt16); {$ifdef CPUI386} cdecl; {$endif}
 quant_func_t  = procedure(block: pInt16; mf: pInt16; f: integer; qbits: integer; starting_idx: integer); {$ifdef CPUI386} cdecl; {$endif}

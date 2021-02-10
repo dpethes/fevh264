@@ -25,11 +25,11 @@ unit intra_pred;
 interface
 
 uses
-  stdint, common, util, pixel, h264stream;
+  common, util, pixel, h264stream;
 
 type
-  TPredict4x4Func = procedure (src, dst: uint8_p; stride: integer);
-  TPredict16x16Func = procedure (src, dst: uint8_p); {$ifdef CPUI386} cdecl; {$endif}
+  TPredict4x4Func = procedure (src, dst: PUint8; stride: integer);
+  TPredict16x16Func = procedure (src, dst: PUint8); {$ifdef CPUI386} cdecl; {$endif}
 
   { TIntraPredictor }
 
@@ -85,22 +85,22 @@ const
   I4x4CACHE_STRIDE = 16;
 
 (* top *)
-procedure predict_top4( src, dst: uint8_p; sstride: integer );
+procedure predict_top4( src, dst: PUint8; sstride: integer );
 var
-  p: int32_t;
+  p: int32;
   i: integer;
 begin
   src -= sstride;
-  p := int32_p(src)^;
+  p := Pint32(src)^;
   for i := 0 to 3 do begin
-      int32_p(dst)^ := p;
+      Pint32(dst)^ := p;
       dst += I4x4CACHE_STRIDE;
   end;
 end;
 
 
 (* left *)
-procedure predict_left4( src, dst: uint8_p; sstride: integer );
+procedure predict_left4( src, dst: PUint8; sstride: integer );
 var
   i: integer;
 begin
@@ -114,7 +114,7 @@ end;
 
 
 (* dc *)
-procedure predict_dc4( src, dst: uint8_p; sstride: integer; mbx, mby, n: word);
+procedure predict_dc4( src, dst: PUint8; sstride: integer; mbx, mby, n: word);
 var
   has_top, has_left: boolean;
   dc, i, shift: integer;
@@ -143,7 +143,7 @@ begin
   dc := dc or (dc shl 8) or (dc shl 16) or (dc shl 24);  //spread
 
   for i := 0 to 3 do begin
-      int32_p(dst)^ := dc;
+      PInt32(dst)^ := dc;
       dst += I4x4CACHE_STRIDE;
   end;
 end;
@@ -155,7 +155,7 @@ If x is equal to 3 and y is equal to 3,
 Otherwise (x is not equal to 3 or y is not equal to 3),
   pred4x4L[x, y] = ( p[x + y, -1] + 2 * p[x + y + 1, -1] + p[x + y + 2, -1] + 2 ) >> 2
 }
-procedure predict_ddl4( src, dst: uint8_p; sstride: integer );
+procedure predict_ddl4( src, dst: PUint8; sstride: integer );
 var
   x, y: integer;
 begin
@@ -177,7 +177,7 @@ Otherwise if x is less than y,
 Otherwise (x is equal to y),
   pred4x4L[x, y] = ( p[0, -1] + 2 * p[-1, -1] + p[-1, 0] + 2 ) >> 2
 }
-procedure predict_ddr4( src, dst: uint8_p; sstride: integer );
+procedure predict_ddr4( src, dst: PUint8; sstride: integer );
 var
   x, y: integer;
 begin
@@ -199,7 +199,7 @@ end;
 
 
 (* vertical right *)
-procedure predict_vr4( src, dst: uint8_p; stride: integer );
+procedure predict_vr4( src, dst: PUint8; stride: integer );
 var
   z, x, y, i: integer;
 begin
@@ -226,7 +226,7 @@ end;
 
 
 (* vertical left *)
-procedure predict_vl4( src, dst: uint8_p; stride: integer );
+procedure predict_vl4( src, dst: PUint8; stride: integer );
 var
   x, y: integer;
 begin
@@ -245,7 +245,7 @@ end;
 
 
 (* horiz down *)
-procedure predict_hd4( src, dst: uint8_p; stride: integer );
+procedure predict_hd4( src, dst: PUint8; stride: integer );
 var
   z, x, y, i: integer;
 begin
@@ -288,7 +288,7 @@ pred4x4L[ x, y ] = ( p[ -1, 2 ] + 3 * p[ -1, 3 ] + 2 ) >> 2
 - Otherwise (zHU is greater than 5),
 pred4x4L[ x, y ] = p[ -1, 3 ]
 }
-procedure predict_hu4( src, dst: uint8_p; stride: integer );
+procedure predict_hu4( src, dst: PUint8; stride: integer );
 var
   z, x, y, i: integer;
 begin
@@ -316,24 +316,24 @@ end;
 (*******************************************************************************
 8.3.2 Intra_16x16 prediction process for luma samples
 *******************************************************************************)
-procedure predict_top16_pas(src, dst: uint8_p); {$ifdef CPUI386} cdecl; {$endif}
+procedure predict_top16_pas(src, dst: PUint8); {$ifdef CPUI386} cdecl; {$endif}
 var
-  p1, p2: int64_t;
+  p1, p2: int64;
   i: integer;
 begin
-  p1 := int64_p(src+1)^;
-  p2 := int64_p(src+9)^;
+  p1 := PInt64(src+1)^;
+  p2 := PInt64(src+9)^;
   for i := 0 to 7 do begin
-      int64_p(dst   )^ := p1;
-      int64_p(dst+8 )^ := p2;
-      int64_p(dst+16)^ := p1;
-      int64_p(dst+24)^ := p2;
+      PInt64(dst   )^ := p1;
+      PInt64(dst+8 )^ := p2;
+      PInt64(dst+16)^ := p1;
+      PInt64(dst+24)^ := p2;
       dst += 32;
   end;
 end;
 
 
-procedure predict_left16_pas(src, dst: uint8_p); {$ifdef CPUI386} cdecl; {$endif}
+procedure predict_left16_pas(src, dst: PUint8); {$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
   v: uint64;
@@ -349,7 +349,7 @@ begin
 end;
 
 
-procedure predict_dc16(src, dst: uint8_p; const mbx, mby: word);
+procedure predict_dc16(src, dst: PUint8; const mbx, mby: word);
 var
   dc, i, avail: integer;
 begin
@@ -377,7 +377,7 @@ begin
 end;
 
 
-procedure predict_plane16_pas(src, dst: uint8_p); {$ifdef CPUI386} cdecl; {$endif}
+procedure predict_plane16_pas(src, dst: PUint8); {$ifdef CPUI386} cdecl; {$endif}
 var
   x, y: integer;
   a, b, c, d, h, v, i: integer;
@@ -416,7 +416,7 @@ end;
 (*******************************************************************************
 8.3.3 Intra prediction process for chroma samples
 *******************************************************************************)
-procedure predict_dc8( src, dst: uint8_p; sstride: integer; mbx, mby: word);
+procedure predict_dc8( src, dst: PUint8; sstride: integer; mbx, mby: word);
 var
   has_top, has_left: boolean;
   i, k: integer;
@@ -517,21 +517,21 @@ begin
 end;
 
 
-procedure predict_top8( src, dst: uint8_p; sstride: integer );
+procedure predict_top8( src, dst: PUint8; sstride: integer );
 var
   p: int64;
   i: integer;
 begin
   src -= sstride;
-  p := int64_p(src)^;
+  p := PInt64(src)^;
   for i := 0 to 7 do begin
-      int64_p(dst)^ := p;
+      PInt64(dst)^ := p;
       dst += 16;
   end;
 end;
 
 
-procedure predict_left8( src, dst: uint8_p; sstride: integer );
+procedure predict_left8( src, dst: PUint8; sstride: integer );
 var
   i: integer;
 begin
@@ -544,7 +544,7 @@ begin
 end;
 
 
-procedure predict_plane8( src, dst: uint8_p; stride: integer);
+procedure predict_plane8( src, dst: PUint8; stride: integer);
 var
   x, y: integer;
   a, b, c, d, h, v, i: integer;
@@ -867,14 +867,14 @@ end;
 (*******************************************************************************
 *)
 {$ifdef CPUI386}
-procedure predict_top16_sse2(src, dst: uint8_p); cdecl; external;
-procedure predict_left16_mmx(src, dst: uint8_p); cdecl; external;
-procedure predict_plane16_sse2(src, dst: uint8_p); cdecl; external;
+procedure predict_top16_sse2(src, dst: PUint8); cdecl; external;
+procedure predict_left16_mmx(src, dst: PUint8); cdecl; external;
+procedure predict_plane16_sse2(src, dst: PUint8); cdecl; external;
 {$endif}
 {$ifdef CPUX86_64}
-procedure predict_top16_sse2(src, dst: uint8_p); external name 'predict_top16_sse2';
-procedure predict_left16_ssse3(src, dst: uint8_p); external name 'predict_left16_ssse3';
-procedure predict_plane16_sse2(src, dst: uint8_p); external name 'predict_plane16_sse2';
+procedure predict_top16_sse2(src, dst: PUint8); external name 'predict_top16_sse2';
+procedure predict_left16_ssse3(src, dst: PUint8); external name 'predict_left16_ssse3';
+procedure predict_plane16_sse2(src, dst: PUint8); external name 'predict_plane16_sse2';
 {$endif}
 
 procedure intra_pred_init(const flags: TDsp_init_flags);

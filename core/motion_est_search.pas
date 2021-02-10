@@ -25,7 +25,7 @@ unit motion_est_search;
 interface
 
 uses
-  stdint, common, util, motion_comp, frame, h264stream, macroblock;
+  common, util, motion_comp, frame, h264stream, macroblock;
 
 type
   { TRegionSearch }

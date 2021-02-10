@@ -26,7 +26,7 @@ unit h264stream;
 interface
 
 uses
-  util, stdint, common, vlc, bitstream, h264tables;
+  util, common, vlc, bitstream, h264tables;
 
 type
   //Table 7-1 – NAL unit type codes

@@ -25,7 +25,7 @@ unit macroblock;
 interface
 
 uses
-  stdint, common, util, pixel, intra_pred, transquant, vlc, h264tables;
+  common, util, pixel, intra_pred, transquant, vlc, h264tables;
 
 procedure mb_alloc(var mb: macroblock_t);
 procedure mb_free(var mb: macroblock_t);
@@ -262,7 +262,7 @@ procedure encode_mb_intra_i4
   (var mb: macroblock_t; var frame: frame_t; const intrapred: TIntraPredictor);
 var
   i: integer;
-  block: int16_p;
+  block: PInt16;
   overall_coefs: array[0..3] of integer;
   sad, sad_tresh: integer;
   block_offset: integer;
@@ -313,7 +313,7 @@ end;
 procedure encode_mb_intra_i16(var mb: macroblock_t);
 var
   i: integer;
-  block: int16_p;
+  block: PInt16;
   overall_coefs: integer;
 
 begin
@@ -348,7 +348,7 @@ end;
 procedure decode_mb_intra_i16(var mb: macroblock_t; const intrapred: TIntraPredictor);
 var
   i: integer;
-  block: int16_p;
+  block: PInt16;
 
 begin
   intrapred.Predict_16x16(mb.i16_pred_mode, mb.x, mb.y);
@@ -374,7 +374,7 @@ end;
   Uses brute-force bitcost recalculation that runs on the whole block. Something
   smarter could be done, but would require way more code for little benefit I guess
   }
-procedure trans_quant_opt(var blk_info: block_t; const coefs: int16_p; var mb: macroblock_t; blk_idx: integer);
+procedure trans_quant_opt(var blk_info: block_t; const coefs: PInt16; var mb: macroblock_t; blk_idx: integer);
 var
   nr_coefs: array[0..15] of int16;  //quantized coefs with less rounding applied
   cost, unmodified_cost: integer;
@@ -413,7 +413,7 @@ inter coding
 procedure encode_mb_inter(var mb: macroblock_t);
 var
   i: integer;
-  block: int16_p;
+  block: PInt16;
   overall_coefs: array[0..3] of integer;
   sad, sad_tresh: integer;
   block_offset: integer;
@@ -446,7 +446,7 @@ end;
 procedure encode_mb_inter_quant_refine(var mb: macroblock_t);
 var
   i: integer;
-  block: int16_p;
+  block: PInt16;
   overall_coefs: array[0..3] of integer;
   block_offset: integer;
 
@@ -473,7 +473,7 @@ end;
 procedure decode_mb_inter(var mb: macroblock_t);
 var
   i: integer;
-  block: int16_p;
+  block: PInt16;
 begin
   move(mb.mcomp^, mb.pixels_dec^, 256);  //prefill, so empty blocks are a no-op
   for i := 0 to 15 do begin
@@ -503,7 +503,7 @@ procedure encode_mb_chroma
   (var mb: macroblock_t; const intrapred: TIntraPredictor; const intra: boolean);
 var
   i, j, n: integer;
-  block: int16_p;
+  block: PInt16;
   pred: pbyte;
   sad, sad_tresh: integer;
   overall_ac_coefs, block_ac_coefs: integer;
@@ -563,7 +563,7 @@ end;
 procedure decode_mb_chroma(var mb: macroblock_t; const intra: boolean);
 var
   i, j: integer;
-  block: int16_p;
+  block: PInt16;
   pred: pbyte;
 begin
   if intra then

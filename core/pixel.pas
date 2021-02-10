@@ -25,10 +25,10 @@ unit pixel;
 interface
 
 uses
-  stdint, util;
+  util;
 
-procedure pixel_load_4x4 (dest, src: uint8_p; stride: integer);
-procedure pixel_save_4x4 (src, dest: uint8_p; stride: integer);
+procedure pixel_load_4x4 (dest, src: PUint8; stride: integer);
+procedure pixel_save_4x4 (src, dest: PUint8; stride: integer);
 
 procedure pixel_init(const flags: TDsp_init_flags);
 
@@ -267,7 +267,7 @@ end;
 pixel_sub_8x8_pas
 subtract two 8x8 blocks, return word-sized results
 *)
-procedure pixel_sub_4x4_pas (pix1, pix2: pbyte; diff: int16_p); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_sub_4x4_pas (pix1, pix2: pbyte; diff: PInt16); {$ifdef CPUI386} cdecl; {$endif}
 var
   x, y: integer;
 begin
@@ -285,7 +285,7 @@ end;
 pixel_add_8x8_pas
 addition of two 8x8 blocks, return clipped byte-sized results
 *)
-procedure pixel_add_4x4_pas (pix1, pix2: pbyte; diff: int16_p); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_add_4x4_pas (pix1, pix2: pbyte; diff: PInt16); {$ifdef CPUI386} cdecl; {$endif}
 var
   y, x: integer;
 begin
@@ -303,7 +303,7 @@ end;
 pixel_load_16x16
 load 16x16 pixel block from frame
 *)
-procedure pixel_load_16x16_pas (dest, src: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_load_16x16_pas (dest, src: PUint8; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
 begin
@@ -314,7 +314,7 @@ begin
   end;
 end;
 
-procedure pixel_load_16x8_pas (dest, src: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_load_16x8_pas (dest, src: PUint8; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
 begin
@@ -326,24 +326,24 @@ begin
 end;
 
 
-procedure pixel_load_8x8_pas (dest, src: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_load_8x8_pas (dest, src: PUint8; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
 begin
   for i := 0 to 7 do begin
-      uint64_p(dest)^ := uint64_p(src)^;
+      PUInt64(dest)^ := PUInt64(src)^;
       src  += stride;
       dest += 16;
   end;
 end;
 
 
-procedure pixel_load_4x4 (dest, src: uint8_p; stride: integer);
+procedure pixel_load_4x4 (dest, src: PUint8; stride: integer);
 var
   i: integer;
 begin
   for i := 0 to 3 do begin
-      uint32_p(dest)^ := uint32_p(src)^;
+      PUInt32(dest)^ := PUInt32(src)^;
       src  += stride;
       dest += 16;
   end;
@@ -355,7 +355,7 @@ end;
 pixel_save_16x16
 save 16x16 pixel block to frame
 *)
-procedure pixel_save_16x16_pas (src, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_save_16x16_pas (src, dest: PUint8; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
 begin
@@ -367,24 +367,24 @@ begin
 end;
 
 
-procedure pixel_save_8x8_pas(src, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_save_8x8_pas(src, dest: PUint8; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 var
   i: integer;
 begin
   for i := 0 to 7 do begin
-      uint64_p(dest)^ := uint64_p(src)^;
+      PUInt64(dest)^ := PUInt64(src)^;
       dest += stride;
       src  += 16;
   end;
 end;
 
 
-procedure pixel_save_4x4(src, dest: uint8_p; stride: integer);
+procedure pixel_save_4x4(src, dest: PUint8; stride: integer);
 var
   i: integer;
 begin
   for i := 0 to 3 do begin
-      uint32_p(dest)^ := uint32_p(src)^;
+      PUInt32(dest)^ := PUInt32(src)^;
       dest += stride;
       src  += 16;
   end;
@@ -396,7 +396,7 @@ end;
 pixel_avg_16x16
 average of 2 pixel arrays
 *)
-procedure pixel_avg_16x16_pas(src1, src2, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_avg_16x16_pas(src1, src2, dest: PUint8; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 var
   x, y: integer;
 begin
@@ -409,7 +409,7 @@ begin
   end;
 end;
 
-procedure pixel_avg_16x8_pas(src1, src2, dest: uint8_p; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
+procedure pixel_avg_16x8_pas(src1, src2, dest: PUint8; stride: integer); {$ifdef CPUI386} cdecl; {$endif}
 var
   x, y: integer;
 begin
@@ -426,7 +426,7 @@ end;
 (*******************************************************************************
 pixel_downsample_row
 *)
-procedure pixel_downsample_row_pas(src: uint8_p; src_stride: integer; dst: uint8_p; dst_width: integer);
+procedure pixel_downsample_row_pas(src: PUint8; src_stride: integer; dst: PUint8; dst_width: integer);
 var
   x: integer;
 begin
@@ -447,15 +447,15 @@ function ssd_16x16_sse2(pix1, pix2: pbyte; stride: integer): integer; cdecl; ext
 function ssd_8x8_sse2  (pix1, pix2: pbyte; stride: integer): integer; cdecl; external;
 function var_16x16_sse2(pix: pbyte): uint32; cdecl; external;
 
-procedure pixel_loadu_16x16_sse2(dest, src: uint8_p; stride: integer); cdecl; external;
-procedure pixel_load_16x16_sse2 (dest, src: uint8_p; stride: integer); cdecl; external;
-procedure pixel_load_8x8_mmx    (dest, src: uint8_p; stride: integer); cdecl; external;
-procedure pixel_save_16x16_sse2 (src, dest: uint8_p; stride: integer); cdecl; external;
-procedure pixel_save_8x8_mmx    (src, dest: uint8_p; stride: integer); cdecl; external;
+procedure pixel_loadu_16x16_sse2(dest, src: PUint8; stride: integer); cdecl; external;
+procedure pixel_load_16x16_sse2 (dest, src: PUint8; stride: integer); cdecl; external;
+procedure pixel_load_8x8_mmx    (dest, src: PUint8; stride: integer); cdecl; external;
+procedure pixel_save_16x16_sse2 (src, dest: PUint8; stride: integer); cdecl; external;
+procedure pixel_save_8x8_mmx    (src, dest: PUint8; stride: integer); cdecl; external;
 
-procedure pixel_sub_4x4_mmx (pix1, pix2: pbyte; diff: int16_p); cdecl; external;
-procedure pixel_add_4x4_mmx (pix1, pix2: pbyte; diff: int16_p); cdecl; external;
-procedure pixel_avg_16x16_sse2 (src1, src2, dest: uint8_p; stride: integer); cdecl; external;
+procedure pixel_sub_4x4_mmx (pix1, pix2: pbyte; diff: PUint16); cdecl; external;
+procedure pixel_add_4x4_mmx (pix1, pix2: pbyte; diff: PUint16); cdecl; external;
+procedure pixel_avg_16x16_sse2 (src1, src2, dest: PUint8; stride: integer); cdecl; external;
 
 function satd_16x16_sse2 (pix1, pix2: pbyte; stride: integer): integer; cdecl; external;
 function satd_16x16_mmx (pix1, pix2: pbyte; stride: integer): integer; cdecl; external;
@@ -481,16 +481,16 @@ function satd_4x4_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external
 
 function var_16x16_sse2(pix: pbyte): uint32; external name 'var_16x16_sse2';
 
-procedure pixel_loadu_16x16_sse2(dest, src: uint8_p; stride: integer); external name 'pixel_loadu_16x16_sse2';
-procedure pixel_load_16x16_sse2 (dest, src: uint8_p; stride: integer); external name 'pixel_load_16x16_sse2';
-procedure pixel_load_8x8_sse2   (dest, src: uint8_p; stride: integer); external name 'pixel_load_8x8_sse2';
-procedure pixel_save_16x16_sse2 (src, dest: uint8_p; stride: integer); external name 'pixel_save_16x16_sse2';
-procedure pixel_save_8x8_sse2   (src, dest: uint8_p; stride: integer); external name 'pixel_save_8x8_sse2';
+procedure pixel_loadu_16x16_sse2(dest, src: PUint8; stride: integer); external name 'pixel_loadu_16x16_sse2';
+procedure pixel_load_16x16_sse2 (dest, src: PUint8; stride: integer); external name 'pixel_load_16x16_sse2';
+procedure pixel_load_8x8_sse2   (dest, src: PUint8; stride: integer); external name 'pixel_load_8x8_sse2';
+procedure pixel_save_16x16_sse2 (src, dest: PUint8; stride: integer); external name 'pixel_save_16x16_sse2';
+procedure pixel_save_8x8_sse2   (src, dest: PUint8; stride: integer); external name 'pixel_save_8x8_sse2';
 
-procedure pixel_sub_4x4_mmx (pix1, pix2: pbyte; diff: int16_p); external name 'pixel_sub_4x4_mmx';
-procedure pixel_add_4x4_mmx (pix1, pix2: pbyte; diff: int16_p); external name 'pixel_add_4x4_mmx';
-procedure pixel_avg_16x16_sse2 (src1, src2, dest: uint8_p; stride: integer); external name 'pixel_avg_16x16_sse2';
-procedure pixel_downsample_row_sse2(src: uint8_p; src_stride: integer; dst: uint8_p; dst_width: integer); external name 'pixel_downsample_row_sse2';
+procedure pixel_sub_4x4_mmx (pix1, pix2: pbyte; diff: PInt16); external name 'pixel_sub_4x4_mmx';
+procedure pixel_add_4x4_mmx (pix1, pix2: pbyte; diff: PInt16); external name 'pixel_add_4x4_mmx';
+procedure pixel_avg_16x16_sse2 (src1, src2, dest: PUint8; stride: integer); external name 'pixel_avg_16x16_sse2';
+procedure pixel_downsample_row_sse2(src: PUint8; src_stride: integer; dst: PUint8; dst_width: integer); external name 'pixel_downsample_row_sse2';
 {$endif}
 
 procedure pixel_init(const flags: TDsp_init_flags);

@@ -25,7 +25,7 @@ unit vlc;
 interface
 
 uses
-  stdint, common, bitstream, h264tables;
+  common, bitstream, h264tables;
 
 type
   residual_type_t = (RES_LUMA := 0, RES_LUMA_DC, RES_LUMA_AC, RES_DC, RES_AC_U, RES_AC_V);
@@ -38,8 +38,8 @@ procedure cavlc_encode
 function cavlc_block_bits
   (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t): integer;
 function cavlc_block_bits_DC (const blok: block_t): integer;
-procedure cavlc_analyse_block (var block: block_t; dct_coefs: int16_p; const ncoef: integer);
-procedure cavlc_analyse_block_2x2(var block: block_t; dct_coefs: int16_p);
+procedure cavlc_analyse_block (var block: block_t; dct_coefs: PInt16; const ncoef: integer);
+procedure cavlc_analyse_block_2x2(var block: block_t; dct_coefs: PInt16);
 
 procedure write_se_code(var bs: TBitstreamWriter; n: integer);
 procedure write_ue_code(var bs: TBitstreamWriter; const n: integer);
@@ -138,7 +138,7 @@ begin
 end;
 
 
-procedure zigzag16(a, b: int16_p);
+procedure zigzag16(a, b: PInt16);
 begin
   //for i := 0 to 15 do  a[i] := b[ zigzag_pos[i] ];
   a[0] := b[0];
@@ -159,7 +159,7 @@ begin
   a[15] := b[15];
 end;
 
-procedure zigzag15(a, b: int16_p);
+procedure zigzag15(a, b: PInt16);
 begin
   //for i := 0 to 14 do  a[i] := b[-1 + zigzag_pos[i+1]];
   a[0] := b[0];
@@ -527,10 +527,10 @@ end;
 
 
 //******************************************************************************
-procedure cavlc_analyse_block (var block: block_t; dct_coefs: int16_p; const ncoef: integer);
+procedure cavlc_analyse_block (var block: block_t; dct_coefs: PInt16; const ncoef: integer);
 var
   i, first_nz_index, zeros, n: integer;
-  p: array[0..15] of int16_t;
+  p: array[0..15] of int16;
   coef: integer;
 begin
   block.ncoef := ncoef;
@@ -596,9 +596,9 @@ begin
 end;
 
 
-procedure cavlc_analyse_block_2x2(var block: block_t; dct_coefs: int16_p);
+procedure cavlc_analyse_block_2x2(var block: block_t; dct_coefs: PInt16);
 var
-  p: array[0..3] of int16_t;
+  p: array[0..3] of int16;
   i, zeros, n: integer;
   coef: integer;
 begin

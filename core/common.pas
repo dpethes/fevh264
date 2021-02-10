@@ -40,7 +40,7 @@ unit common;
 interface
 
 uses
-  stdint, stats;
+  stats;
   
 const
   SLICE_P = 5;
@@ -175,7 +175,7 @@ type
       qpc: byte;
       chroma_qp_offset: int8;
 
-      i4_pred_mode: array[0..23] of uint8_t;
+      i4_pred_mode: array[0..23] of UInt8;
                               { intra prediction mode for luma 4x4 blocks
                                 0..15  - blocks from current mb
                                 16..19 - top mb bottom row
@@ -195,20 +195,20 @@ type
       //luma
       pfenc,
       pfdec,
-      pfpred: uint8_p;
-      pixels: uint8_p;        //original pixels
-      pred:   uint8_p;        //intra predicted pixels
-      mcomp:  uint8_p;        //motion-compensated (inter predicted) pixels
-      pixels_dec: uint8_p;    //decoded pixels
+      pfpred: PUInt8;
+      pixels: PUInt8;        //original pixels
+      pred:   PUInt8;        //intra predicted pixels
+      mcomp:  PUInt8;        //motion-compensated (inter predicted) pixels
+      pixels_dec: PUInt8;    //decoded pixels
 
       //chroma
       pfenc_c,
       pfdec_c,
-      pfpred_c: array[0..1] of uint8_p;
+      pfpred_c: array[0..1] of PUInt8;
       pixels_c,
       pred_c,
       mcomp_c,
-      pixels_dec_c: array[0..1] of uint8_p;
+      pixels_dec_c: array[0..1] of PUInt8;
 
       //motion estimation, analysis
       score_skip,
@@ -217,7 +217,7 @@ type
       bitcost: int16;                    //currently unused
 
       //coef arrays
-      dct: array[0..24] of int16_p;      //0-15 - luma, 16-23 - chroma, 24 - luma DC
+      dct: array[0..24] of PInt16;      //0-15 - luma, 16-23 - chroma, 24 - luma DC
       chroma_dc: array[0..1, 0..3] of int16;
       block: array[0..26] of block_t;    //0-24 as in dct, 25/26 chroma_dc u/v
 
