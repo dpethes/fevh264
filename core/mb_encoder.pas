@@ -553,13 +553,17 @@ begin
       end;
   end;
 
-  //encode as intra if prediction score isn't much worse
+  { Try intra modes if I_16x16 prediction score isn't much worse than P_16x16 and do mb type decision.
+    P_16x16 can be later improved by partitioning or qpel rdo, which could turn the type decision in its favor;
+    ignore it for now.
+  }
   mb.i16_pred_mode := intrapred.Analyse_16x16();
   score_intra := intrapred.LastScore;
   if score_intra < score_p * 2 then begin
-      //I16x16
+      //store P_16x16 for later
       CacheStore;
       p16_cached := true;
+      //test I16x16
       mb.mbtype := MB_I_16x16;
       EncodeCurrentType;
       bits_intra := MBCost;
@@ -567,11 +571,11 @@ begin
       if (bits_intra < bits_inter * 2) and (min(bits_inter, bits_intra) > MIN_I_4x4_BITCOST) then begin
           CacheStore;
           mb.mbtype := MB_I_4x4;
-          EncodeCurrentType;
+          EncodeCurrentType;     //this is both encode & decode for I_4x4 due to block prediction (needs decoded neighbours)
           bits_i4  := MBCost;
           score_i4 := intrapred.LastScore;
 
-          //pick better
+          //pick mode with lower bits: I_4x4 is already decoded, so can't get prediction score here
           if bits_intra < bits_i4 then begin
               mb.mbtype := MB_I_16x16;
               CacheLoad;
@@ -580,16 +584,16 @@ begin
               score_intra := score_i4;
           end;
       end;
-      //inter / intra?
+      //pick inter or intra
       mode_lambda := LAMBDA_MBTYPE[mb.qp];
       if mode_lambda * bits_inter + score_p < mode_lambda * bits_intra + score_intra then begin
           mb.mbtype := MB_P_16x16;
           CacheLoad;
       end else if (enable_I_PCM) and (bits_intra > MB_I_PCM_BITCOST) then begin
-          mb.mbtype := MB_I_PCM;
+          mb.mbtype := MB_I_PCM;  //PCM is sometimes better when qp is close or equal to 0
           EncodeCurrentType;
       end;
-      //if there's no residual and p16 lost to i16 due to bitcost, pskip can still be an option
+      //if there's no residual and p16 lost to i16 due to mv bitcost, pskip can still be an option
       if (mb.mbtype <> MB_P_16x16) and (mb.cbp = 0) then begin
           if (mb.score_skip < score_intra + bits_intra) then begin
               MakeSkip;
@@ -601,6 +605,10 @@ begin
       p16_cached := false;
   end;
 
+  { Try to improve inter mode by using P_16x8. It does not have qpel rdo refinement yet,
+    so bias slightly against it if qpel rdo is enabled. Motion compensated pixels
+    get overwritten in MB_P_16x8 ME, so restore them if P_16x8 is not chosen
+  }
   sub_16x16 := true;
   if (mb.mbtype = MB_P_16x16) and sub_16x16 then begin
       CacheMvStore;
@@ -615,7 +623,7 @@ begin
       bits_inter_sub := MBCost;
 
       mode_lambda := LAMBDA_MBTYPE_PSKIP[mb.qp];
-      if (me.Subme > 4) then  //bias somewhat against MB_P_16x8, as it does not have qpel rdo refinement
+      if (me.Subme > 4) then  //bias against MB_P_16x8
           mode_lambda *= 4;
       if (mb.mv = mb.mv1) or (bits_inter * mode_lambda + score_p < bits_inter_sub * mode_lambda + score_psub) then begin
           mb.mbtype := MB_P_16x16;
@@ -626,13 +634,16 @@ begin
       end;
   end;
 
-  //apply rdo refinement only if there is residual to work with to save some time at negligible quality cost
+  { Apply rdo refinement for P_16x16, but only if there is some residual to work with to save a bit of time
+    at negligible quality cost. Motion compensated pixels get overwritten, but ME restores luma for best MV,
+    so restore chroma MC pixels only if no better MV is found
+  }
   if (mb.mbtype = MB_P_16x16) and (mb.cbp > 0) and (me.Subme > 4) then begin
       CacheMvStore;
       me.Refine(mb);
       if mb.mv = cache_motion.mv then begin  //refinement couldn't find better mv
           CacheLoad;
-          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);  //chroma MC pixels not restored
+          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
       end else
           EncodeCurrentType;
   end;
