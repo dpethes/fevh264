@@ -39,6 +39,7 @@ procedure encode_mb_intra_i16(var mb: macroblock_t);
 procedure decode_mb_intra_i16(var mb: macroblock_t; const intrapred: TIntraPredictor);
 
 procedure encode_mb_inter(var mb: macroblock_t);
+procedure encode_mb_inter_quant_refine(var mb: macroblock_t);
 procedure decode_mb_inter(var mb: macroblock_t);
 
 procedure decode_mb_inter_pskip(var mb: macroblock_t);
@@ -367,6 +368,43 @@ begin
   end;
 end;
 
+{ optimize quant coef rounding
+  Use more precise coef (like intra) if the block bitcost doesn't increase. Block
+  cost can actually go down in some cases.
+  Uses brute-force bitcost recalculation that runs on the whole block. Something
+  smarter could be done, but would require way more code for little benefit I guess
+  }
+procedure trans_quant_opt(var blk_info: block_t; const coefs: int16_p; var mb: macroblock_t; blk_idx: integer);
+var
+  nr_coefs: array[0..15] of int16;  //quantized coefs with less rounding applied
+  cost, unmodified_cost: integer;
+  k, tmp: integer;
+begin
+  move (coefs^, nr_coefs, 16*2);
+  transqt(nr_coefs, mb.quant_ctx_qp, true);
+
+  transqt(coefs, mb.quant_ctx_qp, false);      //could probably re-use the already quantized coefs, but this costs just a couple of cycles
+  //cavlc_analyse_block(blk_info, coefs, 16);  //regular quant coefs are already analyzed
+  unmodified_cost := cavlc_block_bits(mb, blk_info, blk_idx, RES_LUMA);
+
+  for k := 0 to 15 do begin
+      if nr_coefs[k] <> coefs[k] then begin
+          tmp := coefs[k];
+          coefs[k] := nr_coefs[k];
+          cavlc_analyse_block(blk_info, coefs, 16);
+          cost := cavlc_block_bits(mb, blk_info, blk_idx, RES_LUMA);
+          if cost > unmodified_cost then begin
+              coefs[k] := tmp;
+          end;
+      end;
+  end;
+  cavlc_analyse_block(blk_info, coefs, 16);
+
+  if (blk_info.nlevel = 1) and (blk_info.t1 = 1) and (coefs[15] <> 0) then begin  //save 12-14 bits
+      blk_info.t1 := 0;
+      blk_info.nlevel := 0;
+  end
+end;
 
 
 (*******************************************************************************
@@ -405,6 +443,32 @@ begin
       if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
 end;
 
+procedure encode_mb_inter_quant_refine(var mb: macroblock_t);
+var
+  i: integer;
+  block: int16_p;
+  overall_coefs: array[0..3] of integer;
+  block_offset: integer;
+
+begin
+  for i := 0 to 3 do overall_coefs[i] := 0;
+
+  for i := 0 to 15 do begin
+      block := mb.dct[i];
+      if mb.block[i].nlevel > 0 then begin
+          block_offset := BLOCK_OFFSET_4[i];
+          dsp.pixel_sub_4x4(mb.pixels + block_offset, mb.mcomp + block_offset, block);  //reload coefs for finer quant
+          trans_quant_opt(mb.block[i], block, mb, i);
+
+          mb.nz_coef_cnt[i] := mb.block[i].nlevel;
+          overall_coefs[i shr 2] += mb.nz_coef_cnt[i];
+      end;
+  end;
+
+  mb.cbp := mb.cbp and not %1111;  //recalc luma cpb only, some block might get zero-ed
+  for i := 0 to 3 do
+      if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
+end;
 
 procedure decode_mb_inter(var mb: macroblock_t);
 var

@@ -96,7 +96,7 @@ begin
       AddOption('m', atInt,    'subme',  'subpixel ME refinement level [3]'
                                          + ' (0=none; 1=hpel; 2=qpel; 3=qpel SATD; 4=qpel chroma SATD; 5=qpel RD)');
       AddOption('a', atInt,    'analyse','mb type decision quality [2]'
-                                         + ' (0=worst; 3=best)');
+                                         + ' (0=worst; 4=best)');
       AddOption('r', atInt,    'ref',    'reference frame count [1]');
       AddOption('l', atNone,   'loopfilter',    'enable in-loop deblocking filter');
       AddOption('t', atNone,   'filterthread',  'run deblocking in separate thread');

@@ -56,7 +56,8 @@ type
                                { 0 - none
                                  1 - heuristics - SAD
                                  2 - heuristics - SATD
-                                 3 - bitcost
+                                 3 - rdo
+                                 4 - rdo + quant refinement
                                }
       ref: byte;               // reference frame count
       key_interval: word;      // maximum keyframe interval
@@ -121,7 +122,7 @@ implementation
 
 procedure TEncodingParameters.SetAnalysisLevel(const AValue: byte);
 begin
-  analyse := clip3(0, AValue, 3);
+  analyse := clip3(0, AValue, 4);
 end;
 
 procedure TEncodingParameters.SetChromaQParamOffset(const AValue: shortint);

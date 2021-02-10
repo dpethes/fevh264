@@ -43,6 +43,7 @@ type
           mv, mvp: motionvec_t;
       end;
       enable_I_PCM: boolean;
+      enable_quant_refine: boolean;
 
       procedure InitMB(mbx, mby: integer);
       procedure InitForInter;
@@ -65,6 +66,7 @@ type
       num_ref_frames: integer;
       LoopFilter: boolean;
       property ChromaQPOffset: shortint write SetChromaQPOffset;
+      property EnableQuantRefine: boolean write enable_quant_refine;
 
       constructor Create; virtual;
       destructor Free; virtual;
@@ -408,6 +410,7 @@ begin
   intrapred := TIntraPredictor.Create;
   intrapred.SetMB(@mb);
   enable_I_PCM := false;
+  enable_quant_refine := false;
 end;
 
 destructor TMacroblockEncoder.Free;
@@ -633,6 +636,11 @@ begin
       end else
           EncodeCurrentType;
   end;
+
+  if enable_quant_refine then
+      if (mb.mbtype in [MB_P_16x16..MB_P_16x8]) and (mb.cbp > 0) then begin
+          encode_mb_inter_quant_refine(mb);
+      end;
 end;
 
 procedure TMBEncoderRDoptAnalyse.EncodeIntra;

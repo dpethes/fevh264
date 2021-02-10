@@ -141,7 +141,8 @@ begin
       1: mb_enc := TMBEncoderQuickAnalyse.Create;
       2: mb_enc := TMBEncoderQuickAnalyseSATD.Create;
   else
-      mb_enc := TMBEncoderRDoptAnalyse.Create;
+      mb_enc := TMBEncoderRDoptAnalyse.Create; //3 and more
+      if param.AnalysisLevel > 3 then mb_enc.EnableQuantRefine := true;
   end;
   mb_enc.num_ref_frames := num_ref_frames;
   mb_enc.me := me;
