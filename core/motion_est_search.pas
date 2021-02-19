@@ -454,7 +454,7 @@ begin
       MotionCompensation.CompensateQPelXY(fref, nx, ny, mb.mcomp);
       MotionCompensation.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
       encode_mb_inter(mb);
-      encode_mb_chroma(mb, nil, false);
+      encode_mb_chroma(mb, false);
 
       score := GetCost;
       if score < min_score then begin

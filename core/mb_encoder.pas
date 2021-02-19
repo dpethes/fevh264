@@ -159,22 +159,26 @@ begin
 
       MB_I_4x4: begin
           encode_mb_intra_i4(mb, frame, intrapred);
-          if chroma_coding then
-              encode_mb_chroma(mb, intrapred, true);
+          if chroma_coding then begin
+              mb.chroma_pred_mode := intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1]);
+              encode_mb_chroma(mb, true);
+          end;
       end;
 
       MB_I_16x16: begin
           intrapred.Predict_16x16(mb.i16_pred_mode, mb.x, mb.y);
           encode_mb_intra_i16(mb);
-          if chroma_coding then
-              encode_mb_chroma(mb, intrapred, true);
+          if chroma_coding then begin
+              mb.chroma_pred_mode := intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1]);
+              encode_mb_chroma(mb, true);
+          end;
       end;
 
       MB_P_16x16: begin
           encode_mb_inter(mb);
           if chroma_coding then begin
               MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
-              encode_mb_chroma(mb, intrapred, false);
+              encode_mb_chroma(mb, false);
           end;
       end;
 
@@ -183,7 +187,7 @@ begin
           if chroma_coding then begin
               MotionCompensation.CompensateChroma_8x4(mb.fref, mb.mv,  mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], 0);
               MotionCompensation.CompensateChroma_8x4(mb.fref, mb.mv1, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], 1);
-              encode_mb_chroma(mb, intrapred, false);
+              encode_mb_chroma(mb, false);
           end;
       end;
 

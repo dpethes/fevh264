@@ -45,7 +45,7 @@ procedure decode_mb_inter(var mb: macroblock_t);
 procedure decode_mb_inter_pskip(var mb: macroblock_t);
 procedure decode_mb_pcm(var mb: macroblock_t);
 
-procedure encode_mb_chroma(var mb: macroblock_t; const intrapred: TIntraPredictor; const intra: boolean);
+procedure encode_mb_chroma(var mb: macroblock_t; const intra: boolean);
 procedure decode_mb_chroma(var mb: macroblock_t; const intra: boolean);
 
 (*******************************************************************************
@@ -499,8 +499,7 @@ end;
 (*******************************************************************************
 chroma coding
 *)
-procedure encode_mb_chroma
-  (var mb: macroblock_t; const intrapred: TIntraPredictor; const intra: boolean);
+procedure encode_mb_chroma(var mb: macroblock_t; const intra: boolean);
 var
   i, j, n: integer;
   block: PInt16;
@@ -511,9 +510,6 @@ var
 begin
   overall_ac_coefs := 0;
   sad_tresh := SAD_DECIMATE_TRESH[mb.qpc];
-
-  if intra then
-      mb.chroma_pred_mode := intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1]);
 
   for j := 0 to 1 do begin
       if intra then
