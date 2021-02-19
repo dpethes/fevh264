@@ -274,8 +274,8 @@ type
       //bitstream buffer
       bs_buf: pbyte;
 
-      //stats
-      stats: TFrameStats;
+      //stats, RC
+      stats: TCodingStats;
       estimated_framebits: integer;
       qp_adj: integer;
 

@@ -156,7 +156,7 @@ begin
   frame.bs_buf := fev_malloc(frame.w * frame.h * 3);
   frame.lowres := nil;
 
-  frame.stats := TFrameStats.Create;
+  frame.stats := TCodingStats.Create;
 end;
 
 
@@ -221,6 +221,7 @@ end;
 procedure frame_write_stats (var stats_file: textfile; const frame: frame_t);
 var
   ftype: char;
+  mb_i_count, mb_p_count, mb_skip_count: integer;
 begin
   dsp.FpuReset;
   ftype := 'P';
@@ -229,16 +230,20 @@ begin
       //if not frame.idr then
       //    ftype := 'i';
   end;
-  with frame.stats do
-  writeln( stats_file,
-    format('%4d %s qp: %2d (%4.2f) size: %6d  itex: %6d  ptex: %6d  other: %4d  i:%d p:%d skip: %d est: %d qpa:%d',
-           [frame.num, ftype, frame.qp, frame.qp_avg,
-            size_bytes * 8,
-            itex_bits, ptex_bits, size_bytes * 8 - (itex_bits + ptex_bits),
-            mb_i4_count + mb_i16_count, mb_p_count, mb_skip_count,
-            frame.estimated_framebits ,
-            frame.qp_adj
-           ]) );
+  with frame.stats do begin
+      mb_i_count := mb_type_count[MB_I_4x4] + mb_type_count[MB_I_16x16] + mb_type_count[MB_I_PCM];
+      mb_p_count := mb_type_count[MB_P_16x16] + mb_type_count[MB_P_16x8];
+      mb_skip_count := mb_type_count[MB_P_SKIP];
+      writeln( stats_file,
+        format('%4d %s qp: %2d (%4.2f) size: %6d  itex: %6d  ptex: %6d  other: %4d  i:%d p:%d skip: %d est: %d qpa:%d',
+               [frame.num, ftype, frame.qp, frame.qp_avg,
+                size_bytes * 8,
+                itex_bits, ptex_bits, size_bytes * 8 - (itex_bits + ptex_bits),
+                mb_i_count, mb_p_count, mb_skip_count,
+                frame.estimated_framebits ,
+                frame.qp_adj
+               ]) );
+  end;
 {
   if h.aq then
       for y := 0 to (h.mb_height - 1) do begin

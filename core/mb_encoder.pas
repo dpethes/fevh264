@@ -36,7 +36,7 @@ type
     private
       mb: macroblock_t;
       frame: frame_t;
-      stats: TFrameStats;
+      stats: TCodingStats;
       intrapred: TIntraPredictor;
       mb_can_use_pskip: boolean;
       cache_motion: record
@@ -204,25 +204,46 @@ begin
   end;
 end;
 
+//decode and store pixels to frame, update mb stats
 procedure TMacroblockEncoder.Decode;
+var
+  i: Integer;
 begin
+  stats.mb_type_count[mb.mbtype] += 1;
   case mb.mbtype of
-      MB_I_PCM: decode_mb_pcm(mb);
-      //MB_I_4x4: decoded during encode
-      MB_I_16x16:
+      MB_I_4x4: begin  //decoded during encode
+          for i := 0 to 15 do
+              stats.pred[mb.i4_pred_mode[i]] += 1;
+      end;
+      MB_I_16x16: begin
           decode_mb_intra_i16(mb, intrapred);
+          stats.pred16[mb.i16_pred_mode] += 1;
+      end;
       MB_P_16x16, MB_P_16x8:
           decode_mb_inter(mb);
       MB_P_SKIP:
           decode_mb_inter_pskip(mb);
+      MB_I_PCM:
+          decode_mb_pcm(mb);
   end;
-  if chroma_coding and (mb.mbtype <> MB_I_PCM) then
-      decode_mb_chroma(mb, is_intra(mb.mbtype));
-end;
 
-procedure TMacroblockEncoder.SetChromaQPOffset(const AValue: shortint);
-begin
-  mb.chroma_qp_offset := AValue;
+  if mb.mbtype <> MB_I_4x4 then
+      dsp.pixel_save_16x16(mb.pixels_dec, mb.pfdec, frame.stride);
+
+  if chroma_coding then begin
+      if mb.mbtype <> MB_I_PCM then
+          decode_mb_chroma(mb, is_intra(mb.mbtype));
+      dsp.pixel_save_8x8 (mb.pixels_dec_c[0], mb.pfdec_c[0], frame.stride_c);
+      dsp.pixel_save_8x8 (mb.pixels_dec_c[1], mb.pfdec_c[1], frame.stride_c);
+  end;
+
+  if is_intra(mb.mbtype) then begin
+      stats.itex_bits += mb.residual_bits;
+      stats.pred_8x8_chroma[mb.chroma_pred_mode] += 1;
+  end else begin
+      stats.ptex_bits += mb.residual_bits;
+      stats.ref[mb.ref] += 1;
+  end;
 end;
 
 { Write mb to bitstream, decode and write pixels to frame and store MB to frame's MB array.
@@ -235,41 +256,6 @@ var
 begin
   h264s.WriteMB(mb);
   Decode;
-
-  if mb.mbtype <> MB_I_4x4 then
-      dsp.pixel_save_16x16(mb.pixels_dec, mb.pfdec, frame.stride);
-  dsp.pixel_save_8x8 (mb.pixels_dec_c[0], mb.pfdec_c[0], frame.stride_c);
-  dsp.pixel_save_8x8 (mb.pixels_dec_c[1], mb.pfdec_c[1], frame.stride_c);
-
-  //stats
-  case mb.mbtype of
-      MB_I_4x4: begin
-          stats.mb_i4_count += 1;
-          for i := 0 to 15 do
-              stats.pred[mb.i4_pred_mode[i]] += 1;
-          stats.pred_8x8_chroma[mb.chroma_pred_mode] += 1;
-          stats.itex_bits += mb.residual_bits;
-      end;
-      MB_I_16x16: begin
-          stats.mb_i16_count += 1;
-          stats.pred16[mb.i16_pred_mode] += 1;
-          stats.pred_8x8_chroma[mb.chroma_pred_mode] += 1;
-          stats.itex_bits += mb.residual_bits;
-      end;
-      MB_I_PCM: begin
-          stats.mb_ipcm_count += 1;
-          stats.itex_bits += mb.residual_bits;
-      end;
-      MB_P_16x16, MB_P_16x8: begin
-          stats.mb_p_count += 1;
-          stats.ref[mb.ref] += 1;
-          stats.ptex_bits += mb.residual_bits;
-      end;
-      MB_P_SKIP: begin
-          stats.mb_skip_count += 1;
-          stats.ref[mb.ref] += 1;
-      end;
-  end;
 
   if not LoopFilter then begin
       stats.ssd[1] += dsp.ssd_8x8  (mb.pixels_dec_c[0], mb.pixels_c[0], 16);
@@ -430,6 +416,11 @@ begin
   stats := f.stats;
   mb_init_frame_invariant(mb, frame);
   enable_I_PCM := frame.qp < 10;
+end;
+
+procedure TMacroblockEncoder.SetChromaQPOffset(const AValue: shortint);
+begin
+  mb.chroma_qp_offset := AValue;
 end;
 
 

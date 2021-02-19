@@ -26,101 +26,73 @@ interface
 
 type
 
-  { TFrameStats }
+  { TCodingStats }
 
-  TFrameStats = class
+  TCodingStats = class
     public
+      mb_type_count: array[0..5] of int64;
       pred: array[0..8] of int64;
       pred16: array[0..3] of int64;
       pred_8x8_chroma: array[0..3] of int64;
       ref: array[0..15] of int64;
       ptex_bits,
       itex_bits,
-      mb_skip_count,
-      mb_i4_count,
-      mb_i16_count,
-      mb_ipcm_count,
-      mb_p_count: int64;
       size_bytes: int64;
       ssd: array[0..2] of int64;
-
-      constructor Create;
-      procedure Clear; virtual;
-      procedure Add(a: TFrameStats);
-      procedure WriteMBInfo         (var f: TextFile);
-      procedure WritePredictionInfo (var f: TextFile);
-      procedure WriteReferenceInfo  (var f: TextFile; const refcount: integer);
-  end;
-
-  { TStreamStats }
-
-  TStreamStats = class(TFrameStats)
-    public
       i_count,
       p_count: int64;
 
-      procedure Clear; override;
+      constructor Create;
+      procedure Clear; virtual;
+      procedure Add(a: TCodingStats);
+      procedure WriteMBInfo         (var f: TextFile);
+      procedure WritePredictionInfo (var f: TextFile);
+      procedure WriteReferenceInfo  (var f: TextFile; const refcount: integer);
       procedure WriteStreamInfo(var f: TextFile);
   end;
+
 
 (*******************************************************************************
 *******************************************************************************)
 implementation
+
+uses
+  common;
 
 const
   I4x4_PRED_NAMES: array[0..8] of string[3] = ('v', 'h', 'dc', 'ddl', 'ddr', 'vr', 'hd', 'vl', 'hu');
   I16x16_PRED_NAMES:  array[0..3] of string[5] = ('v', 'h', 'dc', 'plane');
   ICHROMA_PRED_NAMES: array[0..3] of string[5] = ('dc', 'h', 'v', 'plane');
 
-{ TStreamStats }
 
-procedure TStreamStats.Clear;
-begin
-  inherited Clear;
-  i_count := 0;
-  p_count := 0;
-end;
+{ TCodingStats }
 
-procedure TStreamStats.WriteStreamInfo(var f: TextFile);
-begin
-  writeln( f, 'stream size: ', size_bytes:10, ' B  (', size_bytes /1024/1024:6:2, ' MB)' );
-  writeln( f, 'I-frames: ', i_count );
-  writeln( f, 'P-frames: ', p_count );
-end;
-
-{ TFrameStats }
-
-constructor TFrameStats.Create;
+constructor TCodingStats.Create;
 begin
   Clear;
 end;
 
-procedure TFrameStats.Clear;
+procedure TCodingStats.Clear;
 begin
   Fillbyte(pred,   sizeof(pred), 0);
   Fillbyte(pred16, sizeof(pred16), 0);
   Fillbyte(pred_8x8_chroma, sizeof(pred_8x8_chroma), 0);
   Fillbyte(ref,    sizeof(ref), 0);
   Fillbyte(ssd,    sizeof(ssd), 0);
+  Fillbyte(mb_type_count, sizeof(mb_type_count), 0);
   ptex_bits := 0;
   itex_bits := 0;
-  mb_skip_count := 0;
-  mb_i4_count   := 0;
-  mb_i16_count  := 0;
-  mb_p_count    := 0;
   size_bytes := 0;
+  i_count := 0;
+  p_count := 0;
 end;
 
-procedure TFrameStats.Add(a: TFrameStats);
+procedure TCodingStats.Add(a: TCodingStats);
 var
   i: integer;
 begin
   itex_bits     += a.itex_bits;
   ptex_bits     += a.ptex_bits;
-  mb_i4_count   += a.mb_i4_count;
-  mb_i16_count  += a.mb_i16_count;
-  mb_p_count    += a.mb_p_count;
-  mb_skip_count += a.mb_skip_count;
   size_bytes    += a.size_bytes;
   for i := 0 to 8 do
       pred[i]   += a.pred[i];
@@ -132,54 +104,58 @@ begin
       ref[i] += a.ref[i];
   for i := 0 to 2 do
       ssd[i] += a.ssd[i];
+  for i := 0 to 5 do
+      mb_type_count[i] += a.mb_type_count[i];
 end;
 
-procedure TFrameStats.WriteMBInfo(var f: TextFile);
+procedure TCodingStats.WriteMBInfo(var f: TextFile);
 begin
   writeln( f, 'mb counts:' );
-  writeln( f, '  I4x4:  ', mb_i4_count:10);
-  writeln( f, '  I16x16:', mb_i16_count:10);
-  writeln( f, '  I_PCM:',  mb_ipcm_count:10);
-  writeln( f, '  P_L0:  ', mb_p_count:10);
-  writeln( f, '  skip:  ', mb_skip_count:10);
+  writeln( f, '  I4x4:      ', mb_type_count[MB_I_4x4]:10);
+  writeln( f, '  I16x16:    ', mb_type_count[MB_I_16x16]:10);
+  writeln( f, '  P_L0_16x16:', mb_type_count[MB_P_16x16]:10);
+  writeln( f, '  P_L0_16x8: ', mb_type_count[MB_P_16x8]:10);
+  writeln( f, '  skip:      ', mb_type_count[MB_P_SKIP]:10);
+  if mb_type_count[MB_I_PCM] > 0 then
+      writeln( f, '  I_PCM:', mb_type_count[MB_I_PCM]:10);
   writeln( f, 'residual bits:' );
   writeln( f, '  itex:    ', itex_bits:10 );
   writeln( f, '  ptex:    ', ptex_bits:10 );
   writeln( f, 'other bits:', size_bytes * 8 - (itex_bits + ptex_bits):10 );
 end;
 
-procedure TFrameStats.WritePredictionInfo(var f: TextFile);
+procedure TCodingStats.WritePredictionInfo(var f: TextFile);
 var
   i: integer;
   blk_n: int64;
 begin
   write(f, 'I4x4 pred:   ');
-  blk_n := 16 * mb_i4_count;
+  blk_n := 16 * mb_type_count[MB_I_4x4];
   if blk_n > 0 then
       for i := 0 to length(pred) - 1 do
           write(f, I4x4_PRED_NAMES[i], ': ', pred[i] / (blk_n / 100) :3:1, '% ');
   writeln(f);
   write(f, 'I16x16 pred: ');
-  blk_n := mb_i16_count;
+  blk_n := mb_type_count[MB_I_16x16];
   if blk_n > 0 then
       for i := 0 to length(pred16) - 1 do
           write(f, I16x16_PRED_NAMES[i], ': ', pred16[i] / (blk_n / 100) :3:1, '% ');
   writeln(f);
   write(f, 'chroma pred: ');
-  blk_n := mb_i4_count + mb_i16_count;
+  blk_n := mb_type_count[MB_I_4x4] + mb_type_count[MB_I_16x16];
   if blk_n > 0 then
       for i := 0 to length(pred_8x8_chroma) - 1 do
           write(f, ICHROMA_PRED_NAMES[i], ': ', pred_8x8_chroma[i] / (blk_n / 100) :3:1, '% ');
   writeln(f);
 end;
 
-procedure TFrameStats.WriteReferenceInfo(var f: TextFile; const refcount: integer);
+procedure TCodingStats.WriteReferenceInfo(var f: TextFile; const refcount: integer);
 var
   mbp_count: integer;
   i: integer;
 begin
   if refcount > 1 then begin
-      mbp_count := mb_p_count + mb_skip_count;
+      mbp_count := mb_type_count[MB_P_SKIP] + mb_type_count[MB_P_16x16] + mb_type_count[MB_P_16x8];   //no mixed refs
       write(f, 'L0 ref: ');
       for i := 0 to refcount - 1 do begin
           write(f, ref[i] / (mbp_count / 100):3:1, '% ');
@@ -187,6 +163,14 @@ begin
       writeln(f);
   end;
 end;
+
+procedure TCodingStats.WriteStreamInfo(var f: TextFile);
+begin
+  writeln( f, 'stream size: ', size_bytes:10, ' B  (', size_bytes /1024/1024:6:2, ' MB)' );
+  writeln( f, 'I-frames: ', i_count );
+  writeln( f, 'P-frames: ', p_count );
+end;
+
 
 end.
 

@@ -49,7 +49,7 @@ type
       mb_enc: TMacroblockEncoder;
       mb_enc_lowres: TMBEncoderLowresRun;
       fenc: frame_t;  //currently encoded frame
-      stats: TStreamStats;
+      stats: TCodingStats;
       frame_num: integer;
 
       width,
@@ -164,7 +164,7 @@ begin
   deblocker := TDeblocker.Create(filter_ab_offset);
 
   //stats
-  stats := TStreamStats.Create;
+  stats := TCodingStats.Create;
   h264s.SEIString := param.ToString;
   if param.WriteStatsFile then begin
       AssignFile(stats_file, param.stats_filename);
@@ -301,15 +301,21 @@ end;
 
 
 function TFevh264Encoder.SceneCut(const mbrow: integer): boolean;
+var
+  mb_i4_count, mb_i16_count: integer;
 begin
   result := false;
-  if (fenc.ftype = SLICE_P) and (mbrow > mb_height div 2) then begin
-      if (2 * fenc.stats.mb_i4_count > mb_count)
-        or (4 * integer(fenc.stats.mb_i16_count) > 3 * mb_count)
-        or (8 * integer(fenc.stats.mb_i4_count + fenc.stats.mb_i16_count) > 7 * mb_count)
-      then
-          result := true;
-  end;
+  if (fenc.ftype = SLICE_I) or (mbrow <= mb_height div 2) then
+      exit;
+
+  mb_i4_count  := fenc.stats.mb_type_count[MB_I_4x4];
+  mb_i16_count := fenc.stats.mb_type_count[MB_I_16x16];
+
+  if (2 * mb_i4_count > mb_count)
+    or (4 * mb_i16_count > 3 * mb_count)
+    or (8 * (mb_i4_count + mb_i16_count) > 7 * mb_count)
+  then
+      result := true;
 end;
 
 
