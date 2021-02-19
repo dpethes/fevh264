@@ -82,7 +82,7 @@ type
       frame_header_size: word;
       frame_size: longword;
       img: TPlanarImage;
-      procedure ParseHeader;
+      function ParseHeader: boolean;
     public
       constructor Create(const filename: string);
       destructor Destroy; override;
@@ -188,23 +188,27 @@ end;
 
 { TY4MFileReader }
 
-procedure TY4MFileReader.ParseHeader;
+function TY4MFileReader.ParseHeader: boolean;
+const
+  MINSIZE = 36;  //~ minimal header with single frame
 var
   i, num, denom: integer;
   c, param_c: char;
   s: string;
+  filemagic_buffer: array[0..9] of byte;
 begin
+  result := false;
+  if FileSize(fileHandle) < MINSIZE then
+      exit;
+
+  blockread(fileHandle, filemagic_buffer[0], Length(Y4M_MAGIC) + 1);
+  filemagic_buffer[9] := 0;
+  s := pchar(@filemagic_buffer[0]);
+  if s <> Y4M_MAGIC then
+      exit;
+
   param_c := ' ';
   c := ' ';
-  s := '';
-  for i := 1 to length(Y4M_MAGIC) do begin
-      blockread(fileHandle, c, 1);
-      s += c;
-  end;
-  blockread(fileHandle, c, 1);
-  if s <> Y4M_MAGIC then
-      raise EFormatError.Create('Not a Y4M file');
-
   repeat
       blockread(fileHandle, param_c, 1);
       s := '';
@@ -231,6 +235,7 @@ begin
 
   file_header_size  := FilePos(fileHandle);
   frame_header_size := 6;
+  result := true;
 end;
 
 constructor TY4MFileReader.Create(const filename: string);
@@ -241,7 +246,8 @@ begin
 
   AssignFile(fileHandle, filename);
   Reset(fileHandle, 1);
-  ParseHeader;
+  if not ParseHeader then
+      raise EFormatError.Create('Not a Y4M file');
 
   frame_size  := width * height + (width * height div 2);
   frame_count := (FileSize(fileHandle) - file_header_size) div (Y4M_FRAME_HEADER_SIZE + int64(frame_size));

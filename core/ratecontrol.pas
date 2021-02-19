@@ -21,6 +21,7 @@ along with Fev.  If not, see <http://www.gnu.org/licenses/>.
 
 unit ratecontrol;
 {$mode objfpc}{$H+}
+{$define RC_CONSOLE_WRITE}
 
 interface
 
@@ -327,10 +328,10 @@ var
   f: TextFile;
   s: string;
   i: integer;
-  fnum, qp, size, itex, ptex, other: integer;
-  mbi, mbp, mbskip: integer;
+  fnum: integer;
   qpa: double;
   ftype, bogus: char;
+  frame: TRcFrame;
 begin
   AssignFile(f, fname);
   Reset(f);
@@ -342,25 +343,17 @@ begin
           halt;
       end;
       SScanf(s, '%d%c%c qp: %d (%f) size: %d  itex: %d  ptex: %d  other: %d  i:%d p:%d skip: %d',
-        [@fnum, @bogus, @ftype, @qp, @qpa, @size, @itex, @ptex, @other, @mbi, @mbp, @mbskip]);
+        [@fnum, @bogus, @ftype,
+         @frame.qp, @qpa, @frame.bitsize,
+         @frame.itex, @frame.ptex, @frame.misc_bits,
+         @frame.mb_i, @frame.mb_p, @frame.mb_skip]);
 
-      frames[i].bitsize := size;
-      frames[i].qp      := qp;
-      frames[i].qp_init := qp;
-
-      frames[i].tex_bits := itex + ptex;
-      frames[i].itex := itex;
-      frames[i].ptex := ptex;
-      frames[i].misc_bits := other;
-
-      frames[i].mb_i := mbi;
-      frames[i].mb_p := mbp;
-      frames[i].mb_skip := mbskip;
-
+      frame.qp_init := frame.qp;
+      frame.tex_bits := frame.itex + frame.ptex;
+      frame.frame_type := SLICE_I;
       if ftype = 'P' then
-          frames[i].frame_type := SLICE_P
-      else
-          frames[i].frame_type := SLICE_I;
+          frame.frame_type := SLICE_P;
+      frames[i] := frame;
       //writeln(stderr, frames[i].bitsize:20, frames[i].tex_bits:20, frames[i].misc_bits:20, frames[i].mb_skip:20);
   end;
   CloseFile(f);
@@ -471,11 +464,13 @@ begin
   bit_reserve := trunc( avg_target_framesize * reserve_frames );
   SetBitReserveReductionPoint;
 
+{$ifdef RC_CONSOLE_WRITE}
   writeln(stderr, 'rc: adjusted qp: ', qp_avg:5:2, ' kbps: ', kbps:7:1);
   writeln(stderr, 'rc: target avg. frame size: ', avg_target_framesize:2);
   writeln(stderr, 'rc: rate_mult: ', rate_mult:5:3);
   writeln(stderr, 'rc: initial qp: ', qp_init:2);
   writeln(stderr, 'rc: bit reserve: ', bit_reserve:2);
+{$endif}
 end;
 
 
@@ -529,8 +524,10 @@ var
 begin
   frames := nil;
   if mode = tRc2passAvg then begin
+{$ifdef RC_CONSOLE_WRITE}
       writeln(stderr, 'rc: avg.qp: ', encoded_qp_avg / nframes:4:2);
       writeln(stderr, 'stddev: ', sqrt(ssd / nframes):10:2);
+{$endif}
   end;
   for gop in gop_list do
       gop.Free;
