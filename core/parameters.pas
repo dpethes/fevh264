@@ -43,7 +43,7 @@ type
       frames: longword;        // frame count
       fps: single;             // fps
       qp: byte;                // quantization parameter
-      chroma_qp_offset: shortint;  // chroma qp offset
+      chroma_qp_offset: int8;  // chroma qp offset
       subme: byte;             // subpixel ME refinement
                                { 0 - none (fpel only)
                                  1 - hpel
@@ -96,7 +96,7 @@ type
       property Bitrate: longword read rc.bitrate;
 
       property QParam: byte read qp write SetQParam;
-      property ChromaQParamOffset: shortint read chroma_qp_offset write SetChromaQParamOffset;
+      property ChromaQParamOffset: int8 read chroma_qp_offset write SetChromaQParamOffset;
       property KeyFrameInterval: word read key_interval write SetKeyFrameInterval;
 
       property LoopFilterEnabled: boolean read loopfilter write loopfilter;
@@ -127,7 +127,7 @@ begin
   analyse := clip3(0, AValue, 4);
 end;
 
-procedure TEncodingParameters.SetChromaQParamOffset(const AValue: shortint);
+procedure TEncodingParameters.SetChromaQParamOffset(const AValue: int8);
 begin
   chroma_qp_offset := clip3(-MAX_CHROMA_QP_OFFSET, AValue, MAX_CHROMA_QP_OFFSET);
   ValidateQParams;

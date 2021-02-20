@@ -90,7 +90,7 @@ begin
 
       AddOption('q', atInt,    'qp',     'quantization parameter [21]');
       AddOption('B', atInt,    'bitrate','use average bitrate mode (needs logfile)');
-      AddOption('c', atInt,    'chroma-qp-offset', 'chroma QP adjustment [0]');
+      AddOption('c', atInt,    'chroma-qp-offset', 'chroma QP adjustment [0] (-12..12)');
       AddOption('k', atInt,    'keyint', 'maximum keyframe interval [300]');
       AddOption('m', atInt,    'subme',  'subpixel ME refinement level [3]'
                                          + ' (0=none; 1=hpel; 2=qpel; 3=qpel SATD; 4=qpel chroma SATD; 5=qpel RD)');

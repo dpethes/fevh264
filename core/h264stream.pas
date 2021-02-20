@@ -52,7 +52,7 @@ type
   pps_t = record
       deblocking_filter_control_present_flag: byte;
       qp: byte;
-      chroma_qp_offset: shortint;
+      chroma_qp_offset: int8;
   end;
 
   //slice
@@ -97,7 +97,7 @@ type
       idr_pic_id: word;
 
       function GetNoPSkip: boolean; inline;
-      procedure SetChromaQPOffset(const AValue: byte);
+      procedure SetChromaQPOffset(const AValue: int8);
       procedure SetKeyInterval(const AValue: word);
       procedure SetNumRefFrames(const AValue: byte);
       procedure SetQP(const AValue: byte);
@@ -126,7 +126,7 @@ type
     public
       property NumRefFrames: byte read sps.num_ref_frames write SetNumRefFrames;
       property QP: byte             write SetQP;
-      property ChromaQPOffset: byte write SetChromaQPOffset;
+      property ChromaQPOffset: int8 write SetChromaQPOffset;
       property KeyInterval: word    write SetKeyInterval;
       property SEIString: string    read GetSEI write SetSEI;
       property NoPSkipAllowed: boolean  read GetNoPSkip;
@@ -524,7 +524,7 @@ end;
 
 { TH264Stream }
 
-procedure TH264Stream.SetChromaQPOffset(const AValue: byte);
+procedure TH264Stream.SetChromaQPOffset(const AValue: int8);
 begin
   pps.chroma_qp_offset := AValue;
 end;
