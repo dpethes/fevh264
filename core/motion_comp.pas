@@ -37,14 +37,14 @@ type
 
   MotionCompensation = class
     public
-      class procedure Compensate       (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dst: pbyte); static;
+      class procedure Compensate       (const fref: frame_p; const mb: macroblock_t); static;
       class procedure CompensateQPelXY (const fref: frame_p; qx, qy: integer; dst: pbyte); static;
-      class procedure CompensateChroma (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte); static;
+      class procedure CompensateChroma (const fref: frame_p; const mb: macroblock_t); static;
       class procedure CompensateChromaQpelXY(const fref: frame_p; qx, qy: integer; dstU, dstV: pbyte); static;
 
-      class procedure Compensate_16x8       (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dst: pbyte; idx: integer); static;
+      class procedure Compensate_16x8       (const fref: frame_p; const mb: macroblock_t; idx: integer); static;
       class procedure CompensateQPelXY_16x8 (const fref: frame_p; qx, qy: integer; dst: pbyte); static;
-      class procedure CompensateChroma_8x4 (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte; idx: integer); static;
+      class procedure CompensateChroma_8x4  (const fref: frame_p; const mb: macroblock_t; idx: integer); static;
       class procedure CompensateChromaQpelXY_8x4(const fref: frame_p; qx, qy: integer; dstU, dstV: pbyte); static;
   end;
 
@@ -78,25 +78,25 @@ end;
 (*******************************************************************************
 motion_compensate
 *)
-class procedure MotionCompensation.Compensate(const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dst: pbyte);
+class procedure MotionCompensation.Compensate(const fref: frame_p; const mb: macroblock_t);
 var
   x, y,
   fx, fy: integer;  //fullpel position
   stride: integer;
   j: longword;
 begin
-  x := mbx * 64 + mv.x;
-  y := mby * 64 + mv.y;
+  x := mb.x * 64 + mb.mv.x;
+  y := mb.y * 64 + mb.mv.y;
   //qpel or hpel / fullpel
   if (x and 1 + y and 1) > 0 then
-      CompensateQPelXY(fref, x, y, dst)
+      CompensateQPelXY(fref, x, y, mb.mcomp)
   else begin
       stride := fref^.stride;
       fx := (x + FRAME_PADDING_W*4) shr 2;
       fy := (y + FRAME_PADDING_W*4) shr 2;
       //mv_range_check(mb, fref, fx, fy);
       j := (y and 2) or (x and 2 shr 1);
-      dsp.pixel_loadu_16x16 (dst, fref^.luma_mc[j] - fref^.frame_mem_offset + fy * stride + fx, stride);
+      dsp.pixel_loadu_16x16 (mb.mcomp, fref^.luma_mc[j] - fref^.frame_mem_offset + fy * stride + fx, stride);
   end;
 end;
 
@@ -183,16 +183,23 @@ end;
 
 
 class procedure MotionCompensation.Compensate_16x8(const fref: frame_p;
-  mv: motionvec_t; mbx, mby: integer; dst: pbyte; idx: integer);
+  const mb: macroblock_t; idx: integer);
 var
   x, y,
   fx, fy: integer;  //fullpel position
   stride: integer;
   j: longword;
+  dst: PUInt8;
 begin
-  x := mbx * 64 + mv.x + XY_qpel_offset_16x8[idx, 0];
-  y := mby * 64 + mv.y + XY_qpel_offset_16x8[idx, 1];
-  dst += MB_pixel_offset_16x8[idx, 0] + MB_pixel_offset_16x8[idx, 1] * 16;  //MB_STRIDE
+  if idx = 0 then begin
+      x := mb.x * 64 + mb.mv.x + XY_qpel_offset_16x8[idx, 0];
+      y := mb.y * 64 + mb.mv.y + XY_qpel_offset_16x8[idx, 1];
+  end else
+  begin
+      x := mb.x * 64 + mb.mv1.x + XY_qpel_offset_16x8[idx, 0];
+      y := mb.y * 64 + mb.mv1.y + XY_qpel_offset_16x8[idx, 1];
+  end;
+  dst := mb.mcomp + MB_pixel_offset_16x8[idx, 0] + MB_pixel_offset_16x8[idx, 1] * 16;  //MB_STRIDE
   //qpel or hpel / fullpel
   if (x and 1 + y and 1) > 0 then
       CompensateQPelXY_16x8(fref, x, y, dst)
@@ -242,14 +249,13 @@ begin
 end;
 
 
-class procedure MotionCompensation.CompensateChroma
-  (const fref: frame_p; mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte);
+class procedure MotionCompensation.CompensateChroma(const fref: frame_p; const mb: macroblock_t);
 var
   x, y: integer;
 begin
-  x := mbx * 64 + mv.x;  //qpel position
-  y := mby * 64 + mv.y;
-  CompensateChromaQpelXY(fref, x, y, dstU, dstV);
+  x := mb.x * 64 + mb.mv.x;  //qpel position
+  y := mb.y * 64 + mb.mv.y;
+  CompensateChromaQpelXY(fref, x, y, mb.mcomp_c[0], mb.mcomp_c[1]);
 end;
 
 class procedure MotionCompensation.CompensateChromaQpelXY
@@ -279,18 +285,24 @@ begin
 end;
 
 
-class procedure MotionCompensation.CompensateChroma_8x4(const fref: frame_p;
-  mv: motionvec_t; mbx, mby: integer; dstU, dstV: pbyte; idx: integer);
+class procedure MotionCompensation.CompensateChroma_8x4(const fref: frame_p; const mb: macroblock_t; idx: integer);
 var
   x, y: integer;
   subpart_offset: integer;
+  dstU, dstV: PUInt8;
 begin
-  x := mbx * 64 + mv.x + XY_qpel_offset_16x8[idx, 0];
-  y := mby * 64 + mv.y + XY_qpel_offset_16x8[idx, 1];
+  if idx = 0 then begin
+      x := mb.x * 64 + mb.mv.x + XY_qpel_offset_16x8[idx, 0];
+      y := mb.y * 64 + mb.mv.y + XY_qpel_offset_16x8[idx, 1];
+  end else
+  begin
+      x := mb.x * 64 + mb.mv1.x + XY_qpel_offset_16x8[idx, 0];
+      y := mb.y * 64 + mb.mv1.y + XY_qpel_offset_16x8[idx, 1];
+  end;
 
   subpart_offset := (MB_pixel_offset_16x8[idx, 0] div 2) + (MB_pixel_offset_16x8[idx, 1] div 2) * 16;  //MB_STRIDE
-  dstU += subpart_offset;
-  dstV += subpart_offset;
+  dstU := mb.mcomp_c[0] + subpart_offset;
+  dstV := mb.mcomp_c[1] + subpart_offset;
 
   CompensateChromaQpelXY_8x4(fref, x, y, dstU, dstV);
 end;

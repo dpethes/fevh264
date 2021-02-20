@@ -223,7 +223,7 @@ begin
       mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
 
   mb.mv := ClipMVRange(mb.mv);
-  MotionCompensation.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  MotionCompensation.Compensate(fref, mb);
 end;
 
 procedure TMotionEstimator.Refine(var mb: macroblock_t);
@@ -240,7 +240,7 @@ begin
       mv_field[mb.y * mb_width + mb.x] := mb.mv;
   end;
 
-  MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  MotionCompensation.Compensate(mb.fref, mb);
 end;
 
 procedure TMotionEstimator.Skipped(var mb: macroblock_t);
@@ -318,7 +318,7 @@ begin
       InterPredLoadMvs(mb, fenc, ref_count);
 
   mb.mv := ClipMVRange(mv);
-  MotionCompensation.Compensate(fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  MotionCompensation.Compensate(fref, mb);
 end;
 
 
@@ -337,8 +337,8 @@ begin
   mb.mv1 := mv1;
   mv_field[mb.y * mb_width + mb.x] := mv1;
 
-  MotionCompensation.Compensate_16x8(mb.fref, mb.mv,  mb.x, mb.y, mb.mcomp, 0);
-  MotionCompensation.Compensate_16x8(mb.fref, mb.mv1, mb.x, mb.y, mb.mcomp, 1);
+  MotionCompensation.Compensate_16x8(mb.fref, mb, 0);
+  MotionCompensation.Compensate_16x8(mb.fref, mb, 1);
 end;
 
 

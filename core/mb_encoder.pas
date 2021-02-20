@@ -177,7 +177,7 @@ begin
       MB_P_16x16: begin
           encode_mb_inter(mb);
           if chroma_coding then begin
-              MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+              MotionCompensation.CompensateChroma(mb.fref, mb);
               encode_mb_chroma(mb, false);
           end;
       end;
@@ -185,8 +185,8 @@ begin
       MB_P_16x8: begin
           encode_mb_inter(mb);
           if chroma_coding then begin
-              MotionCompensation.CompensateChroma_8x4(mb.fref, mb.mv,  mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], 0);
-              MotionCompensation.CompensateChroma_8x4(mb.fref, mb.mv1, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], 1);
+              MotionCompensation.CompensateChroma_8x4(mb.fref, mb, 0);
+              MotionCompensation.CompensateChroma_8x4(mb.fref, mb, 1);
               encode_mb_chroma(mb, false);
           end;
       end;
@@ -338,7 +338,7 @@ begin
   if not mb_can_use_pskip then exit;
 
   mb.mv := mb.mv_skip;
-  MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  MotionCompensation.Compensate(mb.fref, mb);
   score := dsp.ssd_16x16(mb.pixels, mb.mcomp, 16);
   if use_satd then
       mb.score_skip := dsp.satd_16x16(mb.pixels, mb.mcomp, 16)
@@ -346,7 +346,7 @@ begin
       mb.score_skip := dsp.sad_16x16 (mb.pixels, mb.mcomp, 16);
   score_c := 0;
   if chroma_coding then begin
-      MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+      MotionCompensation.CompensateChroma(mb.fref, mb);
       score_c := GetChromaMcSSD;
   end;
   mb.score_skip_uv_ssd := score_c;
@@ -388,9 +388,9 @@ begin
   end;
   mb.mbtype := MB_P_SKIP;
   mb.mv     := mb.mv_skip;
-  MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+  MotionCompensation.Compensate(mb.fref, mb);
   if chroma_coding then
-      MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+      MotionCompensation.CompensateChroma(mb.fref, mb);
 end;
 
 
@@ -631,8 +631,8 @@ begin
           mb.mbtype := MB_P_16x16;
           CacheMvLoad;
           CacheLoad;
-          MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);  //MC pixels not cached
-          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+          MotionCompensation.Compensate(mb.fref, mb);  //MC pixels not cached
+          MotionCompensation.CompensateChroma(mb.fref, mb);
       end;
   end;
 
@@ -645,7 +645,7 @@ begin
       me.Refine(mb);
       if mb.mv = cache_motion.mv then begin  //refinement couldn't find better mv
           CacheLoad;
-          MotionCompensation.CompensateChroma(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1]);
+          MotionCompensation.CompensateChroma(mb.fref, mb);
       end else
           EncodeCurrentType;
   end;
@@ -820,7 +820,7 @@ begin
           if (mb.mv = mb.mv1) or (score_p < score_psub) then begin
               mb.mbtype := MB_P_16x16;
               CacheMvLoad;
-              MotionCompensation.Compensate(mb.fref, mb.mv, mb.x, mb.y, mb.mcomp);
+              MotionCompensation.Compensate(mb.fref, mb);
           end;
       end;
 

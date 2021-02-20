@@ -502,6 +502,7 @@ end;
 function TRegionSearch.SearchQPel_16x8_partition(var mb: macroblock_t; idx: integer;
   const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
 var
+  cur_partition: pbyte;
   mbcmp: mbcmp_func_t;
   max_x, max_y: integer;
   mbx, mby,              //macroblock qpel x,y position
@@ -512,19 +513,18 @@ var
   range: integer;
   iter: integer;
   check_bounds: boolean;
-  chroma_subpart_offset: integer;
-
 
 function chroma_score: integer; inline;
 begin
-  result := dsp.satd_8x4(mb.pixels_c[0], mb.mcomp_c[0] + chroma_subpart_offset, 16);
-  result += dsp.satd_8x4(mb.pixels_c[1], mb.mcomp_c[1] + chroma_subpart_offset, 16);
+  result := dsp.satd_8x4(mb.pixels_c[0], mb.mcomp_c[0], 16);
+  result += dsp.satd_8x4(mb.pixels_c[1], mb.mcomp_c[1], 16);
 end;
 
 procedure check_pattern_qpel;
 var
   i: integer;
   nx, ny,
+  nx_partition, ny_partition: integer;
   score: integer;
 begin
   if check_bounds then
@@ -533,14 +533,16 @@ begin
   for i := 0 to 3 do begin
       nx := x + pt_dia_small[i][0];
       ny := y + pt_dia_small[i][1];
+      nx_partition := nx + XY_qpel_offset_16x8[idx, 0];
+      ny_partition := ny + XY_qpel_offset_16x8[idx, 1];
 
       //offset to current sub-block
-      MotionCompensation.CompensateQPelXY_16x8(fref, nx + XY_qpel_offset_16x8[idx, 0], ny + XY_qpel_offset_16x8[idx, 1], mb.mcomp);
-      score := mbcmp(cur, mb.mcomp, 16)
+      MotionCompensation.CompensateQPelXY_16x8(fref, nx_partition, ny_partition, mb.mcomp);
+      score := mbcmp(cur_partition, mb.mcomp, 16)
                + InterCost.Bits(XYToMVec(nx - mbx, ny - mby));
 
       if chroma_me then begin
-          MotionCompensation.CompensateChroma_8x4(fref, XYToMVec(nx - mbx, ny - mby), mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], idx);
+          MotionCompensation.CompensateChromaQpelXY_8x4(fref, nx_partition, ny_partition, mb.mcomp_c[0], mb.mcomp_c[1]);
           score += chroma_score();
       end;
 
@@ -554,12 +556,9 @@ begin
 end;
 
 begin
+  cur_partition := cur + MB_pixel_offset_16x8[idx, 0] + MB_pixel_offset_16x8[idx, 1] * 16;  //MB_STRIDE
   mbx    := _mbx * 4;
   mby    := _mby * 4;
-
-  cur += MB_pixel_offset_16x8[idx, 0] + MB_pixel_offset_16x8[idx, 1] * 16;  //MB_STRIDE
-  chroma_subpart_offset := (MB_pixel_offset_16x8[idx, 0] div 2) + (MB_pixel_offset_16x8[idx, 1] div 2) * 16;  //MB_STRIDE
-
   max_x  := _max_x_qpel;
   max_y  := _max_y_qpel;
   if satd then
@@ -584,18 +583,18 @@ begin
   until (mv = mv_prev_pass) or (iter >= range);
 
   if min_score = MaxInt then begin    //return valid score if no searches were done (rare cases at the padded edge of a frame)
-      MotionCompensation.CompensateQPelXY_16x8(fref, x + XY_qpel_offset_16x8[idx, 0], y + XY_qpel_offset_16x8[idx, 1], mb.mcomp);
+      x += XY_qpel_offset_16x8[idx, 0];
+      y += XY_qpel_offset_16x8[idx, 1];
+      MotionCompensation.CompensateQPelXY_16x8(fref, x, y, mb.mcomp);
       min_score := mbcmp(cur, mb.mcomp, 16) + InterCost.Bits(mv);
       if chroma_me then begin
-          MotionCompensation.CompensateChroma_8x4(fref, XYToMVec(x - mbx, y - mby), mb.x, mb.y, mb.mcomp_c[0], mb.mcomp_c[1], 1);
+          MotionCompensation.CompensateChromaQpelXY_8x4(fref, x, y, mb.mcomp_c[0], mb.mcomp_c[1]);
           min_score += chroma_score();
       end;
   end;
 
   _last_search_score := min_score;
   result := mv;
-
-  cur -= MB_pixel_offset_16x8[idx, 0] + MB_pixel_offset_16x8[idx, 1] * 16;  //MB_STRIDE
 end;
 
 end.
