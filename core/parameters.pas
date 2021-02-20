@@ -39,7 +39,7 @@ type
   TEncodingParameters = class
     private
       width,
-      height: word;         // input dimensions
+      height: word;            // input dimensions
       frames: longword;        // frame count
       fps: single;             // fps
       qp: byte;                // quantization parameter
@@ -66,6 +66,7 @@ type
       filter_offset_div2: int8;// alpha/beta offset div 2
       aq: boolean;             // mb-level adaptive quantization
       luma_only: boolean;      // ignore chroma
+      dump_decoded_frames: boolean;  //store decoded frames to disk (pgm or y4m)
 
       rc: record
           enabled: boolean;    // enable avg. bitrate ratecontrol
@@ -108,6 +109,7 @@ type
       property AdaptiveQuant: boolean read aq write aq;
 
       property IgnoreChroma: boolean read luma_only write luma_only;
+      property DumpFrames: boolean read dump_decoded_frames write dump_decoded_frames;
 
       constructor Create;
       constructor Create(const width_, height_: word; const fps_: double);

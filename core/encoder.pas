@@ -21,6 +21,7 @@ along with Fev.  If not, see <http://www.gnu.org/licenses/>.
 
 unit encoder;
 {$mode objfpc}
+{define DEBUG_Y4M_OUTPUT}
 
 interface
 
@@ -29,12 +30,24 @@ uses
   intra_pred, motion_est, ratecontrol, image, mb_encoder;
 
 type
+{$ifdef DEBUG_Y4M_OUTPUT}
+  y4m_file = record
+      hnd: file;
+      file_header_size,
+      frame_header_size: word;
+      width,
+      height: word;
+      frame_size: longword;
+      frame_count,
+      current_frame: longword;
+      frame_rate: double;
+  end;
+{$endif}
+
   { TFevh264Encoder }
 
   TFevh264Encoder = class
     public
-      dump_decoded_frames: boolean;
-
       { Create encoder with desired parameters.
       Param instance is bound to encoder and shouldn't be modified until the encoder is freed
       }
@@ -72,6 +85,10 @@ type
       me: TMotionEstimator;
       me_lowres: TMotionEstimator;
       deblocker: TDeblocker;
+{$ifdef DEBUG_Y4M_OUTPUT}
+      _y4m_dump: y4m_file;
+      _img_dump: TPlanarImage;
+{$endif}
 
       procedure SetISlice;
       procedure SetPSlice;
@@ -91,6 +108,35 @@ type
 (*******************************************************************************
 *******************************************************************************)
 implementation
+
+{$ifdef DEBUG_Y4M_OUTPUT}
+const
+  Y4M_MAGIC   = 'YUV4MPEG2';
+  FRAME_MAGIC = 'FRAME'#10;
+
+procedure y4m_open(var f: y4m_file; const filename: string);
+var
+  s: string;
+begin
+  AssignFile(f.hnd, filename);
+  Rewrite(f.hnd, 1);
+  s := format( Y4M_MAGIC + ' W%d H%d F25:1 Ip A1:1'#10, [f.width, f.height] );
+  blockwrite(f.hnd, s[1], length(s));
+  f.frame_size := f.width * f.height * 3 div 2;
+end;
+
+procedure y4m_close (var f: y4m_file);
+begin
+  CloseFile(f.hnd);
+end;
+
+procedure y4m_frame_write(var f: y4m_file; frame: pbyte);
+begin
+  blockwrite(f.hnd, FRAME_MAGIC, sizeof(FRAME_MAGIC));
+  blockwrite(f.hnd, frame^, f.frame_size);
+  f.current_frame += 1;
+end;
+{$endif}
 
 
 { TFevh264Encoder }
@@ -171,6 +217,14 @@ begin
       Rewrite(stats_file);
       writeln(stats_file, h264s.SEIString);
   end;
+{$ifdef DEBUG_Y4M_OUTPUT}
+  if _param.DumpFrames then begin
+      _img_dump := TPlanarImage.Create(width, height);
+      _y4m_dump.width := width;
+      _y4m_dump.height := height;
+      y4m_open(_y4m_dump, 'dump.y4m');
+  end;
+{$endif}
 end;
 
 
@@ -188,13 +242,19 @@ begin
   mb_enc_lowres.Free;
   deblocker.Free;
   stats.Free;
+{$ifdef DEBUG_Y4M_OUTPUT}
+  if _param.DumpFrames then begin
+      _img_dump.Free;
+      y4m_close(_y4m_dump);
+  end;
+{$endif}
 end;
 
 
 procedure TFevh264Encoder.EncodeFrame(const img: TPlanarImage; buffer: pbyte; out stream_size: longword);
 begin
   frames.GetFree(fenc);
-  frame_img2frame_copy(fenc, img);
+  frame_copy_image_with_padding(fenc, img);
   frame_lowres_from_input(fenc);
   fenc.num := frame_num;
 
@@ -232,7 +292,7 @@ begin
 
   //done
   frame_num += 1;
-  if dump_decoded_frames then
+  if _param.DumpFrames then
       DumpFrame;
   dsp.FpuReset;
 end;
@@ -369,6 +429,11 @@ procedure TFevh264Encoder.DumpFrame;
 var
   s: string;
 begin
+{$ifdef DEBUG_Y4M_OUTPUT}
+  frame_copy_decoded_to_image(fenc, _img_dump);
+  y4m_frame_write(_y4m_dump, _img_dump.plane[0]);
+  exit;
+{$endif}
   s := format('fdec%6d', [frame_num]);
   pgm_save(s + '.pgm', fenc.mem[3], fenc.pw, fenc.ph);
   if mb_enc.chroma_coding then begin

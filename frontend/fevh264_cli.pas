@@ -29,7 +29,6 @@ uses
   
 var
   foutput: string;
-  dump: boolean;
   frames: integer;
   options: TCliOptionHandler;
 
@@ -144,7 +143,7 @@ begin
               param.stats_filename := input_filename + '.1pass.txt';
       end;
 
-      dump := options.IsSet('dump');
+      param.DumpFrames := options.IsSet('dump');
       if options.IsSet('frames') then
           frames := StrToInt(options['f']);
   except
@@ -251,7 +250,6 @@ begin
   param.FrameCount := frame_count;
 
   encoder := TFevh264Encoder.Create(param);
-  encoder.dump_decoded_frames := dump;
   buffer := getmem(width * height * 4);
 
   //encoding loop

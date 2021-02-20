@@ -35,7 +35,8 @@ procedure frame_new(var frame: frame_t; const mb_width, mb_height: integer);
 procedure frame_free(var frame: frame_t);
 procedure frame_decoded_macroblock_row_ssd(frame: frame_p; const mby: integer);
 procedure frame_write_stats (var stats_file: textfile; const frame: frame_t);
-procedure frame_img2frame_copy(var frame: frame_t; const img: TPlanarImage);
+procedure frame_copy_image_with_padding(var frame: frame_t; const img: TPlanarImage);
+procedure frame_copy_decoded_to_image(var frame: frame_t; var img: TPlanarImage);
 procedure frame_paint_edges(var frame: frame_t);
 procedure frame_hpel_interpolate(var frame: frame_t);
 procedure frame_lowres_from_input(var frame: frame_t);
@@ -326,7 +327,7 @@ begin
 end;
 
 
-procedure frame_img2frame_copy(var frame: frame_t; const img: TPlanarImage);
+procedure frame_copy_image_with_padding(var frame: frame_t; const img: TPlanarImage);
 var
   w, h, i, j: integer;
   dstride, sstride, edge_width, chroma_height: integer;
@@ -374,6 +375,39 @@ begin
       for i := 1 to 2 do
           paint_edge_horiz(frame.plane[i] - 8 + frame.stride_c * (h div 2 - 1),
                            frame.plane[i] - 8 + frame.stride_c * h div 2, frame.stride_c, edge_width);
+  end;
+end;
+
+
+procedure frame_copy_decoded_to_image(var frame: frame_t; var img: TPlanarImage);
+var
+  w, h, i, j: integer;
+  frame_stride, image_stride, edge_width, chroma_height: integer;
+  s, d: pbyte;
+begin
+  w := img.Width;
+  h := img.Height;
+  //y
+  frame_stride := frame.stride;
+  image_stride := img.stride;
+  s := frame.plane_dec[0];
+  d := img.plane[0];
+  for i := 0 to h - 1 do begin
+      move(s^, d^, w);
+      d += image_stride;
+      s += frame_stride;
+  end;
+  //u/v
+  frame_stride := frame.stride_c;
+  image_stride := img.stride_c;
+  for j := 1 to 2 do begin
+      s := frame.plane_dec[j];
+      d := img.plane[j];
+      for i := 0 to h div 2 - 1 do begin
+          move(s^, d^, w div 2);
+          d += image_stride;
+          s += frame_stride;
+      end;
   end;
 end;
 
