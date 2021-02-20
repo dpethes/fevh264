@@ -89,15 +89,17 @@ procedure CalculateBStrength (const mb: macroblock_p);
     result := CLIP_TABLE[((((a^.nz_coef_cnt[na] + b^.nz_coef_cnt[nb]) * $ffff) >> 8) and 2) + bS_min];
   end;
 
-  //minimum filtering strength between two MBs, affected by different ref, mv delta >= 4, diff. partitions
-  //TODO revise for 16x8
-  function mb_bS(const a, b: macroblock_p): integer; inline;
+  //set strength=1 if mv delta >= 4
+  function bS_by_mvdiff(const a, b: motionvec_t): integer; inline;
   begin
-    result := 0;
-    if (a^.ref <> b^.ref) or
-        (( abs(a^.mv.x - b^.mv.x) >= 4 ) or ( abs(a^.mv.y - b^.mv.y) >= 4 ))
-    then
-        result := 1;
+    //( abs(a.x - b.x) >= 4 ) or ( abs(a.y - b.y) >= 4 )  ?  1 : 0
+    result := ((((abs(a.x - b.x) >> 2) + (abs(a.y - b.y) >> 2) ) * $ffff) >> 15) and 1;
+  end;
+
+  //MB_P_16x16, MB_P_SKIP only
+  function mbtypes_with_single_mv(const a, b: macroblock_p): boolean; inline;
+  begin
+    result := ((a^.mbtype <= MB_P_SKIP) and (b^.mbtype <= MB_P_SKIP))
   end;
 
   function is_bS_sum_zero(pv, ph: pint64): boolean; inline;
@@ -107,11 +109,13 @@ procedure CalculateBStrength (const mb: macroblock_p);
 
 const
   intra_bS: TBSarray = ( (4,4,4,4), (3,3,3,3), (3,3,3,3), (3,3,3,3) );
+  SHUFFLE4X = $01010101;
 
 var
   i: integer;
-  mba, mbb: macroblock_p;
-  bS_min: integer;
+  other_mb: macroblock_p;
+  bS_min: array[0..3] of byte;
+  bS_min_overall: uint32 absolute bS_min;
 
 begin
   if is_intra(mb^.mbtype) then begin
@@ -121,8 +125,10 @@ begin
       exit;
   end;
 
-  //internal edges - strength depends only on this mb's luma only
-  if (mb^.cbp and CBP_LUMA_MASK) > 0 then
+  { internal edges - strength depends on current mb's luma coef count and partition mvs
+    Assume no partitions first, then correct partition edges by mv diff condition if needed
+  }
+  if (mb^.cbp and CBP_LUMA_MASK) > 0 then begin
       for i := 1 to 3 do begin
           mb^.bS_vertical  [i, 0] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[i, 0], BLOCK_XY_POS_TO_IDX[i-1, 0]);
           mb^.bS_vertical  [i, 1] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[i, 1], BLOCK_XY_POS_TO_IDX[i-1, 1]);
@@ -134,32 +140,60 @@ begin
           mb^.bS_horizontal[i, 2] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[2, i], BLOCK_XY_POS_TO_IDX[2, i-1]);
           mb^.bS_horizontal[i, 3] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[3, i], BLOCK_XY_POS_TO_IDX[3, i-1]);
       end;
+  end;
+  if mb^.mbtype = MB_P_16x8 then begin
+      bS_min_overall := bS_by_mvdiff(mb^.mv, mb^.mv1);
+      if bS_min_overall > 0 then
+          for i := 0 to 3 do
+              if mb^.bS_horizontal[2, i] = 0 then mb^.bS_horizontal[2, i] := 1;
+  end;
 
   //vertical edges - 'left' macroblock edge
   if mb^.x > 0 then begin
-      mba := mb^.mba;
-      if is_intra(mba^.mbtype) then begin  //edge shared with intra block
+      other_mb := mb^.mba;
+      if is_intra(other_mb^.mbtype) then begin  //edge shared with intra block
           mb^.bS_vertical[0] := intra_bS[0];
-      end else begin
-          bS_min := mb_bS(mb, mba);
-          mb^.bS_vertical[0, 0] := outer_edge_bS(mb, mba, 0,  5, bS_min);
-          mb^.bS_vertical[0, 1] := outer_edge_bS(mb, mba, 2,  7, bS_min);
-          mb^.bS_vertical[0, 2] := outer_edge_bS(mb, mba, 8, 13, bS_min);
-          mb^.bS_vertical[0, 3] := outer_edge_bS(mb, mba,10, 15, bS_min);
+      end
+      else begin
+          bS_min_overall := 0;
+          if (mb^.ref <> other_mb^.ref) then
+              bS_min_overall := 1 * SHUFFLE4X
+          else if mbtypes_with_single_mv(mb, other_mb) then
+              bS_min_overall := bS_by_mvdiff(mb^.mv, other_mb^.mv) * SHUFFLE4X
+          else begin
+              //eval mvdiff per block - only handles MB_P_16x8 for now
+              bS_min[0] := bS_by_mvdiff(mb^.mv,  other_mb^.mv);
+              bS_min[1] := bS_min[0];
+              bS_min[2] := bS_by_mvdiff(mb^.mv1, other_mb^.mv1);
+              bS_min[3] := bS_min[2];
+          end;
+          mb^.bS_vertical[0, 0] := outer_edge_bS(mb, other_mb, 0,  5, bS_min[0]);
+          mb^.bS_vertical[0, 1] := outer_edge_bS(mb, other_mb, 2,  7, bS_min[1]);
+          mb^.bS_vertical[0, 2] := outer_edge_bS(mb, other_mb, 8, 13, bS_min[2]);
+          mb^.bS_vertical[0, 3] := outer_edge_bS(mb, other_mb,10, 15, bS_min[3]);
       end;
   end;
 
   //horizontal edges - 'top' macroblock edge
   if mb^.y > 0 then begin
-      mbb := mb^.mbb;
-      if is_intra(mbb^.mbtype) then begin  //edge shared with intra block
+      other_mb := mb^.mbb;
+      if is_intra(other_mb^.mbtype) then begin  //edge shared with intra block
           mb^.bS_horizontal[0] := intra_bS[0];
-      end else begin
-          bS_min := mb_bS(mb, mbb);
-          mb^.bS_horizontal[0, 0] := outer_edge_bS(mb, mbb, 0, 10, bS_min);
-          mb^.bS_horizontal[0, 1] := outer_edge_bS(mb, mbb, 1, 11, bS_min);
-          mb^.bS_horizontal[0, 2] := outer_edge_bS(mb, mbb, 4, 14, bS_min);
-          mb^.bS_horizontal[0, 3] := outer_edge_bS(mb, mbb, 5, 15, bS_min);
+      end
+      else begin
+          bS_min_overall := 0;
+          if (mb^.ref <> other_mb^.ref) then
+              bS_min_overall := 1 * SHUFFLE4X
+          else if mbtypes_with_single_mv(mb, other_mb) then
+              bS_min_overall := bS_by_mvdiff(mb^.mv, other_mb^.mv) * SHUFFLE4X
+          else begin
+              //eval mvdiff per block - only handles MB_P_16x8 for now
+              bS_min_overall := bS_by_mvdiff(mb^.mv, other_mb^.mv1) * SHUFFLE4X;
+          end;
+          mb^.bS_horizontal[0, 0] := outer_edge_bS(mb, other_mb, 0, 10, bS_min[0]);
+          mb^.bS_horizontal[0, 1] := outer_edge_bS(mb, other_mb, 1, 11, bS_min[1]);
+          mb^.bS_horizontal[0, 2] := outer_edge_bS(mb, other_mb, 4, 14, bS_min[2]);
+          mb^.bS_horizontal[0, 3] := outer_edge_bS(mb, other_mb, 5, 15, bS_min[3]);
       end;
   end;
 

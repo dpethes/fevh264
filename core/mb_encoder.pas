@@ -219,10 +219,16 @@ begin
           decode_mb_intra_i16(mb, intrapred);
           stats.pred16[mb.i16_pred_mode] += 1;
       end;
-      MB_P_16x16, MB_P_16x8:
+      MB_P_16x16: begin
           decode_mb_inter(mb);
-      MB_P_SKIP:
+          mb.mv1 := mb.mv;
+      end;
+      MB_P_SKIP: begin
           decode_mb_inter_pskip(mb);
+          mb.mv1 := mb.mv;
+      end;
+      MB_P_16x8:
+          decode_mb_inter(mb);
       MB_I_PCM:
           decode_mb_pcm(mb);
   end;
