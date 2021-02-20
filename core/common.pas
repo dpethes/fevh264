@@ -77,6 +77,8 @@ const
 
   MB_DCT_ARRAY_SIZE = 2 * 16 * 25;
 
+  CBP_LUMA_MASK = %1111;
+
 { ordering of 8x8 luma blocks
   1 | 2
   --+--

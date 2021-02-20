@@ -702,7 +702,7 @@ begin
   //luma
   if mb.mbtype = MB_I_16x16 then begin
       cavlc_encode(mb, mb.block[24], 0, RES_LUMA_DC, bs);
-      if (mb.cbp and %1111) > 0 then
+      if (mb.cbp and CBP_LUMA_MASK) > 0 then
           for i := 0 to 15 do
               cavlc_encode(mb, mb.block[i], i, RES_LUMA_AC, bs);
   end else
@@ -870,7 +870,7 @@ end;
 function mb_I_16x16_mbtype_num(const cbp, pred: integer): integer; inline;
 begin
   result := 1 + pred + (cbp shr 4) * 4;
-  if cbp and %1111 > 0 then
+  if cbp and CBP_LUMA_MASK > 0 then
       result += 12;
 end;
 
@@ -1011,7 +1011,7 @@ begin
 
   if mb.mbtype = MB_I_16x16 then begin
       result += cavlc_block_bits(mb, mb.block[24], 0, RES_LUMA_DC);
-      if (mb.cbp and %1111) > 0 then
+      if (mb.cbp and CBP_LUMA_MASK) > 0 then
           for i := 0 to 15 do
               result += cavlc_block_bits(mb, mb.block[i], i, RES_LUMA_AC);
   end else

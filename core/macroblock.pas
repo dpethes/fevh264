@@ -341,7 +341,7 @@ begin
   if overall_coefs = 0 then
       mb.cbp := 0
   else
-      mb.cbp := %1111;
+      mb.cbp := CBP_LUMA_MASK;
 end;
 
 
@@ -465,7 +465,7 @@ begin
       end;
   end;
 
-  mb.cbp := mb.cbp and not %1111;  //recalc luma cpb only, some block might get zero-ed
+  mb.cbp := mb.cbp and not CBP_LUMA_MASK;  //recalc luma cpb only, some block might get zero-ed
   for i := 0 to 3 do
       if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
 end;

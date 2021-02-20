@@ -73,21 +73,24 @@ mixedModeEdgeFlag = 0 (prog)
 }
 procedure CalculateBStrength (const mb: macroblock_p);
 
-  //test p/q non-zero coeffs
+  //filtering strength between blocks of the same macroblock
   function inner_edge_bS(const a: macroblock_p; na, nb: integer): integer; inline;
   begin
-    result := 0;
-    if a^.nz_coef_cnt[na] + a^.nz_coef_cnt[nb] > 0 then result := 2;
+    //a^.nz_coef_cnt[na] + a^.nz_coef_cnt[nb] > 0  ?  2 : 0
+    result := (((a^.nz_coef_cnt[na] + a^.nz_coef_cnt[nb]) * $ffff) >> 8) and 2;
   end;
 
-  //strength between blocks from two MBs (outer edge)
-  function mb_edge_bS(const a, b: macroblock_p; na, nb: integer; bS_min: integer): integer; inline;
+  //filtering strength between blocks of two different macroblocks
+  function outer_edge_bS(const a, b: macroblock_p; na, nb: integer; bS_min: integer): integer; inline;
+  const
+    CLIP_TABLE: array[0..3] of byte = (0, 1, 2, 2);
   begin
-    result := bS_min;
-    if a^.nz_coef_cnt[na] + b^.nz_coef_cnt[nb] > 0 then result := 2;
+    //a^.nz_coef_cnt[na] + b^.nz_coef_cnt[nb] > 0  ?  2 : (0..1)
+    result := CLIP_TABLE[((((a^.nz_coef_cnt[na] + b^.nz_coef_cnt[nb]) * $ffff) >> 8) and 2) + bS_min];
   end;
 
-  //strength between two MBs, affected by different ref, mv delta >= 4, diff. partitions
+  //minimum filtering strength between two MBs, affected by different ref, mv delta >= 4, diff. partitions
+  //TODO revise for 16x8
   function mb_bS(const a, b: macroblock_p): integer; inline;
   begin
     result := 0;
@@ -106,7 +109,7 @@ const
   intra_bS: TBSarray = ( (4,4,4,4), (3,3,3,3), (3,3,3,3), (3,3,3,3) );
 
 var
-  i, j: integer;
+  i: integer;
   mba, mbb: macroblock_p;
   bS_min: integer;
 
@@ -118,41 +121,45 @@ begin
       exit;
   end;
 
-  //internal edges: strength depends on luma only, but additional test for rare cases where there's only chroma hurts perf
-  if (mb^.cbp <> 0) then begin
-      for i := 1 to 3 do   //vert edge index
-          for j := 0 to 3 do
-              mb^.bS_vertical[i, j] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[i, j], BLOCK_XY_POS_TO_IDX[i-1, j]);
-      for i := 1 to 3 do   //horiz edge index
-          for j := 0 to 3 do
-              mb^.bS_horizontal[i, j] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[j, i], BLOCK_XY_POS_TO_IDX[j, i-1]);
-  end;
+  //internal edges - strength depends only on this mb's luma only
+  if (mb^.cbp and CBP_LUMA_MASK) > 0 then
+      for i := 1 to 3 do begin
+          mb^.bS_vertical  [i, 0] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[i, 0], BLOCK_XY_POS_TO_IDX[i-1, 0]);
+          mb^.bS_vertical  [i, 1] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[i, 1], BLOCK_XY_POS_TO_IDX[i-1, 1]);
+          mb^.bS_vertical  [i, 2] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[i, 2], BLOCK_XY_POS_TO_IDX[i-1, 2]);
+          mb^.bS_vertical  [i, 3] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[i, 3], BLOCK_XY_POS_TO_IDX[i-1, 3]);
 
-  //vertical edges - left edge
+          mb^.bS_horizontal[i, 0] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[0, i], BLOCK_XY_POS_TO_IDX[0, i-1]);
+          mb^.bS_horizontal[i, 1] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[1, i], BLOCK_XY_POS_TO_IDX[1, i-1]);
+          mb^.bS_horizontal[i, 2] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[2, i], BLOCK_XY_POS_TO_IDX[2, i-1]);
+          mb^.bS_horizontal[i, 3] := inner_edge_bS(mb, BLOCK_XY_POS_TO_IDX[3, i], BLOCK_XY_POS_TO_IDX[3, i-1]);
+      end;
+
+  //vertical edges - 'left' macroblock edge
   if mb^.x > 0 then begin
       mba := mb^.mba;
       if is_intra(mba^.mbtype) then begin  //edge shared with intra block
           mb^.bS_vertical[0] := intra_bS[0];
       end else begin
           bS_min := mb_bS(mb, mba);
-          mb^.bS_vertical[0, 0] := mb_edge_bS(mb, mba, 0,  5, bS_min);
-          mb^.bS_vertical[0, 1] := mb_edge_bS(mb, mba, 2,  7, bS_min);
-          mb^.bS_vertical[0, 2] := mb_edge_bS(mb, mba, 8, 13, bS_min);
-          mb^.bS_vertical[0, 3] := mb_edge_bS(mb, mba,10, 15, bS_min);
+          mb^.bS_vertical[0, 0] := outer_edge_bS(mb, mba, 0,  5, bS_min);
+          mb^.bS_vertical[0, 1] := outer_edge_bS(mb, mba, 2,  7, bS_min);
+          mb^.bS_vertical[0, 2] := outer_edge_bS(mb, mba, 8, 13, bS_min);
+          mb^.bS_vertical[0, 3] := outer_edge_bS(mb, mba,10, 15, bS_min);
       end;
   end;
 
-  //horizontal edges - top edge
+  //horizontal edges - 'top' macroblock edge
   if mb^.y > 0 then begin
       mbb := mb^.mbb;
       if is_intra(mbb^.mbtype) then begin  //edge shared with intra block
           mb^.bS_horizontal[0] := intra_bS[0];
       end else begin
           bS_min := mb_bS(mb, mbb);
-          mb^.bS_horizontal[0, 0] := mb_edge_bS(mb, mbb, 0, 10, bS_min);
-          mb^.bS_horizontal[0, 1] := mb_edge_bS(mb, mbb, 1, 11, bS_min);
-          mb^.bS_horizontal[0, 2] := mb_edge_bS(mb, mbb, 4, 14, bS_min);
-          mb^.bS_horizontal[0, 3] := mb_edge_bS(mb, mbb, 5, 15, bS_min);
+          mb^.bS_horizontal[0, 0] := outer_edge_bS(mb, mbb, 0, 10, bS_min);
+          mb^.bS_horizontal[0, 1] := outer_edge_bS(mb, mbb, 1, 11, bS_min);
+          mb^.bS_horizontal[0, 2] := outer_edge_bS(mb, mbb, 4, 14, bS_min);
+          mb^.bS_horizontal[0, 3] := outer_edge_bS(mb, mbb, 5, 15, bS_min);
       end;
   end;
 
