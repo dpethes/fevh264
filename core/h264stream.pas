@@ -692,33 +692,49 @@ end;
 procedure TH264Stream.write_mb_residual(var mb: macroblock_t);
 var
   bits, i: integer;
+  ctx: TCavlcEncodeContext;
+  cbp_luma: integer;
 begin
   write_se_code(bs, mb.qp - last_mb_qp);  //mb_qp_delta
   last_mb_qp := mb.qp;
   bits := bs.BitSize;
 
   //luma
+  ctx.nz_coef_cnt := mb.nz_coef_cnt;
   if mb.mbtype = MB_I_16x16 then begin
-      cavlc_encode(bs, mb, mb.block[24], 0, RES_LUMA_DC);
-      if (mb.cbp and CBP_LUMA_MASK) > 0 then
-          for i := 0 to 15 do
-              cavlc_encode(bs, mb, mb.block[i], i, RES_LUMA_AC);
-  end else
-      for i := 0 to 15 do
-          if (mb.cbp and (1 shl (i div 4))) > 0 then
-              cavlc_encode(bs, mb, mb.block[i], i, RES_LUMA);
+      ctx.residual_type := RES_LUMA_DC;
+      cavlc_encode(bs, ctx, mb.block[24], 0);
+      cbp_luma := 0;
+      if (mb.cbp and CBP_LUMA_MASK) > 0 then begin
+          ctx.residual_type := RES_LUMA_AC;
+          cbp_luma := %1111;
+      end;
+  end else begin
+      ctx.residual_type := RES_LUMA;
+      cbp_luma := mb.cbp;
+  end;
+  for i := 0 to 15 do begin
+      if (cbp_luma and (1 shl (i shr 2))) > 0 then
+          cavlc_encode(bs, ctx, mb.block[i], i);
+  end;
 
   //chroma
   if mb.cbp shr 4 > 0 then begin
       //dc
+      ctx.residual_type := RES_DC;  //doesn't use nzcounts
       for i := 0 to 1 do
-          cavlc_encode(bs, mb, mb.block[25 + i], i, RES_DC);
+          cavlc_encode(bs, ctx, mb.block[25 + i], i);
       //ac
       if mb.cbp shr 5 > 0 then begin
+          ctx.residual_type := RES_AC_U;
+          ctx.nz_coef_cnt := mb.nz_coef_cnt_chroma_ac[0];
           for i := 0 to 3 do
-              cavlc_encode(bs, mb, mb.block[16 + i], i, RES_AC_U);
+              cavlc_encode(bs, ctx, mb.block[16 + i], i);
+
+          ctx.residual_type := RES_AC_V;
+          ctx.nz_coef_cnt := mb.nz_coef_cnt_chroma_ac[1];
           for i := 0 to 3 do
-              cavlc_encode(bs, mb, mb.block[16 + 4 + i], i, RES_AC_V);
+              cavlc_encode(bs, ctx, mb.block[20 + i], i);
       end;
   end;
 

@@ -28,15 +28,20 @@ uses
   common, bitstream, h264tables;
 
 type
-  residual_type_t = (RES_LUMA := 0, RES_LUMA_DC, RES_LUMA_AC, RES_DC, RES_AC_U, RES_AC_V);
+  TResidualType = (RES_LUMA := 0, RES_LUMA_DC, RES_LUMA_AC, RES_DC, RES_AC_U, RES_AC_V);
+
+  TCavlcEncodeContext = record
+      nz_coef_cnt: pbyte;
+      residual_type: TResidualType;
+  end;
 
 procedure vlc_init();
 procedure vlc_done();
 
 procedure cavlc_encode
-  (var bs: TBitstreamWriter; const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t);
+  (var bs: TBitstreamWriter; const ctx: TCavlcEncodeContext; const blok: block_t; const blk_idx: integer);
 function cavlc_block_bits
-  (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t): integer;
+  (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: TResidualType): integer;
 function cavlc_block_bits_DC (const blok: block_t): integer;
 procedure cavlc_analyse_block (var block: block_t; dct_coefs: PInt16; const ncoef: integer);
 procedure cavlc_analyse_block_2x2(var block: block_t; dct_coefs: PInt16);
@@ -181,7 +186,7 @@ end;
 
 
 //get table index according to nz counts of surrounding blocks
-function predict_nz_count_to_tab(const nzc: array of byte; const i: byte; const chroma: boolean = false): byte;
+function predict_nz_count_to_tab(const nzc: PByte; const i: byte; const chroma: boolean = false): byte;
 const
   { values:
     0..15  - current mb index
@@ -280,8 +285,8 @@ end;
 (*******************************************************************************
 cavlc_encode
 *)
-procedure cavlc_encode(var bs: TBitstreamWriter; const mb: macroblock_t;
-  const blok: block_t; const blk_idx: byte; const res: residual_type_t);
+procedure cavlc_encode
+  (var bs: TBitstreamWriter; const ctx: TCavlcEncodeContext; const blok: block_t; const blk_idx: integer);
 var
   i: integer;
   coef: integer;
@@ -292,6 +297,7 @@ var
   tab: byte;
   suffix_length: byte;
   vlc: vlc_bits_len;
+  is_chroma_ac: boolean;
 
 
 begin
@@ -299,16 +305,10 @@ begin
   t1 := blok.t1;
 
   //coef_token
-  if res <> RES_DC then begin
-      case res of
-          RES_AC_U:
-              tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[0], blk_idx, true);
-          RES_AC_V:
-              tab := predict_nz_count_to_tab(mb.nz_coef_cnt_chroma_ac[1], blk_idx, true);
-          //RES_LUMA, RES_LUMA_AC, RES_LUMA_DC:
-          else
-              tab := predict_nz_count_to_tab(mb.nz_coef_cnt, blk_idx);
-      end;
+  if ctx.residual_type <> RES_DC then begin
+      is_chroma_ac := ctx.residual_type in [RES_AC_U, RES_AC_V];
+      tab := predict_nz_count_to_tab(ctx.nz_coef_cnt, blk_idx, is_chroma_ac);
+
       bs.Write(tab_coef_num[tab, nz, t1][0], tab_coef_num[tab, nz, t1][1])
   end else
       bs.Write(tab_coef_num_chroma_dc[nz, t1][0], tab_coef_num_chroma_dc[nz, t1][1]);
@@ -345,7 +345,7 @@ begin
   //total number of zeros in runs
   total_zeros := blok.ncoef - nz - blok.t0;
   if nz < blok.ncoef then begin
-      if res <> RES_DC then begin
+      if ctx.residual_type <> RES_DC then begin
           if nz < 8 then
               vlc := tab_total_zeros0[nz, total_zeros]
           else
@@ -411,7 +411,7 @@ begin
 end;
 
 
-function cavlc_block_bits(const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t): integer;
+function cavlc_block_bits(const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: TResidualType): integer;
 var
   i: integer;
   coef: integer;
