@@ -34,7 +34,7 @@ procedure vlc_init();
 procedure vlc_done();
 
 procedure cavlc_encode
-  (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t; var bs: TBitstreamWriter);
+  (var bs: TBitstreamWriter; const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t);
 function cavlc_block_bits
   (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t): integer;
 function cavlc_block_bits_DC (const blok: block_t): integer;
@@ -280,8 +280,8 @@ end;
 (*******************************************************************************
 cavlc_encode
 *)
-procedure cavlc_encode
-  (const mb: macroblock_t; const blok: block_t; const blk_idx: byte; const res: residual_type_t; var bs: TBitstreamWriter);
+procedure cavlc_encode(var bs: TBitstreamWriter; const mb: macroblock_t;
+  const blok: block_t; const blk_idx: byte; const res: residual_type_t);
 var
   i: integer;
   coef: integer;
@@ -498,7 +498,7 @@ var
   i: integer;
   coef: integer;
   nz, t1: integer;
-  suffix_length, run_before: byte;
+  suffix_length: byte;
 begin
   t1 := blok.t1;
   nz := blok.nlevel;

@@ -58,7 +58,7 @@ type
       procedure InsertRef(var f: frame_t);
       procedure SetRefs(var f: frame_t; const frame_num, nrefs: integer);
       procedure GetFree(var f: frame_t);
-      procedure debug;
+      //procedure debug;
       constructor Create(const ref_count, mb_w, mb_h: integer);
       destructor Free;
   end;
@@ -382,7 +382,7 @@ end;
 procedure frame_copy_decoded_to_image(var frame: frame_t; var img: TPlanarImage);
 var
   w, h, i, j: integer;
-  frame_stride, image_stride, edge_width, chroma_height: integer;
+  frame_stride, image_stride: integer;
   s, d: pbyte;
 begin
   w := img.Width;
@@ -471,8 +471,7 @@ begin
           f := @listL0[i];
           exit;
       end;
-  writeln('GetRef - ref not found! ', frame_num);
-  halt;
+  //writeln('GetRef - ref not found! ', frame_num);
 end;
 
 procedure TFrameManager.SetRefs(var f: frame_t; const frame_num, nrefs: integer);
@@ -488,14 +487,12 @@ end;
 
 procedure TFrameManager.GetFree(var f: frame_t);
 begin
-  if ifree = -1 then begin
-      writeln('GetFree - no free frame!');
-      halt;
-  end;
+  Assert(ifree <> -1, 'GetFree - no free frame');
   f := listL0[ifree];
   ifree := -1;
 end;
 
+{
 procedure TFrameManager.debug;
 var
   i: integer;
@@ -505,6 +502,7 @@ begin
       writeln(i:3, listL0[i].num:4);
   end;
 end;
+}
 
 constructor TFrameManager.Create(const ref_count, mb_w, mb_h: integer);
 var

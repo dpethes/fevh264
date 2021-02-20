@@ -243,13 +243,14 @@ begin
       dsp.pixel_save_8x8 (mb.pixels_dec_c[1], mb.pfdec_c[1], frame.stride_c);
   end;
 
-  if is_intra(mb.mbtype) then begin
-      stats.itex_bits += mb.residual_bits;
-      stats.pred_8x8_chroma[mb.chroma_pred_mode] += 1;
-  end else begin
-      stats.ptex_bits += mb.residual_bits;
-      stats.ref[mb.ref] += 1;
-  end;
+  with stats do
+      if is_intra(mb.mbtype) then begin
+          itex_bits += mb.residual_bits;
+          pred_8x8_chroma[mb.chroma_pred_mode] += 1;
+      end else begin
+          ptex_bits += mb.residual_bits;
+          ref[mb.ref] += 1;
+      end;
 end;
 
 { Write mb to bitstream, decode and write pixels to frame and store MB to frame's MB array.

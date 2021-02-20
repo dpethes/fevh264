@@ -24,7 +24,7 @@ unit parameters;
 interface
 
 uses
-  Classes, SysUtils, util;
+  SysUtils, util;
 
 const
   MIN_QP = 0;

@@ -308,7 +308,7 @@ profile: baseline
 
 procedure TH264Stream.WriteParamSetsToNAL(var nalstream: TNALStream);
 const
-  sei_uuid = '2011012520091007';
+  SEI_UUID = '2011012520091007';
   PROFILE_BASELINE = 66;
   PROFILE_MAIN = 77;
 var
@@ -424,19 +424,17 @@ begin
 
   //sei; payload_type = 5 (user_data_unregistered)
   if write_sei then begin
-      sei_text := 'fevh264 ' + sei_string;
+      sei_text := SEI_UUID + 'fevh264 ' + sei_string;
 
       b := TBitstreamWriter.Create(@rbsp);
       b.Write(5, 8);          //last_payload_type_byte
 
-      i := Length(sei_uuid) + Length(sei_text);
+      i := Length(sei_text);
       while i > 255 do begin
           b.Write(255, 8);    //ff_byte
           i -= 255;
       end;
       b.Write(i, 8);          //last_payload_size_byte
-      for i := 1 to Length(sei_uuid) do
-          b.Write(byte( sei_uuid[i] ), 8);
       for i := 1 to Length(sei_text) do
           b.Write(byte( sei_text[i] ), 8);
 
@@ -701,26 +699,26 @@ begin
 
   //luma
   if mb.mbtype = MB_I_16x16 then begin
-      cavlc_encode(mb, mb.block[24], 0, RES_LUMA_DC, bs);
+      cavlc_encode(bs, mb, mb.block[24], 0, RES_LUMA_DC);
       if (mb.cbp and CBP_LUMA_MASK) > 0 then
           for i := 0 to 15 do
-              cavlc_encode(mb, mb.block[i], i, RES_LUMA_AC, bs);
+              cavlc_encode(bs, mb, mb.block[i], i, RES_LUMA_AC);
   end else
       for i := 0 to 15 do
           if (mb.cbp and (1 shl (i div 4))) > 0 then
-              cavlc_encode(mb, mb.block[i], i, RES_LUMA, bs);
+              cavlc_encode(bs, mb, mb.block[i], i, RES_LUMA);
 
   //chroma
   if mb.cbp shr 4 > 0 then begin
       //dc
       for i := 0 to 1 do
-          cavlc_encode(mb, mb.block[25 + i], i, RES_DC, bs);
+          cavlc_encode(bs, mb, mb.block[25 + i], i, RES_DC);
       //ac
       if mb.cbp shr 5 > 0 then begin
           for i := 0 to 3 do
-              cavlc_encode(mb, mb.block[16 + i], i, RES_AC_U, bs);
+              cavlc_encode(bs, mb, mb.block[16 + i], i, RES_AC_U);
           for i := 0 to 3 do
-              cavlc_encode(mb, mb.block[16 + 4 + i], i, RES_AC_V, bs);
+              cavlc_encode(bs, mb, mb.block[16 + 4 + i], i, RES_AC_V);
       end;
   end;
 
@@ -731,11 +729,13 @@ constructor TH264Stream.Create(w, h, mbw, mbh: integer);
 const
   QP_DEFAULT = 26;
 begin
-  sps.width  := w;
-  sps.height := h;
-  sps.mb_width  := mbw;
-  sps.mb_height := mbh;
-  sps.pic_order_cnt_type := 0;
+  with sps do begin
+      width  := w;
+      height := h;
+      mb_width  := mbw;
+      mb_height := mbh;
+      pic_order_cnt_type := 0;
+  end;
   write_vui := true;
   write_sei := true;
   sei_string := '';

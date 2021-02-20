@@ -209,8 +209,6 @@ begin
 end;
 
 function satd_8x4_pas(pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
-var
-  i: integer;
 begin
   result := 0;
   result += satd_4x4_pas(pix1,      pix2,      stride);
