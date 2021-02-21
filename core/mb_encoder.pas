@@ -57,6 +57,7 @@ type
       function TryPostInterEncodeSkip(const score_inter: integer): boolean;
       procedure MakeSkip;
       function GetChromaMcSSD: integer;
+      function GetChromaPredictedSSD: integer;
 
     public
       me: TMotionEstimator;
@@ -398,6 +399,12 @@ begin
           + dsp.ssd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
 end;
 
+function TMacroblockEncoder.GetChromaPredictedSSD: integer;
+begin
+  result := dsp.ssd_8x8(mb.pixels_c[0], mb.pred_c[0], 16)
+          + dsp.ssd_8x8(mb.pixels_c[1], mb.pred_c[1], 16);
+end;
+
 constructor TMacroblockEncoder.Create;
 begin
   mb_alloc(mb);
@@ -504,10 +511,10 @@ var
   score_i4, score_intra, score_p: integer;
   bits_i4, bits_intra, bits_inter: integer;
   mode_lambda: integer;
-  score_p_chroma: integer;
-  can_switch_to_skip: boolean;
-
+  score_p_chroma,
+  score_intra_chroma_ssd: integer;
   score_psub, bits_inter_sub: integer;
+  can_switch_to_skip: boolean;
   sub_16x16: boolean;
   p16_cached: boolean;
 
@@ -588,8 +595,15 @@ begin
           EncodeCurrentType;
       end;
       //if there's no residual and p16 lost to i16 due to mv bitcost, pskip can still be an option
-      if (mb.mbtype <> MB_P_16x16) and (mb.cbp = 0) then begin
-          if (mb.score_skip < score_intra + bits_intra) then begin
+      if (mb.mbtype <> MB_P_16x16) and (mb.cbp = 0) and mb_can_use_pskip then begin
+          mode_lambda := LAMBDA_MBTYPE_PSKIP[mb.qp];
+          can_switch_to_skip := mb.score_skip <= score_intra + mode_lambda * bits_intra;
+          //compare chroma as well, in case the pskip chroma was bad
+          if can_switch_to_skip and chroma_coding then begin
+              score_intra_chroma_ssd := GetChromaPredictedSSD;
+              can_switch_to_skip := mb.score_skip_uv_ssd <= score_intra_chroma_ssd + (mode_lambda * bits_intra div 4);
+          end;
+          if can_switch_to_skip then begin
               MakeSkip;
               me.Skipped(mb);
               exit;
