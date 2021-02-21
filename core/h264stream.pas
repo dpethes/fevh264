@@ -1097,7 +1097,7 @@ end;
 { TInterPredCost }
 
 const
-  lambda_mv: array[0..51] of byte = (
+  lambda_mv: array[0..QP_MAX] of byte = (
       0,0,0,0,0,0,0,1,1,1,
       1,1,1,1,1,1,1,2,2,2,
       2,3,3,3,4,4,5,5,6,7,

@@ -406,7 +406,7 @@ const
 { for qp in range(15,52):
     lx = 0.85 * pow(2, (qp-12) / 3.2)
 }
-  LAMBDA_ME: array[0..51] of uint16 = (
+  LAMBDA_ME: array[0..QP_MAX] of uint16 = (
     1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
     1, 1, 1, 1, 1, 2, 2, 3, 3, 4,
     5, 6, 7, 9, 11, 14, 18, 22, 27, 34, 42,

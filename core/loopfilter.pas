@@ -39,13 +39,13 @@ implementation
 
 const
 //Table 8-14 – Derivation of indexA and indexB from offset dependent threshold variables α and β
-TAB_ALPHA: array[0..51] of byte = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,5,6,7,8,9,10,12,13,
+TAB_ALPHA: array[0..QP_MAX] of byte = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4,4,5,6,7,8,9,10,12,13,
            15,17,20,22,25,28,32,36,40,45,50,56,63,71,80,90,101,113,127,144,162,182,203,226,255,255);
-TAB_BETA: array[0..51] of byte = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,3,3,3,3,4,4,4,
+TAB_BETA: array[0..QP_MAX] of byte = (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,2,2,2,3,3,3,3,4,4,4,
           6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13,14,14,15,15,16,16,17,17,18,18);
 
 //Table 8-15 – Value of filter clipping variable tC0 as a function of indexA and bS
-TAB_TC0: array[1..3, 0..51] of byte = (
+TAB_TC0: array[1..3, 0..QP_MAX] of byte = (
   (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,
    1,1,1,1,1,1,1,2,2,2,2,3,3,3,4,4,4,5,6,6,7,8,9,10,11,13),
   (0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,
@@ -448,8 +448,8 @@ var
   indexB, indexB_c: integer;
 begin
   qpa := mb^.qp;  //simplified for cqp with no I_PCM
-  indexA := clip3(0, qpa + offset_a, 51);
-  indexB := clip3(0, qpa + offset_b, 51);
+  indexA := clip3(0, qpa + offset_a, QP_MAX);
+  indexB := clip3(0, qpa + offset_b, QP_MAX);
   alpha := TAB_ALPHA[indexA];
   beta  := TAB_BETA [indexB];
 
@@ -459,8 +459,8 @@ begin
       beta_c  := beta;
   end else begin
       qpc := mb^.qpc;
-      indexA_c := clip3(0, qpc + offset_a, 51);
-      indexB_c := clip3(0, qpc + offset_b, 51);
+      indexA_c := clip3(0, qpc + offset_a, QP_MAX);
+      indexB_c := clip3(0, qpc + offset_b, QP_MAX);
       alpha_c := TAB_ALPHA[indexA_c];
       beta_c  := TAB_BETA [indexB_c];
   end;

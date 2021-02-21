@@ -486,7 +486,7 @@ end;
 
 procedure TMBEncoderRDoptAnalyse.EncodeInter;
 const
-  LAMBDA_MBTYPE: array[0..51] of byte = (  //todo tune lambdas
+  LAMBDA_MBTYPE: array[0..QP_MAX] of byte = (
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
      4,  4,  4,  4,  4,  4,  4,  4,  4,  4,
     16, 16, 16, 16, 16, 16, 16, 16, 16, 16,
@@ -495,7 +495,7 @@ const
     32, 32
   );
   //todo merge both tables; lambda+4 gains results closer to the old lambda at qp18-24+
-  LAMBDA_MBTYPE_PSKIP: array[0..51] of byte = (
+  LAMBDA_MBTYPE_PSKIP: array[0..QP_MAX] of byte = (
      1, 1, 1, 1, 1, 1, 1, 1, 1, 1,  1, 1, 1, 1, 1, 1, 2, 2, 2, 2,  // 0..19
      3, 3, 3, 4, 4, 4, 5, 6, 6, 7,  8, 9,10,11,13,14,16,18,20,23,  //20..39
     25,29,32,36,40,45,51,57,64,72, 81,91                           //40..51
