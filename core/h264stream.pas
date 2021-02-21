@@ -311,6 +311,7 @@ const
   SEI_UUID = '2011012520091007';
   PROFILE_BASELINE = 66;
   PROFILE_MAIN = 77;
+  PROFILE_HIGH444 = 144;
 var
   b: TBitstreamWriter;
   rbsp: array[0..255] of byte;
@@ -332,12 +333,17 @@ begin
 
   b.Write(profile, 8);        //profile_idc u(8) (annex A)
   b.Write(1);                 //constraint_set0_flag u(1)
-  b.Write(0);                 //constraint_set1_flag u(1)
-  b.Write(0);                 //constraint_set2_flag u(1)
-  b.Write(0, 5);              //reserved_zero_5bits /* equal to 0 */ 0 u(5)
+  b.Write(0, 1+1+5);          //constraint_set1_flag, constraint_set2_flag, constraint_set3_flag + zero_4bits / reserved_zero_5bits
   b.Write(level, 8);          //level_idc 0 u(8)
 
   write_ue_code(b, 0);        //seq_parameter_set_id 0 ue(v)
+  if profile = PROFILE_HIGH444 then begin
+      write_ue_code(b, 1);    //chroma_format_idc  ue(v)  1=(4:2:0)
+      write_ue_code(b, 0);    //bit_depth_luma_minus8  ue(v)
+      write_ue_code(b, 0);    //bit_depth_chroma_minus8  ue(v)
+      b.Write(0);             //qpprime_y_zero_transform_bypass_flag  u(1)  1=lossless if qp=0
+      b.Write(0);             //seq_scaling_matrix_present_flag
+  end;
   write_ue_code(b, sps.log2_max_frame_num_minus4);
                               //log2_max_frame_num_minus4 0 ue(v)
   write_ue_code(b, sps.pic_order_cnt_type);
