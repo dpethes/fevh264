@@ -498,7 +498,6 @@ end;
   
 
 //mb.mcomp isn't adjusted, as it gets properly written at end of ME
-//cur needs to be offset, but maybe do it differently?
 function TRegionSearch.SearchQPel_16x8_partition(var mb: macroblock_t; idx: integer;
   const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
 var
@@ -539,7 +538,7 @@ begin
       //offset to current sub-block
       MotionCompensation.CompensateQPelXY_16x8(fref, nx_partition, ny_partition, mb.mcomp);
       score := mbcmp(cur_partition, mb.mcomp, 16)
-               + InterCost.Bits(XYToMVec(nx - mbx, ny - mby));
+               + InterCost.Bits(nx - mbx, ny - mby);
 
       if chroma_me then begin
           MotionCompensation.CompensateChromaQpelXY_8x4(fref, nx_partition, ny_partition, mb.mcomp_c[0], mb.mcomp_c[1]);
@@ -582,18 +581,6 @@ begin
       iter += 1;
   until (mv = mv_prev_pass) or (iter >= range);
 
-  if min_score = MaxInt then begin    //return valid score if no searches were done (rare cases at the padded edge of a frame)
-      x += XY_qpel_offset_16x8[idx, 0];
-      y += XY_qpel_offset_16x8[idx, 1];
-      MotionCompensation.CompensateQPelXY_16x8(fref, x, y, mb.mcomp);
-      min_score := mbcmp(cur, mb.mcomp, 16) + InterCost.Bits(mv);
-      if chroma_me then begin
-          MotionCompensation.CompensateChromaQpelXY_8x4(fref, x, y, mb.mcomp_c[0], mb.mcomp_c[1]);
-          min_score += chroma_score();
-      end;
-  end;
-
-  _last_search_score := min_score;
   result := mv;
 end;
 

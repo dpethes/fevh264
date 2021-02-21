@@ -51,7 +51,7 @@ type
       procedure EstimateMultiRef(var mb: macroblock_t; var fenc: frame_t);
       procedure EstimateSingleRef(var mb: macroblock_t; var fenc: frame_t);
       procedure LoadMVPredictors(const mbx, mby: integer);
-      class function ClipMVRange(const mv: motionvec_t): motionvec_t; inline;
+      class function ClipMVRange(const mv: motionvec_t): motionvec_t;
       procedure SetNumReferences(AValue: integer);
       procedure SetSubMELevel(AValue: integer);
 
