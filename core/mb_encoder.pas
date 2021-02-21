@@ -52,6 +52,7 @@ type
       procedure CacheMvStore;
       procedure CacheMvLoad;
       procedure EncodeCurrentType;
+      procedure AnalyzeChromaIntra;
       procedure Decode;
       function TrySkip(const use_satd: boolean = true): boolean;
       function TryPostInterEncodeSkip(const score_inter: integer): boolean;
@@ -158,19 +159,15 @@ begin
 
       MB_I_4x4: begin
           encode_mb_intra_i4(mb, frame, intrapred);
-          if chroma_coding then begin
-              mb.chroma_pred_mode := intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1]);
+          if chroma_coding then
               encode_mb_chroma(mb, true);
-          end;
       end;
 
       MB_I_16x16: begin
           intrapred.Predict_16x16(mb.i16_pred_mode, mb.x, mb.y);
           encode_mb_intra_i16(mb);
-          if chroma_coding then begin
-              mb.chroma_pred_mode := intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1]);
+          if chroma_coding then
               encode_mb_chroma(mb, true);
-          end;
       end;
 
       MB_P_16x16: begin
@@ -201,6 +198,12 @@ begin
       mb.mv := ZERO_MV;
       mb.ref := -1;
   end;
+end;
+
+procedure TMacroblockEncoder.AnalyzeChromaIntra;
+begin
+  if chroma_coding then
+      mb.chroma_pred_mode := intrapred.Analyse_8x8_chroma(mb.pfdec_c[0], mb.pfdec_c[1]);
 end;
 
 //decode and store pixels to frame, update mb stats
@@ -564,6 +567,8 @@ begin
       //store P_16x16 for later
       CacheStore;
       p16_cached := true;
+      //chroma I8x8 first, it's used for both intra modes
+      AnalyzeChromaIntra;
       //test I16x16
       mb.mbtype := MB_I_16x16;
       EncodeCurrentType;
@@ -668,6 +673,7 @@ var
 begin
   mb.i16_pred_mode := intrapred.Analyse_16x16();
   mb.mbtype := MB_I_16x16;
+  AnalyzeChromaIntra;
   EncodeCurrentType;
   CacheStore;
   bits_i16 := MBCost;
@@ -735,6 +741,7 @@ begin
           else
               mb.mbtype := MB_I_4x4;
           mb.ref := 0;
+          AnalyzeChromaIntra;
       end;
 
       //encode mb
@@ -747,6 +754,7 @@ begin
 
   end else begin
       mb.mbtype := MB_I_4x4;
+      AnalyzeChromaIntra;
       EncodeCurrentType;
   end;
 
@@ -806,6 +814,7 @@ begin
           else
               mb.mbtype := MB_I_4x4;
           mb.ref := 0;
+          AnalyzeChromaIntra;
       end;
 
       //if there were no coeffs left, try skip
@@ -840,6 +849,7 @@ begin
           mb.mbtype := MB_I_16x16
       else
           mb.mbtype := MB_I_4x4;
+      AnalyzeChromaIntra;
       EncodeCurrentType;
   end;
 
@@ -870,6 +880,7 @@ begin
       end;
   end else begin
       mb.mbtype := MB_I_4x4;
+      AnalyzeChromaIntra;
       EncodeCurrentType;
   end;
 

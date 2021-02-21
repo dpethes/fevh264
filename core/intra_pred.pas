@@ -60,7 +60,7 @@ type
       procedure SetMB(const mb_: macroblock_p);
       procedure SetFrame(const frame: frame_p);
       procedure Predict_4x4   (mode: integer; ref: pbyte; mbx, mby, n: integer);
-      procedure Predict_8x8_cr(mode: integer; refU, refV: pbyte; mbx, mby: integer);
+      procedure Predict_8x8_chroma(mode: integer; refU, refV: pbyte; mbx, mby: integer);
       procedure Predict_16x16 (mode: integer; mbx, mby: integer);
 
       //Get best mode for i4x4 prediction. Also stores the predicted pixels
@@ -421,7 +421,7 @@ var
   has_top, has_left: boolean;
   i, k: integer;
   dc, shift: integer;
-  dcf: array[0..3] of byte;
+  dcf: array[0..3] of uint32;
 
 begin
   has_top  := mby > 0;
@@ -497,21 +497,19 @@ begin
       dc := 128;
   dcf[3] := dc;
 
-
   //write
+  dcf[0] *= $01010101;
+  dcf[1] *= $01010101;
+  dcf[2] *= $01010101;
+  dcf[3] *= $01010101;
   for i := 0 to 3 do begin
-      for k := 0 to 3 do
-          dst[k] := dcf[0];
-      for k := 4 to 7 do
-          dst[k] := dcf[1];
+      PUInt32(dst  )^ := dcf[0];
+      PUInt32(dst+4)^ := dcf[1];
       dst += 16;
   end;
-
   for i := 0 to 3 do begin
-      for k := 0 to 3 do
-          dst[k] := dcf[2];
-      for k := 4 to 7 do
-          dst[k] := dcf[3];
+      PUInt32(dst  )^ := dcf[2];
+      PUInt32(dst+4)^ := dcf[3];
       dst += 16;
   end;
 end;
@@ -648,8 +646,9 @@ begin
 end;
 
 
-procedure TIntraPredictor.Predict_8x8_cr(mode: integer; refU, refV: pbyte; mbx, mby: integer);
+procedure TIntraPredictor.Predict_8x8_chroma(mode: integer; refU, refV: pbyte; mbx, mby: integer);
 begin
+  Assert(mode <= 3, 'unknown chroma predict mode');
   case mode of
       INTRA_PRED_CHROMA_DC: begin
           predict_dc8   (refU, prediction_c[0], stride_c, mbx, mby);
@@ -666,15 +665,14 @@ begin
       INTRA_PRED_CHROMA_PLANE: begin
           predict_plane8(refU, prediction_c[0], stride_c);
           predict_plane8(refV, prediction_c[1], stride_c);
-      end
-  else
-      writeln('mb_intra_pred_chroma error: unknown predict mode');
+      end;
   end;
 end;
 
 
 procedure TIntraPredictor.Predict_16x16(mode: integer; mbx, mby: integer);
 begin
+  Assert(mode <= 3, 'unknown chroma predict mode');
   case mode of
       INTRA_PRED_DC:
           predict_dc16   (pixel_cache, prediction, mbx, mby);
@@ -684,8 +682,6 @@ begin
           predict_left16 (pixel_cache, prediction);
       INTRA_PRED_PLANE:
           predict_plane16(pixel_cache, prediction);
-  else
-      writeln('mb_intra_pred_16 error: unknown predict mode');
   end;
 end;
 
@@ -812,7 +808,8 @@ begin
   end;
 
   //restore best mode
-  Predict_8x8_cr(mode, refU, refV, mbx, mby);
+  if mode <> INTRA_PRED_CHROMA_PLANE then
+      Predict_8x8_chroma(mode, refU, refV, mbx, mby);
   result := mode;
 end;
 
