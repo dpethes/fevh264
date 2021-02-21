@@ -78,6 +78,7 @@ const
   MB_DCT_ARRAY_SIZE = 2 * 16 * 25;
 
   CBP_LUMA_MASK = %1111;
+  QP_MAX = 51;
 
 { ordering of 8x8 luma blocks
   1 | 2
@@ -175,8 +176,17 @@ type
       mbtype: int8;
       qp,
       qpc: byte;
-      chroma_qp_offset: int8;
+      cbp: int8;              //cpb bitmask: 0..3 luma, 4 chroma DC only, 5 chroma AC
 
+      //inter pred
+      fref: frame_p;          //reference frame selected for inter prediction
+      mvp,
+      mv_skip,
+      mv: motionvec_t;        //mvs: predicted, skip, coded
+      mvp1, mv1: motionvec_t; //partition mvp/mv for P16x8 mbPartIdx=1
+      ref: int8;              //reference frame L0 index
+
+      //intra pred
       i4_pred_mode: array[0..23] of UInt8;
                               { intra prediction mode for luma 4x4 blocks
                                 0..15  - blocks from current mb
@@ -185,14 +195,6 @@ type
                               }
       i16_pred_mode: int8;    //intra 16x16 pred mode
       chroma_pred_mode: int8; //chroma intra pred mode
-
-      mvp,
-      mv_skip,
-      mv: motionvec_t;        //mvs: predicted, skip, coded
-      mvp1, mv1: motionvec_t; //partition mvp/mv for P16x8 mbPartIdx=1
-      ref: int8;              //reference frame L0 index
-      cbp: int8;              //cpb bitmask: 0..3 luma, 4 chroma DC only, 5 chroma AC
-      fref: frame_p;          //reference frame selected for inter prediction
 
       //luma
       pfenc,
@@ -212,23 +214,16 @@ type
       mcomp_c,
       pixels_dec_c: array[0..1] of PUInt8;
 
-      //motion estimation, analysis
-      score_skip,
-      score_skip_uv_ssd: integer;
-      residual_bits: int16;
-      bitcost: int16;                    //currently unused
-
       //coef arrays
       dct: array[0..24] of PInt16;      //0-15 - luma, 16-23 - chroma, 24 - luma DC
       chroma_dc: array[0..1, 0..3] of int16;
       block: array[0..26] of block_t;    //0-24 as in dct, 25/26 chroma_dc u/v
 
-      //cache for speeding up the prediction process
-      intra_pixel_cache: array[0..33] of byte;
-      {   0,17 - top left pixel
-         1..16 - pixels from top row
-        18..33 - pixels from left column
-      }
+      //motion estimation, analysis
+      score_skip,
+      score_skip_uv_ssd: integer;
+      residual_bits: int16;
+      bitcost: int16;                    //currently unused
 
       //non-zero coef count of surrounding blocks for I4x4/I16x16/chroma ac blocks; write-combined in mb_init
       nz_coef_cnt: array[0..23] of byte;
@@ -240,6 +235,13 @@ type
       //neighboring MBs, used for cavlc NZ counts, intra prediction, filtering strength
       mba, mbb: macroblock_p;
 
+      //cache for speeding up the prediction process
+      intra_pixel_cache: array[0..33] of byte;
+      {   0,17 - top left pixel
+         1..16 - pixels from top row
+        18..33 - pixels from left column
+      }
+
       //loopfilter: boundary filtering strength for vertically/horizontally adjacent blocks
       bS_vertical, bS_horizontal: TBSarray;
       bS_zero: boolean;                  //shortcut
@@ -250,28 +252,26 @@ type
       //info
       num: integer;                   //frame number
       qp: int8;                       //fixed quant parameter
+      chroma_qp_offset: int8;         //chroma qp adjust
       num_ref_frames: int8;           //L0 reference picture count
       ftype: int8;                    //slice type
-      idr: boolean;                   //IDR flag for I slices (unused)
+      mbw, mbh: integer;              //macroblock width, height
+      stride, stride_c: integer;      //luma stride, chroma stride
+
       mbs: macroblock_p;              //frame macroblocks
 
       //img data
-      mbw, mbh: integer;              //macroblock width, height
-      stride, stride_c: integer;      //luma stride, chroma stride
       plane: array[0..2] of pbyte;    //image planes
       luma_mc: array[0..3] of pbyte;  //luma planes for hpel interpolated samples (none, h, v, h+v)
       luma_mc_qpel: array[0..7] of pbyte;  //plane pointers for qpel mc
       plane_dec: array[0..2] of pbyte;//decoded image planes
-      frame_mem_offset,               //padding to image offset in bytes
-      frame_mem_offset_cr: integer;
-      blk_offset: array[0..15] of integer;        //4x4 block offsets
 
       refs: array[0..15] of frame_p;  //L0 reference list
       lowres: frame_p;                //low resolution frame for fast motion estimation
 
-      //mb-adaptive quant data
-      aq_table: pbyte;                //qp table
-      qp_avg: single;                 //average quant
+      frame_mem_offset,               //padding to image offset in bytes
+      frame_mem_offset_cr: integer;
+      blk_offset: array[0..15] of word;  //4x4 block offsets in pixels, 16bits is enough for 4k width
 
       //bitstream buffer
       bs_buf: pbyte;
@@ -281,11 +281,17 @@ type
       estimated_framebits: integer;
       qp_adj: integer;
 
+      //mb-adaptive quant data
+      aq_table: pbyte;                //qp table
+      qp_avg: single;                 //average quant
+
       //rarely used data
       mem: array[0..5] of pbyte;      //allocated memory
       filter_hv_temp: psmallint;      //temp storage for fir filter
       w, h: integer;                  //width, height in 16-pixel granularity
       pw, ph: int16;                  //padded w&h
+
+      idr: boolean;                   //IDR flag for I slices (unused)
   end;
 
 function is_intra(const m: integer): boolean; inline;

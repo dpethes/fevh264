@@ -73,7 +73,8 @@ type
       mb_width,
       mb_height,
       mb_count: integer;
-      filter_ab_offset: integer;
+      filter_ab_offset: int8;
+      chroma_qp_offset: int8;
 
       //encoder configuration
       _param: TEncodingParameters;
@@ -180,6 +181,7 @@ begin
       rc.Set2pass(param.Bitrate, param.FrameCount, param.FrameRate, param.stats_1pass_filename)
   else
       rc.SetConstQP(param.QParam);
+  chroma_qp_offset := param.ChromaQParamOffset;
 
   //mb encoder
   case param.AnalysisLevel of
@@ -193,7 +195,6 @@ begin
   mb_enc.num_ref_frames := num_ref_frames;
   mb_enc.me := me;
   mb_enc.h264s := h264s;
-  mb_enc.ChromaQPOffset := param.ChromaQParamOffset;
   mb_enc.chroma_coding := not param.IgnoreChroma;
   mb_enc.LoopFilter := param.LoopFilterEnabled;
 
@@ -254,9 +255,11 @@ end;
 procedure TFevh264Encoder.EncodeFrame(const img: TPlanarImage; buffer: pbyte; out stream_size: longword);
 begin
   frames.GetFree(fenc);
+  fenc.num := frame_num;
+  fenc.chroma_qp_offset := chroma_qp_offset;
+
   frame_copy_image_with_padding(fenc, img);
   frame_lowres_from_input(fenc);
-  fenc.num := frame_num;
 
   //set frame params
   if (frame_num = 0) or (frame_num - last_keyframe_num >= key_interval) then

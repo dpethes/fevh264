@@ -53,7 +53,6 @@ type
       procedure CacheMvLoad;
       procedure EncodeCurrentType;
       procedure Decode;
-      procedure SetChromaQPOffset(const AValue: shortint);
       function TrySkip(const use_satd: boolean = true): boolean;
       function TryPostInterEncodeSkip(const score_inter: integer): boolean;
       procedure MakeSkip;
@@ -65,7 +64,6 @@ type
       chroma_coding: boolean;  //todo private
       num_ref_frames: integer;
       LoopFilter: boolean;
-      property ChromaQPOffset: shortint write SetChromaQPOffset;
       property EnableQuantRefine: boolean write enable_quant_refine;
 
       constructor Create; virtual;
@@ -403,7 +401,6 @@ end;
 constructor TMacroblockEncoder.Create;
 begin
   mb_alloc(mb);
-  mb.chroma_qp_offset := 0;
   intrapred := TIntraPredictor.Create;
   intrapred.SetMB(@mb);
   enable_I_PCM := false;
@@ -423,11 +420,6 @@ begin
   stats := f.stats;
   mb_init_frame_invariant(mb, frame);
   enable_I_PCM := frame.qp < 10;
-end;
-
-procedure TMacroblockEncoder.SetChromaQPOffset(const AValue: shortint);
-begin
-  mb.chroma_qp_offset := AValue;
 end;
 
 

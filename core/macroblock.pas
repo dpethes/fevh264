@@ -119,13 +119,15 @@ initialize mb structure:
  macroblock_t layout is modified
 *)
 
-procedure mb_init_qp_struct(var mb: macroblock_t);
+procedure mb_init_qp_struct(var mb: macroblock_t; const frame: frame_t);
+var
+  chroma_qp: integer;
 begin
-  if mb.qp < 30 then
-      mb.qpc := mb.qp
-  else
-      mb.qpc := tab_qp_chroma[mb.qp];
-  mb.qpc += mb.chroma_qp_offset;
+  chroma_qp := mb.qp + frame.chroma_qp_offset;
+  chroma_qp := clip3(0, chroma_qp, QP_MAX);
+  if chroma_qp >= 30 then
+      chroma_qp := tab_qp_chroma[chroma_qp];
+  mb.qpc := chroma_qp;
   transqt_init_for_qp(mb.quant_ctx_qp,  mb.qp);
   transqt_init_for_qp(mb.quant_ctx_qpc, mb.qpc);
 end;
@@ -133,7 +135,7 @@ end;
 procedure mb_init_frame_invariant(var mb: macroblock_t; var frame: frame_t);
 begin
   mb.qp := frame.qp;
-  mb_init_qp_struct(mb);
+  mb_init_qp_struct(mb, frame);
 end;
 
 procedure mb_init(var mb: macroblock_t; var frame: frame_t; const adaptive_quant: boolean = false);
@@ -211,7 +213,7 @@ begin
   mb.qp := frame.qp;
   if adaptive_quant then begin
       mb.qp := frame.aq_table[mb.y * frame.mbw + mb.x];
-      mb_init_qp_struct(mb);
+      mb_init_qp_struct(mb, frame);
   end;
 
   { fill I16x16 prediction pixel cache
@@ -242,7 +244,7 @@ end;
 (*******************************************************************************
 intra coding
 *)
-const SAD_DECIMATE_TRESH: array[0..51] of word = (
+const SAD_DECIMATE_TRESH: array[0..QP_MAX] of word = (
     3,   3,   3,   3,   3,   3,   4,   4,   5,   5,
     6,   7,   8,   9,  10,  11,  13,  14,  16,  18,
    20,  22,  26,  28,  32,  36,  40,  44,  52,  56,

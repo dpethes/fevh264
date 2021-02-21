@@ -98,6 +98,7 @@ begin
   frame.mbs := fev_malloc( mb_width * mb_height * sizeof(macroblock_t) );
   frame.aq_table := fev_malloc( mb_width * mb_height );
   frame.qp := 0;
+  frame.chroma_qp_offset := 0;
   frame.qp_avg := 0;
   frame.num := 0;
 
@@ -265,7 +266,6 @@ procedure frame_setup_adapt_q(var frame: frame_t; pixbuffer: pbyte; const base_q
 const
   QP_RANGE = 10;
   QP_MIN = 15;
-  QP_MAX = 51;
   VAR_SHIFT = 14;
 
 var
