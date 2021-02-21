@@ -128,10 +128,10 @@ begin
   qbits := 15 + p.qp_div6;
   p.f_intra := (1 shl qbits) div 3;
   p.f_inter := (1 shl qbits) div 6;
-  p.f_dc    := 1 shl qbits;
+  //p.f_dc    := 1 shl qbits;
 
   p.qbits := qbits;
-  p.qbits_dc := qbits + 1;
+  //p.qbits_dc := qbits + 1;
 
   p.qp := qp;
 end;

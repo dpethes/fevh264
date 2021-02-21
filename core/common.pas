@@ -161,8 +161,8 @@ type
   TQuantCtx = record
       mult_factor,
       rescale_factor: pint16;
-      f_intra, f_inter, f_dc: integer;
-      qp_div6, qbits, qbits_dc: byte;
+      f_intra, f_inter: integer;
+      qp_div6, qbits: byte;
       qp: byte;  //just for correctness checks
   end;
 
