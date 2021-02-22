@@ -236,7 +236,7 @@ begin
   mv := mb.mv;
   SearchRegion.SearchQPelRDO(mb, mb.fref);
   if mv <> mb.mv then begin
-      ClipMVRange(mb.mv);
+      mb.mv := ClipMVRange(mb.mv);
       mv_field[mb.y * mb_width + mb.x] := mb.mv;
   end;
 
@@ -331,10 +331,8 @@ begin
   mv0 := SearchRegion.SearchQPel_16x8_partition(mb, 0, mb.fref, _subme > 2, _subme > 3);
   mv1 := SearchRegion.SearchQPel_16x8_partition(mb, 1, mb.fref, _subme > 2, _subme > 3);
 
-  ClipMVRange(mv0);
-  ClipMVRange(mv1);
-  mb.mv  := mv0;
-  mb.mv1 := mv1;
+  mb.mv  := ClipMVRange(mv0);
+  mb.mv1 := ClipMVRange(mv1);
   mv_field[mb.y * mb_width + mb.x] := mv1;
 
   MotionCompensation.Compensate_16x8(mb.fref, mb, 0);
