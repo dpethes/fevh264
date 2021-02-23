@@ -197,6 +197,7 @@ begin
   mb_enc.h264s := h264s;
   mb_enc.chroma_coding := not param.IgnoreChroma;
   mb_enc.LoopFilter := param.LoopFilterEnabled;
+  mb_enc.EnablePartitions := param.PartitionAnalysisLevel > 0;
 
   //lowres ME - fast fullpel luma search, only macroblock MV gets stored
   me_lowres := TMotionEstimator.Create(

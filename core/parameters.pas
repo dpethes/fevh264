@@ -52,6 +52,7 @@ type
                                  4 - qpel chroma SATD
                                  5 - qpel RD
                                }
+      ref: byte;               // reference frame count
       analyse: byte;           // mb type decision quality
                                { 0 - none
                                  1 - heuristics - SAD
@@ -59,7 +60,10 @@ type
                                  3 - rdo
                                  4 - rdo + quant refinement
                                }
-      ref: byte;               // reference frame count
+      partitions: byte;        // mb partitions to consider 
+                               { 0 - none
+                                 1 - P16x8
+                               }
       key_interval: word;      // maximum keyframe interval
       loopfilter: boolean;     // deblocking
       filter_thread: boolean;  // deblocking in separate thread
@@ -73,11 +77,12 @@ type
           bitrate: longword;   // desired bitrate in kbps
       end;
       procedure SetAnalysisLevel(const AValue: byte);
-      procedure SetChromaQParamOffset(const AValue: shortint);
+      procedure SetChromaQParamOffset(const AValue: int8);
       procedure SetFilterOffset(AValue: int8);
       procedure SetFilterThreadEnabled(AValue: boolean);
       procedure SetKeyFrameInterval(const AValue: word);
       procedure SetNumReferenceFrames(const AValue: byte);
+      procedure SetPartitions(AValue: byte);
       procedure SetQParam(const AValue: byte);
       procedure SetSubpixelMELevel(const AValue: byte);
       procedure ValidateQParams;
@@ -104,6 +109,7 @@ type
       property FilterOffsetDiv2: int8 read filter_offset_div2 write SetFilterOffset;
 
       property AnalysisLevel: byte read analyse write SetAnalysisLevel;
+      property PartitionAnalysisLevel: byte read partitions write SetPartitions;
       property SubpixelMELevel: byte read subme write SetSubpixelMELevel;
       property NumReferenceFrames: byte read ref write SetNumReferenceFrames;
       property AdaptiveQuant: boolean read aq write aq;
@@ -176,6 +182,11 @@ begin
   ValidateSubME;
 end;
 
+procedure TEncodingParameters.SetPartitions(AValue: byte);
+begin
+  partitions := clip3(0, AValue, 1);
+end;
+
 procedure TEncodingParameters.SetQParam(const AValue: byte);
 begin
   qp := clip3(MIN_QP, AValue, MAX_QP);
@@ -198,8 +209,9 @@ begin
   chroma_qp_offset := 0;
   key_interval := 300;
   subme := 3;
-  analyse := 2;
   ref := 1;
+  analyse := 2;
+  partitions := 1;
   rc.enabled := false;
   aq := false;
   loopfilter := false;

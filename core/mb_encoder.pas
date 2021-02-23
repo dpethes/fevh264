@@ -44,6 +44,7 @@ type
       end;
       enable_I_PCM: boolean;
       enable_quant_refine: boolean;
+      enable_partitions: boolean;
 
       procedure InitMB(mbx, mby: integer);
       procedure InitForInter;
@@ -67,6 +68,7 @@ type
       num_ref_frames: integer;
       LoopFilter: boolean;
       property EnableQuantRefine: boolean write enable_quant_refine;
+      property EnablePartitions: boolean write enable_partitions;
 
       constructor Create; virtual;
       destructor Free; virtual;
@@ -518,7 +520,6 @@ var
   score_intra_chroma_ssd: integer;
   score_psub, bits_inter_sub: integer;
   can_switch_to_skip: boolean;
-  sub_16x16: boolean;
   p16_cached: boolean;
 
 begin
@@ -622,8 +623,7 @@ begin
     so bias slightly against it if qpel rdo is enabled. Motion compensated pixels
     get overwritten in MB_P_16x8 ME, so restore them if P_16x8 is not chosen
   }
-  sub_16x16 := true;
-  if (mb.mbtype = MB_P_16x16) and sub_16x16 then begin
+  if enable_partitions and (mb.mbtype = MB_P_16x16) then begin
       CacheMvStore;
       if not p16_cached then
           CacheStore;
@@ -785,7 +785,6 @@ const
 
 var
   score_i, score_p, score_psub: integer;
-  sub_16x16: boolean;
 
 begin
   InitMB(mbx, mby);
@@ -824,8 +823,7 @@ begin
           MakeSkip;
       end;
 
-      sub_16x16 := true;
-      if (mb.mbtype = MB_P_16x16) and sub_16x16 then begin
+      if enable_partitions and (mb.mbtype = MB_P_16x16) then begin
           CacheMvStore;
           mb.mbtype := MB_P_16x8;
           me.Estimate_16x8(mb);

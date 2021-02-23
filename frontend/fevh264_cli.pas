@@ -94,9 +94,10 @@ begin
       AddOption('k', atInt,    'keyint', 'maximum keyframe interval [300]');
       AddOption('m', atInt,    'subme',  'subpixel ME refinement level [3]'
                                          + ' (0=none; 1=hpel; 2=qpel; 3=qpel SATD; 4=qpel chroma SATD; 5=qpel RD)');
+      AddOption('r', atInt,    'ref',    'ME reference frame count [1]');
       AddOption('a', atInt,    'analyse','mb type decision quality [2]'
                                          + ' (0=worst; 4=best)');
-      AddOption('r', atInt,    'ref',    'reference frame count [1]');
+      AddOption('p', atInt,    'partitions',    'analyze macroblock partitions [1] (0=none, 1=P16x8)');
       AddOption('l', atNone,   'loopfilter',    'enable in-loop deblocking filter');
       AddOption('t', atNone,   'filterthread',  'run deblocking in separate thread');
       AddOption('x', atInt,    'offset-filter', 'alpha/beta offset for deblocking [0]'
@@ -125,6 +126,9 @@ begin
           param.AnalysisLevel    := StrToInt(options['a']);
       if options.IsSet('ref') then
           param.NumReferenceFrames := byte( StrToInt(options['r']) );
+      if options.IsSet('partitions') then
+          param.PartitionAnalysisLevel := byte( StrToInt(options['p']) );
+
       if options.IsSet('bitrate') then begin
           param.SetABRRateControl( StrToInt(options['B']) );
           param.stats_1pass_filename := input_filename + '.1pass.txt';
