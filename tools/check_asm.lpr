@@ -235,6 +235,23 @@ begin
       bench_results(4);
   end;
 
+  test('sad_16x8');
+  init_noasm;
+  res_noasm := sad_16x8(src_mbalign, src1, unaligned_stride);
+  init_sse2;
+  res_asm := sad_16x8(src_mbalign, src1, unaligned_stride);
+
+  if check_result(res_noasm, res_asm) then begin
+      //benchmark
+      for i := 0 to MBCMP_ITERS - 1 do begin
+          start_timer;
+          {$define FUNC:=sad_16x8(src_mbalign, src1, unaligned_stride)}
+          FUNC;FUNC;FUNC;FUNC;
+          stop_timer;
+      end;
+      bench_results(4);
+  end;
+
   test('sad_8x8');
   init_noasm;
   res_noasm := sad_8x8(src_mbalign, src1, unaligned_stride);
@@ -245,6 +262,22 @@ begin
       for i := 0 to MBCMP_ITERS - 1 do begin
           start_timer;
           {$define FUNC:=sad_8x8(src_mbalign, src1, unaligned_stride)}
+          FUNC;FUNC;FUNC;FUNC;
+          stop_timer;
+      end;
+      bench_results(4);
+  end;
+
+  test('sad_8x4');
+  init_noasm;
+  res_noasm := sad_8x4(src_mbalign, src1, unaligned_stride);
+  init_sse2;
+  res_asm := sad_8x4(src_mbalign, src1, unaligned_stride);
+
+  if check_result(res_noasm, res_asm) then begin
+      for i := 0 to MBCMP_ITERS - 1 do begin
+          start_timer;
+          {$define FUNC:=sad_8x4(src_mbalign, src1, unaligned_stride)}
           FUNC;FUNC;FUNC;FUNC;
           stop_timer;
       end;
@@ -277,6 +310,21 @@ begin
       for i := 0 to MBCMP_ITERS - 1 do begin
           start_timer;
           ssd_16x16(src_mbalign, src1, unaligned_stride);
+          stop_timer;
+      end;
+      bench_results();
+  end;
+
+  test('ssd_16x8');
+  init_noasm;
+  res_noasm := ssd_16x8(src_mbalign, src1, unaligned_stride);
+  init_sse2;
+  res_asm := ssd_16x8(src_mbalign, src1, unaligned_stride);
+
+  if check_result(res_noasm, res_asm) then begin
+      for i := 0 to MBCMP_ITERS - 1 do begin
+          start_timer;
+          ssd_16x8(src_mbalign, src1, unaligned_stride);
           stop_timer;
       end;
       bench_results();

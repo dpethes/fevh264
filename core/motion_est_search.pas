@@ -563,7 +563,7 @@ begin
   if satd then
       mbcmp := dsp.satd_16x8
   else
-      mbcmp := dsp.satd_16x8;  //todo SAD
+      mbcmp := dsp.sad_16x8;
   range  := ME_RANGES[mpQpel]*2;
 
   mv := mb.mv;

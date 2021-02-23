@@ -34,16 +34,22 @@ procedure pixel_init(const flags: TDsp_init_flags);
 
 var
   sad_16x16,
+  sad_16x8,
   sad_8x8,
+  sad_8x4,
   sad_4x4,
-  ssd_16x16,
-  ssd_8x8,
+
   satd_4x4,
   satd_8x4,
   satd_8x8,
   satd_16x8,
-  satd_16x16: mbcmp_func_t;
+  satd_16x16,
+
+  ssd_16x16,
+  ssd_16x8,
+  ssd_8x8: mbcmp_func_t;
   var_16x16: mbstat_func_t;
+
   pixel_load_16x16,
   pixel_loadu_16x16,
   pixel_loadu_16x8,
@@ -76,6 +82,19 @@ begin
   end;
 end;
 
+function sad_16x8_pas (pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
+var
+  x, y: integer;
+begin
+  result := 0;
+  for y := 0 to 7 do begin
+      for x := 0 to 15 do
+          result += abs(pix1[x] - pix2[x]);
+      pix1 += 16;
+      pix2 += stride;
+  end;
+end;
+
 
 function sad_8x8_pas (pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
 var
@@ -83,6 +102,19 @@ var
 begin
   result := 0;
   for y := 0 to 7 do begin
+      for x := 0 to 7 do
+          result += abs(pix1[x] - pix2[x]);
+      pix1 += 16;
+      pix2 += stride;
+  end;
+end;
+
+function sad_8x4_pas (pix1, pix2: pbyte; stride: integer): integer; {$ifdef CPUI386} cdecl; {$endif}
+var
+  x, y: integer;
+begin
+  result := 0;
+  for y := 0 to 3 do begin
       for x := 0 to 7 do
           result += abs(pix1[x] - pix2[x]);
       pix1 += 16;
@@ -122,6 +154,18 @@ begin
   end;
 end;
 
+function ssd_16x8_pas (pix1, pix2: pbyte; stride: integer): integer;{$ifdef CPUI386} cdecl; {$endif}
+var
+  x, y: integer;
+begin
+  result := 0;
+  for y := 0 to 7 do begin
+      for x := 0 to 15 do
+          result += (pix1[x] - pix2[x]) * (pix1[x] - pix2[x]);
+      pix1 += 16;
+      pix2 += stride;
+  end;
+end;
 
 function ssd_8x8_pas (pix1, pix2: pbyte; stride: integer): integer;{$ifdef CPUI386} cdecl; {$endif}
 var
@@ -463,11 +507,10 @@ function satd_4x4_mmx   (pix1, pix2: pbyte; stride: integer): integer; cdecl; ex
 
 {$ifdef CPUX86_64}
 function sad_16x16_sse2 (pix1, pix2: pbyte; stride: integer): integer; external name 'sad_16x16_sse2';
+function sad_16x8_sse2 (pix1, pix2: pbyte; stride: integer): integer; external name 'sad_16x8_sse2';
 function sad_8x8_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external name 'sad_8x8_mmx';
+function sad_8x4_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external name 'sad_8x4_mmx';
 function sad_4x4_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external name 'sad_4x4_mmx';
-
-function ssd_16x16_sse2(pix1, pix2: pbyte; stride: integer): integer;  external name 'ssd_16x16_sse2';
-function ssd_8x8_sse2  (pix1, pix2: pbyte; stride: integer): integer;  external name 'ssd_8x8_sse2';
 
 function satd_16x16_sse2 (pix1, pix2: pbyte; stride: integer): integer; external name 'satd_16x16_sse2';
 function satd_16x8_sse2 (pix1, pix2: pbyte; stride: integer): integer;  external name 'satd_16x8_sse2';
@@ -477,10 +520,15 @@ function satd_8x8_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external
 function satd_8x4_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external name 'satd_8x4_mmx';
 function satd_4x4_mmx   (pix1, pix2: pbyte; stride: integer): integer;  external name 'satd_4x4_mmx';
 
+function ssd_16x16_sse2(pix1, pix2: pbyte; stride: integer): integer;  external name 'ssd_16x16_sse2';
+function ssd_16x8_sse2 (pix1, pix2: pbyte; stride: integer): integer;  external name 'ssd_16x8_sse2';
+function ssd_8x8_sse2  (pix1, pix2: pbyte; stride: integer): integer;  external name 'ssd_8x8_sse2';
+
 function var_16x16_sse2(pix: pbyte): uint32; external name 'var_16x16_sse2';
 
-procedure pixel_loadu_16x16_sse2(dest, src: PUint8; stride: integer); external name 'pixel_loadu_16x16_sse2';
 procedure pixel_load_16x16_sse2 (dest, src: PUint8; stride: integer); external name 'pixel_load_16x16_sse2';
+procedure pixel_loadu_16x16_sse2(dest, src: PUint8; stride: integer); external name 'pixel_loadu_16x16_sse2';
+procedure pixel_loadu_16x8_sse2 (dest, src: PUint8; stride: integer); external name 'pixel_loadu_16x8_sse2';
 procedure pixel_load_8x8_sse2   (dest, src: PUint8; stride: integer); external name 'pixel_load_8x8_sse2';
 procedure pixel_save_16x16_sse2 (src, dest: PUint8; stride: integer); external name 'pixel_save_16x16_sse2';
 procedure pixel_save_8x8_sse2   (src, dest: PUint8; stride: integer); external name 'pixel_save_8x8_sse2';
@@ -488,18 +536,17 @@ procedure pixel_save_8x8_sse2   (src, dest: PUint8; stride: integer); external n
 procedure pixel_sub_4x4_mmx (pix1, pix2: pbyte; diff: PInt16); external name 'pixel_sub_4x4_mmx';
 procedure pixel_add_4x4_mmx (pix1, pix2: pbyte; diff: PInt16); external name 'pixel_add_4x4_mmx';
 procedure pixel_avg_16x16_sse2 (src1, src2, dest: PUint8; stride: integer); external name 'pixel_avg_16x16_sse2';
+procedure pixel_avg_16x8_sse2  (src1, src2, dest: PUint8; stride: integer); external name 'pixel_avg_16x8_sse2';
 procedure pixel_downsample_row_sse2(src: PUint8; src_stride: integer; dst: PUint8; dst_width: integer); external name 'pixel_downsample_row_sse2';
 {$endif}
 
 procedure pixel_init(const flags: TDsp_init_flags);
 begin
   sad_16x16 := @sad_16x16_pas;
+  sad_16x8  := @sad_16x8_pas;
   sad_8x8   := @sad_8x8_pas;
+  sad_8x4   := @sad_8x4_pas;
   sad_4x4   := @sad_4x4_pas;
-
-  ssd_16x16 := @ssd_16x16_pas;
-  ssd_8x8   := @ssd_8x8_pas;
-  var_16x16 := @var_16x16_pas;
 
   satd_4x4   := @satd_4x4_pas;
   satd_8x4   := @satd_8x4_pas;
@@ -507,15 +554,21 @@ begin
   satd_16x8  := @satd_16x8_pas;
   satd_16x16 := @satd_16x16_pas;
 
+  ssd_16x16 := @ssd_16x16_pas;
+  ssd_16x8  := @ssd_16x8_pas;
+  ssd_8x8   := @ssd_8x8_pas;
+  var_16x16 := @var_16x16_pas;
+
   pixel_load_16x16  := @pixel_load_16x16_pas;
   pixel_loadu_16x16 := @pixel_load_16x16_pas;
-  pixel_loadu_16x8 := @pixel_load_16x8_pas;
-  pixel_load_8x8   := @pixel_load_8x8_pas;
-  pixel_save_16x16 := @pixel_save_16x16_pas;
-  pixel_save_8x8   := @pixel_save_8x8_pas;
-  pixel_add_4x4    := @pixel_add_4x4_pas;
-  pixel_sub_4x4    := @pixel_sub_4x4_pas;
-  pixel_avg_16x16  := @pixel_avg_16x16_pas;
+  pixel_loadu_16x8  := @pixel_load_16x8_pas;
+  pixel_load_8x8    := @pixel_load_8x8_pas;
+  pixel_save_16x16  := @pixel_save_16x16_pas;
+  pixel_save_8x8    := @pixel_save_8x8_pas;
+
+  pixel_add_4x4   := @pixel_add_4x4_pas;
+  pixel_sub_4x4   := @pixel_sub_4x4_pas;
+  pixel_avg_16x16 := @pixel_avg_16x16_pas;
   pixel_avg_16x8  := @pixel_avg_16x8_pas;
 
   pixel_downsample_row := @pixel_downsample_row_pas;
@@ -553,10 +606,10 @@ begin
   //all 64bit sse2 cpus have mmx
   if flags.sse2 then begin
       sad_16x16 := @sad_16x16_sse2;
+      sad_16x8  := @sad_16x8_sse2;
       sad_8x8   := @sad_8x8_mmx;
+      sad_8x4   := @sad_8x4_mmx;
       sad_4x4   := @sad_4x4_mmx;
-      ssd_16x16 := @ssd_16x16_sse2;
-      ssd_8x8   := @ssd_8x8_sse2;
 
       satd_4x4   := @satd_4x4_mmx;
       satd_8x4   := @satd_8x4_sse2;
@@ -564,17 +617,22 @@ begin
       satd_16x8  := @satd_16x8_sse2;
       satd_16x16 := @satd_16x16_sse2;
 
+      ssd_16x16 := @ssd_16x16_sse2;
+      ssd_16x8  := @ssd_16x8_sse2;
+      ssd_8x8   := @ssd_8x8_sse2;
       var_16x16 := @var_16x16_sse2;
 
+      pixel_load_16x16  := @pixel_load_16x16_sse2;
       pixel_loadu_16x16 := @pixel_loadu_16x16_sse2;
-      pixel_load_16x16 := @pixel_load_16x16_sse2;
-      pixel_save_16x16 := @pixel_save_16x16_sse2;
-      pixel_load_8x8 := @pixel_load_8x8_sse2;
-      pixel_save_8x8 := @pixel_save_8x8_sse2;
+      pixel_loadu_16x8  := @pixel_loadu_16x8_sse2;
+      pixel_load_8x8    := @pixel_load_8x8_sse2;
+      pixel_save_16x16  := @pixel_save_16x16_sse2;
+      pixel_save_8x8    := @pixel_save_8x8_sse2;
 
-      pixel_add_4x4  := @pixel_add_4x4_mmx;
-      pixel_sub_4x4  := @pixel_sub_4x4_mmx;
-      pixel_avg_16x16  := @pixel_avg_16x16_sse2;
+      pixel_add_4x4   := @pixel_add_4x4_mmx;
+      pixel_sub_4x4   := @pixel_sub_4x4_mmx;
+      pixel_avg_16x16 := @pixel_avg_16x16_sse2;
+      pixel_avg_16x8  := @pixel_avg_16x8_sse2;
 
       pixel_downsample_row := @pixel_downsample_row_sse2;
   end;

@@ -653,6 +653,8 @@ begin
   }
   if (mb.mbtype = MB_P_16x16) and (mb.cbp > 0) and (me.Subme > 4) then begin
       CacheMvStore;
+      if not p16_cached then
+          CacheStore;
       me.Refine(mb);
       if mb.mv = cache_motion.mv then begin  //refinement couldn't find better mv
           CacheLoad;

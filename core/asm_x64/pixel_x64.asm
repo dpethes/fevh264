@@ -30,14 +30,18 @@ vec_w_8x1:
 SECTION .text
 
 cglobal sad_16x16_sse2
+cglobal sad_16x8_sse2
 cglobal sad_8x8_mmx
+cglobal sad_8x4_mmx
 cglobal sad_4x4_mmx
 cglobal ssd_16x16_sse2
+cglobal ssd_16x8_sse2
 cglobal ssd_8x8_sse2
 cglobal var_16x16_sse2
 
 cglobal pixel_load_16x16_sse2
 cglobal pixel_loadu_16x16_sse2
+cglobal pixel_loadu_16x8_sse2
 cglobal pixel_load_8x8_sse2
 cglobal pixel_save_16x16_sse2
 cglobal pixel_save_8x8_sse2
@@ -45,6 +49,7 @@ cglobal pixel_save_8x8_sse2
 cglobal pixel_sub_4x4_mmx
 cglobal pixel_add_4x4_mmx
 cglobal pixel_avg_16x16_sse2
+cglobal pixel_avg_16x8_sse2
 cglobal pixel_downsample_row_sse2
 
 cglobal satd_4x4_mmx
@@ -85,12 +90,52 @@ sad_16x16_sse2:
     HADDQ   xmm5, xmm0
     movd    r0, xmm5
     ret
+    
+; function sad_16x8_sse2(pix1, pix2: pbyte; stride: integer): integer;
+ALIGN 16
+sad_16x8_sse2:
+    pxor  xmm4, xmm4
+    pxor  xmm5, xmm5
+%rep 4
+    movdqu  xmm0, [r2]
+    psadbw  xmm0, [r1]
+    movdqu  xmm2, [r2 + r3]
+    psadbw  xmm2, [r1 + 16]    
+    add     r1, 32
+    lea     r2, [r2 + 2 * r3]
+    paddq   xmm5, xmm0
+    paddq   xmm4, xmm2
+%endrep
+    paddq   xmm5, xmm4
+    HADDQ   xmm5, xmm0
+    movd    r0, xmm5
+    ret
 
 ; function sad_8x8_mmx(pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 sad_8x8_mmx:
     pxor  mm5, mm5
 %rep 4
+    movq    mm0, [r2]
+    movq    mm1, [r1]
+    movq    mm2, [r2+r3]
+    movq    mm3, [r1+MB_STRIDE]
+    psadbw  mm0, mm1
+    psadbw  mm2, mm3
+    add     r1, 2*MB_STRIDE
+    lea     r2, [r2 + 2 * r3]
+    paddq   mm5, mm0
+    paddq   mm5, mm2
+%endrep
+    movd    r0, mm5
+    ret
+    
+ 
+; function sad_8x4_mmx(pix1, pix2: pbyte; stride: integer): integer;
+ALIGN 16
+sad_8x4_mmx:
+    pxor  mm5, mm5
+%rep 2
     movq    mm0, [r2]
     movq    mm1, [r1]
     movq    mm2, [r2+r3]
@@ -155,6 +200,35 @@ ssd_16x16_sse2:
     movd  r0,  xmm4
     ret
 
+; function ssd_16x8_sse2(pix1, pix2: pbyte; stride: integer): integer;
+ALIGN 16
+ssd_16x8_sse2:
+    pxor  xmm4, xmm4    ; accum
+    pxor  xmm5, xmm5    ; zero
+    mov   r4, 8       ; counter
+.loop:
+    movdqa    xmm0, [r1]
+    movdqa    xmm1, xmm0
+    movdqu    xmm2, [r2]
+    movdqa    xmm3, xmm2
+    punpcklbw xmm0, xmm5
+    punpckhbw xmm1, xmm5
+    punpcklbw xmm2, xmm5
+    punpckhbw xmm3, xmm5
+    psubsw    xmm0, xmm2
+    psubsw    xmm1, xmm3
+    pmaddwd   xmm0, xmm0
+    pmaddwd   xmm1, xmm1
+    paddd     xmm4, xmm0
+    paddd     xmm4, xmm1
+    add   r1, 16
+    add   r2, r3
+    dec   r4
+    jnz   .loop
+    HADDD xmm4, xmm0
+    movd  r0,  xmm4
+    ret
+    
 ; function ssd_8x8_sse2(pix1, pix2: pbyte; stride: integer): integer;
 ALIGN 16
 ssd_8x8_sse2:
@@ -248,6 +322,17 @@ pixel_loadu_16x16_sse2:
     add    r1, MB_STRIDE
 %endrep
     ret
+    
+; pixel_loadu_16x8_sse2
+ALIGN 16
+pixel_loadu_16x8_sse2:
+%rep 8
+    movdqu xmm0, [r2]
+    add    r2, r3
+    movdqa [r1], xmm0
+    add    r1, MB_STRIDE
+%endrep
+    ret
 
 ; pixel_load_8x8_sse2
 ALIGN 16
@@ -289,8 +374,8 @@ pixel_save_8x8_sse2:
     ret
 
 
-; saturated subtraction and 8 -> 16 transport
-; procedure pixel_sub_8x8_sse2(pix1, pix2: pbyte; diff: int16_p);
+; saturated subtraction and 8bit -> 16bit transport
+; procedure pixel_sub_4x4_mmx(pix1, pix2: pbyte; diff: int16_p);
 ALIGN 16
 pixel_sub_4x4_mmx:
     pxor  mm5, mm5
@@ -307,8 +392,8 @@ pixel_sub_4x4_mmx:
 %endrep
     ret
 
-; saturated addition and 16 -> 8 transport
-; procedure pixel_add_8x8_sse2(pix1, pix2: pbyte; diff: int16_p);
+; saturated addition and 16bit -> 8bit transport
+; procedure pixel_add_4x4_mmx(pix1, pix2: pbyte; diff: int16_p);
 ALIGN 16
 pixel_add_4x4_mmx:
     pxor  mm5, mm5
@@ -343,6 +428,23 @@ pixel_avg_16x16_sse2:
 %endrep
     ret
     
+; procedure pixel_avg_16x8_sse2(src1, src2, dest: uint8_p; stride: integer);
+ALIGN 16
+pixel_avg_16x8_sse2:
+%rep 4
+    movdqu  xmm0, [r1]
+    movdqu  xmm1, [r2]
+    movdqu  xmm2, [r1+r4]
+    movdqu  xmm3, [r2+r4]
+    lea     r1, [r1 + 2*r4]    
+    lea     r2, [r2 + 2*r4]  
+    pavgb   xmm0, xmm1
+    pavgb   xmm2, xmm3
+    movdqa  [r3], xmm0
+    movdqa  [r3 + MB_STRIDE], xmm2
+    add     r3, 2*MB_STRIDE
+%endrep
+    ret
     
 ; procedure pixel_downsample_row_sse2 (src: uint8_p; src_stride: integer; dst: uint8_p; dst_width: integer)
 ALIGN 16
