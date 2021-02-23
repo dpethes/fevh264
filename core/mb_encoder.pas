@@ -400,14 +400,12 @@ end;
 
 function TMacroblockEncoder.GetChromaMcSSD: integer;
 begin
-  result := dsp.ssd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16)
-          + dsp.ssd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
+  result := dsp.ssd_16x8(mb.pixels_c[0], mb.mcomp_c[0], 16)  //combined u/v ssd
 end;
 
 function TMacroblockEncoder.GetChromaPredictedSSD: integer;
 begin
-  result := dsp.ssd_8x8(mb.pixels_c[0], mb.pred_c[0], 16)
-          + dsp.ssd_8x8(mb.pixels_c[1], mb.pred_c[1], 16);
+  result := dsp.ssd_16x8(mb.pixels_c[0], mb.pred_c[0], 16)  //combined u/v ssd
 end;
 
 constructor TMacroblockEncoder.Create;

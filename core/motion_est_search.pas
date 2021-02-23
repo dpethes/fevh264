@@ -433,8 +433,7 @@ begin
   decode_mb_inter(mb);
   decode_mb_chroma(mb, false);
   result += dsp.ssd_16x16(mb.pixels, mb.pixels_dec, 16);
-  result += dsp.ssd_8x8(mb.pixels_c[0], mb.pixels_dec_c[0], 16)
-          + dsp.ssd_8x8(mb.pixels_c[1], mb.pixels_dec_c[1], 16);
+  result += dsp.ssd_16x8(mb.pixels_c[0], mb.pixels_dec_c[0], 16)  //combined u/v ssd
 end;
 
 procedure check_pattern_qpel;
