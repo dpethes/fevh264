@@ -45,6 +45,7 @@ type
       enable_I_PCM: boolean;
       enable_quant_refine: boolean;
       enable_partitions: boolean;
+      pskip_mcomp_cache: array[0..255] of byte;
 
       procedure InitMB(mbx, mby: integer);
       procedure InitForInter;
@@ -56,6 +57,7 @@ type
       procedure AnalyzeChromaIntra;
       procedure Decode;
       function TrySkip(const use_satd: boolean = true): boolean;
+      function FastPSkip: boolean;
       function TryPostInterEncodeSkip(const score_inter: integer): boolean;
       procedure MakeSkip;
       function GetChromaMcSSD: integer;
@@ -330,10 +332,11 @@ end;
 { PSkip test, based on SSD treshold. Also stores SATD luma & SSD chroma score
   true = PSkip is acceptable
 }
-function TMacroblockEncoder.TrySkip(const use_satd: boolean = true): boolean;
 const
   SKIP_SSD_TRESH = 256;   //todo variate threshold based on qp/lambda: qp 26 is better with 512 without negative effect
   SKIP_SSD_CHROMA_TRESH = 96;
+
+function TMacroblockEncoder.TrySkip(const use_satd: boolean = true): boolean;
 var
   score, score_c: integer;
 begin
@@ -357,6 +360,31 @@ begin
 
   if (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH) then
       result := true;
+end;
+
+
+function TMacroblockEncoder.FastPSkip: boolean;
+var
+  score, score_c: integer;
+begin
+  result := false;
+  mb.score_skip := MaxInt;
+  if not mb_can_use_pskip then
+      exit;
+
+  mb.mv := mb.mv_skip;
+  MotionCompensation.Compensate(mb.fref, mb);
+  score := dsp.ssd_16x16(mb.pixels, mb.mcomp, 16);
+  score_c := 0;
+  if chroma_coding then begin
+      MotionCompensation.CompensateChroma(mb.fref, mb);
+      score_c := dsp.ssd_16x8(mb.pixels_c[0], mb.mcomp_c[0], 16);
+      mb.score_skip_uv_ssd := score_c;
+  end;
+
+  result := (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH);
+  if not result then
+      move(mb.mcomp^, pskip_mcomp_cache, 256);
 end;
 
 
@@ -525,7 +553,7 @@ begin
   InitForInter;
 
   //early PSkip
-  if TrySkip then begin
+  if FastPSkip then begin
       mb.mbtype := MB_P_SKIP;
       me.Skipped(mb);
       exit;
@@ -541,6 +569,7 @@ begin
 
   //encode as PSkip if inter doesn't improve things much; MB_P_16x16 costs at least 4 bits (5 if multiref)
   if (mb.cbp = 0) and mb_can_use_pskip then begin
+      mb.score_skip := dsp.satd_16x16(mb.pixels, pskip_mcomp_cache, 16);
       can_switch_to_skip := mb.score_skip <= score_p + mode_lambda * bits_inter;
 
       //compare chroma as well, in case the pskip chroma was bad
@@ -601,6 +630,7 @@ begin
       //if there's no residual and p16 lost to i16 due to mv bitcost, pskip can still be an option
       if (mb.mbtype <> MB_P_16x16) and (mb.cbp = 0) and mb_can_use_pskip then begin
           mode_lambda := LAMBDA_MBTYPE_PSKIP[mb.qp];
+          mb.score_skip := dsp.satd_16x16(mb.pixels, pskip_mcomp_cache, 16);
           can_switch_to_skip := mb.score_skip <= score_intra + mode_lambda * bits_intra;
           //compare chroma as well, in case the pskip chroma was bad
           if can_switch_to_skip and chroma_coding then begin

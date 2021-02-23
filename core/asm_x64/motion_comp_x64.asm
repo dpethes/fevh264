@@ -58,7 +58,6 @@ cglobal mc_chroma_8x4_sse2.loop
 ; procedure mc_chroma_8x8_sse2 (src, dst: pbyte; const stride: integer; coef: pbyte);
 ; coef: array[4] of byte
 ; treats xmm0-7 as volatile!
-; todo - use one more xmm
 ALIGN 16
 mc_chroma_8x8_sse2:
     mov   r4, [r4]
@@ -66,14 +65,12 @@ mc_chroma_8x8_sse2:
     pxor  xmm7, xmm7
     get_coef  xmm0, r4, 0, r0
     get_coef  xmm1, r4, 1, r0
+    spread_coef xmm0, xmm1
     get_coef  xmm2, r4, 2, r0
     get_coef  xmm3, r4, 3, r0   
-    spread_coef xmm0, xmm1
     spread_coef xmm2, xmm3
-    ; mc
     mov   r4, 8
 .loop:
-    ; A B
     movq      xmm4, [r1]    ; A
     movq      xmm5, [r1 +1] ; B
     movq      xmm6, [r1+r3] ; C   

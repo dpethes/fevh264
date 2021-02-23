@@ -274,14 +274,18 @@ begin
   dx := qx and 7;
   dy := qy and 7;
 
-  coef[0] := (8 - dx) * (8 - dy);
-  coef[1] := dx * (8 - dy);
-  coef[2] := (8 - dx) * dy;
-  coef[3] := dx * dy;
   i := fy * stride + fx - fref^.frame_mem_offset_cr;
-
-  dsp.mc_chroma_8x8(fref^.plane_dec[1] + i, dstU, stride, @coef);
-  dsp.mc_chroma_8x8(fref^.plane_dec[2] + i, dstV, stride, @coef);
+  if dx + dy = 0 then begin
+      dsp.pixel_load_8x8(dstU, fref^.plane_dec[1] + i, stride);
+      dsp.pixel_load_8x8(dstV, fref^.plane_dec[2] + i, stride);
+  end else begin
+      coef[0] := (8 - dx) * (8 - dy);
+      coef[1] := dx * (8 - dy);
+      coef[2] := (8 - dx) * dy;
+      coef[3] := dx * dy;
+      dsp.mc_chroma_8x8(fref^.plane_dec[1] + i, dstU, stride, @coef);
+      dsp.mc_chroma_8x8(fref^.plane_dec[2] + i, dstV, stride, @coef);
+  end;
 end;
 
 
