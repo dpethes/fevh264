@@ -39,20 +39,24 @@ type
       _starting_fpel_mv: motionvec_t;
       InterCost: TInterPredCost;
       h264s: TH264Stream;
+      _qpel_satd,
+      _chroma_me: boolean;
 
     public
       cur: pbyte;
       _mbx, _mby: integer;
 
       property LastSearchScore: integer read _last_search_score;
+      property UseSatdForQpel: boolean write _qpel_satd;
+      property UseChromaScore: boolean write _chroma_me;
 
       constructor Create(region_width, region_height: integer; h264stream: TH264Stream);
       procedure PickFPelStartingPoint(const fref: frame_p; const predicted_mv_list: TMotionVectorList);
       function SearchFPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchHPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
-      function SearchQPel(var mb: macroblock_t; const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
+      function SearchQPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       procedure SearchQPelRDO(var mb: macroblock_t; const fref: frame_p);
-      function SearchQPel_16x8_partition(var mb: macroblock_t; idx: integer; const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
+      function SearchQPel_16x8_partition(var mb: macroblock_t; starting_mv: motionvec_t; idx: integer; const fref: frame_p): motionvec_t;
  end;
 
 (*******************************************************************************
@@ -62,11 +66,12 @@ implementation
 type
   //motion search patterns
   TXYOffs = array[0..1] of int8;
-  TMEPrecision = (mpFpel, mpHpel, mpQpel);
+  TMEPrecision = (mpFpel, mpHpel, mpQpel, mpQpel_16x8);
 
 const
   FPEL_SAD_TRESH = 64;
-  ME_RANGES: array [TMEPrecision] of byte = (16, 4, 4);
+  ME_RANGES: array [TMEPrecision] of byte = (16, 4, 4, 8);
+  ME_RANGE_QPEL_RDO = 2;
   MIN_XY = -FRAME_EDGE_W;
   MIN_XY_HPEL = MIN_XY * 2;
   MIN_XY_QPEL = MIN_XY * 4;
@@ -90,6 +95,8 @@ begin
 
   _starting_fpel_mv  := ZERO_MV;
   _last_search_score := MaxInt;
+  _qpel_satd := false;
+  _chroma_me := false;
 
   //max. compensated mb position; we need to subtract the unpainted edge
   edge := FRAME_EDGE_W + 1;
@@ -259,8 +266,8 @@ begin
       mcx := nx div 2;
       mcy := ny div 2;
       idx := ((ny and 1) shl 1) or (nx and 1);
-      score := dsp.sad_16x16(cur, ref[idx] + mcy * stride + mcx, stride)
-               + InterCost.Bits((nx - mbx) * 2, (ny - mby) * 2);
+      score := InterCost.Bits((nx - mbx) * 2, (ny - mby) * 2);
+      score += dsp.sad_16x16(cur, ref[idx] + mcy * stride + mcx, stride);
 
       if score < min_score then begin
           min_score := score;
@@ -313,8 +320,7 @@ end;
   output
     h.mb.mv - best found vector in qpel units
 *)
-function TRegionSearch.SearchQPel
-  (var mb: macroblock_t; const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
+function TRegionSearch.SearchQPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
 var
   mbcmp: mbcmp_func_t;
   max_x, max_y: integer;
@@ -326,6 +332,7 @@ var
   range: integer;
   iter: integer;
   check_bounds: boolean;
+  chroma_me: boolean;
 
 procedure check_pattern_qpel();
 var
@@ -357,21 +364,21 @@ begin
 end;
 
 begin
-  mbx    := _mbx * 4;
-  mby    := _mby * 4;
-  max_x  := _max_x_qpel;
-  max_y  := _max_y_qpel;
-  if satd then
+  mbx   := _mbx * 4;
+  mby   := _mby * 4;
+  max_x := _max_x_qpel;
+  max_y := _max_y_qpel;
+  range := ME_RANGES[mpQpel];
+  if _qpel_satd then
       mbcmp := dsp.satd_16x16  //chroma_me always uses satd
   else
       mbcmp := dsp.sad_16x16;
-  range  := ME_RANGES[mpQpel];
+  chroma_me := _chroma_me;
 
   mv := mb.mv;
   x := mbx + mv.x;
   y := mby + mv.y;
   min_score := MaxInt;  //reset score, mbcmp may be different
-
   iter := 0;
   check_bounds := (x - range < MIN_XY_QPEL) or (x + range > max_x) or
                   (y - range < MIN_XY_QPEL) or (y + range > max_y);
@@ -466,11 +473,11 @@ begin
 end;
 
 begin
-  mbx    := _mbx * 4;
-  mby    := _mby * 4;
-  max_x  := _max_x_qpel;
-  max_y  := _max_y_qpel;
-  range  := 2;
+  mbx   := _mbx * 4;
+  mby   := _mby * 4;
+  max_x := _max_x_qpel;
+  max_y := _max_y_qpel;
+  range := ME_RANGE_QPEL_RDO;
   initial_mv := mb.mv;
 
   mv := mb.mv;
@@ -478,7 +485,6 @@ begin
   y := mby + mv.y;
   lambda := LAMBDA_ME[mb.qp];
   min_score := GetCost;
-
   iter := 0;
   check_bounds := (x - range < MIN_XY_QPEL) or (x + range > max_x) or
                   (y - range < MIN_XY_QPEL) or (y + range > max_y);
@@ -497,8 +503,8 @@ end;
   
 
 //mb.mcomp isn't adjusted, as it gets properly written at end of ME
-function TRegionSearch.SearchQPel_16x8_partition(var mb: macroblock_t; idx: integer;
-  const fref: frame_p; const satd, chroma_me: boolean): motionvec_t;
+function TRegionSearch.SearchQPel_16x8_partition(var mb: macroblock_t;
+  starting_mv: motionvec_t; idx: integer; const fref: frame_p): motionvec_t;
 var
   cur_partition: pbyte;
   mbcmp: mbcmp_func_t;
@@ -511,6 +517,7 @@ var
   range: integer;
   iter: integer;
   check_bounds: boolean;
+  chroma_me: boolean;
 
 function chroma_score: integer; inline;
 begin
@@ -531,10 +538,9 @@ begin
   for i := 0 to 3 do begin
       nx := x + pt_dia_small[i][0];
       ny := y + pt_dia_small[i][1];
-      nx_partition := nx + XY_qpel_offset_16x8[idx, 0];
+      nx_partition := nx + XY_qpel_offset_16x8[idx, 0];  //offset to current sub-block
       ny_partition := ny + XY_qpel_offset_16x8[idx, 1];
 
-      //offset to current sub-block
       MotionCompensation.CompensateQPelXY_16x8(fref, nx_partition, ny_partition, mb.mcomp);
       score := mbcmp(cur_partition, mb.mcomp, 16)
                + InterCost.Bits(nx - mbx, ny - mby);
@@ -555,22 +561,21 @@ end;
 
 begin
   cur_partition := cur + MB_pixel_offset_16x8[idx, 0] + MB_pixel_offset_16x8[idx, 1] * 16;  //MB_STRIDE
-  mbx    := _mbx * 4;
-  mby    := _mby * 4;
-  max_x  := _max_x_qpel;
-  max_y  := _max_y_qpel;
-  if satd then
+  mbx   := _mbx * 4;
+  mby   := _mby * 4;
+  max_x := _max_x_qpel;
+  max_y := _max_y_qpel;
+  range := ME_RANGES[mpQpel_16x8];
+  if _qpel_satd then
       mbcmp := dsp.satd_16x8
   else
       mbcmp := dsp.sad_16x8;
-  range  := ME_RANGES[mpQpel]*2;
+  chroma_me := _chroma_me;
 
-  mv := mb.mv;
+  mv := starting_mv;
   x := mbx + mv.x;
   y := mby + mv.y;
-
-  min_score := MaxInt;  //reset score, mbcmp may be different
-
+  min_score := MaxInt;
   iter := 0;
   check_bounds := (x - range < MIN_XY_QPEL) or (x + range > max_x) or
                   (y - range < MIN_XY_QPEL) or (y + range > max_y);

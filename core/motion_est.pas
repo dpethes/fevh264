@@ -143,6 +143,8 @@ end;
 procedure TMotionEstimator.SetSubMELevel(AValue: integer);
 begin
   _subme := AValue;
+  SearchRegion.UseSatdForQpel := _subme >= 3;
+  SearchRegion.UseChromaScore := _subme >= 4;
 end;
 
 constructor TMotionEstimator.Create(const w, h, mbw, mbh: integer; h264stream: TH264Stream);
@@ -220,7 +222,7 @@ begin
   if _subme > 0 then
       mb.mv := SearchRegion.SearchHPel(mb, fref);
   if _subme > 1 then
-      mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
+      mb.mv := SearchRegion.SearchQPel(mb, fref);
 
   mb.mv := ClipMVRange(mb.mv);
   MotionCompensation.Compensate(fref, mb);
@@ -301,7 +303,7 @@ begin
       if score > best_hpel_score * 7 div 5 then  //don't try qpel if the hpel is 1,4x worse
           continue;
 
-      mb.mv := SearchRegion.SearchQPel(mb, fref, _subme > 2, _subme > 3);
+      mb.mv := SearchRegion.SearchQPel(mb, fref);
       score := SearchRegion.LastSearchScore;
       if score < best_score then begin
           mv := mb.mv;
@@ -326,10 +328,9 @@ procedure TMotionEstimator.Estimate_16x8(var mb: macroblock_t);
 var
   mv0, mv1: motionvec_t;
 begin
-  //mb.mv is used as a starting point for both partitions, so don't overwrite it just yet
-  mb.mv1 := mb.mv;
-  mv0 := SearchRegion.SearchQPel_16x8_partition(mb, 0, mb.fref, _subme > 2, _subme > 3);
-  mv1 := SearchRegion.SearchQPel_16x8_partition(mb, 1, mb.fref, _subme > 2, _subme > 3);
+  //mb.mv is used as a starting point for both partitions
+  mv0 := SearchRegion.SearchQPel_16x8_partition(mb, mb.mv, 0, mb.fref);
+  mv1 := SearchRegion.SearchQPel_16x8_partition(mb, mb.mv, 1, mb.fref);
 
   mb.mv  := ClipMVRange(mv0);
   mb.mv1 := ClipMVRange(mv1);
