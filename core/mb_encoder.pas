@@ -859,6 +859,9 @@ begin
           AnalyzeChromaIntra;
       end;
 
+      //encode mb
+      EncodeCurrentType;
+
       //if there were no coeffs left, try skip
       if is_inter(mb.mbtype) and (mb.cbp = 0) and TryPostInterEncodeSkip(score_p) then begin
           MakeSkip;
@@ -877,11 +880,9 @@ begin
               mb.mbtype := MB_P_16x16;
               CacheMvLoad;
               MotionCompensation.Compensate(mb.fref, mb);
-          end;
+          end else
+              EncodeCurrentType;
       end;
-
-      //encode mb
-      EncodeCurrentType;
 
   end else begin
       mb.i16_pred_mode := intrapred.Analyse_16x16();
