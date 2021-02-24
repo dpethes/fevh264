@@ -822,6 +822,8 @@ procedure TH264Stream.GetSliceBytes(var buffer: pbyte; out size: longword);
 var
   nalstream: TNALStream;
 begin
+  if mb_skip_count > 0 then
+      write_ue_code(bs, mb_skip_count);
   if cabac then  //end_of_slice_flag
       ;  //todo
   nalstream._current := buffer;

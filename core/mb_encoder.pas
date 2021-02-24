@@ -315,18 +315,16 @@ var
 begin
   InterPredLoadMvs(mb, frame, num_ref_frames);
   mb_can_use_pskip := false;
-  if h264s.NoPSkipAllowed then exit;
-  if (mb.y < frame.mbh - 1) or (mb.x < frame.mbw - 1) then begin
-      mv := mb.mv_skip;
+  if h264s.NoPSkipAllowed then
+      exit;
 
-      //can't handle out-of-frame mvp, don't skip
-      if mv.x + mb.x * 64 >= frame.w * 4 - 34 then exit;
-      if mv.y + mb.y * 64 >= frame.h * 4 - 34 then exit;
-      if mv.x + mb.x * 64 < MIN_XY then exit;
-      if mv.y + mb.y * 64 < MIN_XY then exit;
-
-      mb_can_use_pskip := true;
-  end;
+  //can't handle out-of-frame mvp, don't skip
+  mv := mb.mv_skip;
+  if mv.x + mb.x * 64 >= frame.w * 4 - 34 then exit;
+  if mv.y + mb.y * 64 >= frame.h * 4 - 34 then exit;
+  if mv.x + mb.x * 64 < MIN_XY then exit;
+  if mv.y + mb.y * 64 < MIN_XY then exit;
+  mb_can_use_pskip := true;
 end;
 
 { PSkip test, based on SSD treshold. Also stores SATD luma & SSD chroma score
