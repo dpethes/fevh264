@@ -339,11 +339,12 @@ const
 
 function TMacroblockEncoder.TrySkip(const use_satd: boolean = true): boolean;
 var
-  score, score_c: integer;
+  score, score_c, lowres_mb_idx: integer;
 begin
   result := false;
   mb.score_skip := MaxInt;
-  if not mb_can_use_pskip then exit;
+  if not mb_can_use_pskip then
+      exit;
 
   mb.mv := mb.mv_skip;
   MotionCompensation.Compensate(mb.fref, mb);
@@ -360,13 +361,17 @@ begin
   mb.score_skip_uv_ssd := score_c;
 
   if (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH) then
-      result := true;
+      result := true
+  else if (mb.mv_skip = ZERO_MV) then begin  //check lowres skip
+      lowres_mb_idx := (mb.y div 2) * frame.lowres^.mbw + (mb.x div 2);
+      result := frame.lowres^.mbs[lowres_mb_idx].score_skip <= LOWRES_SKIP_TRESH;
+  end;
 end;
 
-
+//FastPSkip doesn't calculate sa(t)d score, mc is cached for later score calculation
 function TMacroblockEncoder.FastPSkip: boolean;
 var
-  score, score_c: integer;
+  score, score_c, lowres_mb_idx: integer;
 begin
   result := false;
   mb.score_skip := MaxInt;
@@ -383,9 +388,16 @@ begin
       mb.score_skip_uv_ssd := score_c;
   end;
 
-  result := (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH);
-  if not result then
-      move(mb.mcomp^, pskip_mcomp_cache, 256);
+  if (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH) then
+      result := true
+  else begin
+      if (mb.mv_skip = ZERO_MV) then begin  //check lowres skip
+          lowres_mb_idx := (mb.y div 2) * frame.lowres^.mbw + (mb.x div 2);
+          result := frame.lowres^.mbs[lowres_mb_idx].score_skip <= LOWRES_SKIP_TRESH;
+      end;
+      if not result then
+          move(mb.mcomp^, pskip_mcomp_cache, 256);
+  end;
 end;
 
 
@@ -543,7 +555,7 @@ var
   score_i4, score_intra, score_p: integer;
   bits_i4, bits_intra, bits_inter: integer;
   mode_lambda: integer;
-  score_psub, bits_inter_sub, lowres_mb_idx: integer;
+  score_psub, bits_inter_sub: integer;
   can_switch_to_skip: boolean;
   p16_cached: boolean;
 
@@ -571,14 +583,6 @@ begin
       mb.mbtype := MB_P_SKIP;
       me.Skipped(mb);
       exit;
-  end;
-  if mb_can_use_pskip and (mb.mv_skip = ZERO_MV) then begin
-      lowres_mb_idx := (mb.y div 2) * frame.lowres^.mbw + (mb.x div 2);
-      if frame.lowres^.mbs[lowres_mb_idx].score_skip <= LOWRES_SKIP_TRESH then begin
-          mb.mbtype := MB_P_SKIP;
-          me.Skipped(mb);
-          exit;
-      end;
   end;
 
   //encode as inter
@@ -761,6 +765,7 @@ begin
       //skip
       if TrySkip then begin
           mb.mbtype := MB_P_SKIP;
+          me.Skipped(mb);
           FinalizeMB;
           exit;
       end;
@@ -832,6 +837,7 @@ begin
       //skip
       if TrySkip(true) then begin
           mb.mbtype := MB_P_SKIP;
+          me.Skipped(mb);
           FinalizeMB;
           exit;
       end;
@@ -909,6 +915,7 @@ begin
       //skip
       if TrySkip(false) then begin
           mb.mbtype := MB_P_SKIP;
+          me.Skipped(mb);
       end else begin
           me.Estimate(mb, frame);
           EncodeCurrentType;
