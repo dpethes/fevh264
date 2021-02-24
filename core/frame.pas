@@ -690,9 +690,32 @@ begin
   end;
 end;
 
+procedure frame_lowres_from_plane_uv(var frame: frame_t; src, dst: pbyte);
+var
+  src_stride: integer;
+  dst_width,
+  dst_height,
+  dst_stride: integer;
+  y: integer;
+begin
+  src_stride := frame.stride_c;
+
+  dst_width  := frame.lowres^.w div 2;
+  dst_height := frame.lowres^.h div 2;
+  dst_stride := frame.lowres^.stride_c;
+
+  for y := 0 to dst_height - 1 do begin
+      dsp.pixel_downsample_row(src, src_stride, dst, dst_width);
+      dst += dst_stride;
+      src += src_stride * 2;
+  end;
+end;
+
 procedure frame_lowres_from_input(var frame: frame_t);
 begin
   frame_lowres_from_plane(frame, frame.plane[0], frame.lowres^.plane[0]);
+  frame_lowres_from_plane_uv(frame, frame.plane[1], frame.lowres^.plane[1]);
+  frame_lowres_from_plane_uv(frame, frame.plane[2], frame.lowres^.plane[2]);
 end;
 
 procedure frame_lowres_from_decoded(var frame: frame_t);

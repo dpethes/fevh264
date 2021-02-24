@@ -454,9 +454,9 @@ pixel_downsample_row_sse2:
     psrlw     xmm4, 8     ; mask every 2nd byte
     shr   r4, 3           ; 8 bytes output in one iteration
 .loop:
-    movdqa    xmm0, [r1]
+    movdqu    xmm0, [r1]
     movdqu    xmm1, [r1+1]
-    movdqa    xmm2, [r1+r2]
+    movdqu    xmm2, [r1+r2]
     movdqu    xmm3, [r1+r2+1]
     pavgb     xmm0, xmm1
     pavgb     xmm2, xmm3

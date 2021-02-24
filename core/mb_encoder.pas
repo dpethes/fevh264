@@ -335,6 +335,7 @@ end;
 const
   SKIP_SSD_TRESH = 256;   //todo variate threshold based on qp/lambda: qp 26 is better with 512 without negative effect
   SKIP_SSD_CHROMA_TRESH = 96;
+  LOWRES_SKIP_TRESH = 8;
 
 function TMacroblockEncoder.TrySkip(const use_satd: boolean = true): boolean;
 var
@@ -542,7 +543,7 @@ var
   score_i4, score_intra, score_p: integer;
   bits_i4, bits_intra, bits_inter: integer;
   mode_lambda: integer;
-  score_psub, bits_inter_sub: integer;
+  score_psub, bits_inter_sub, lowres_mb_idx: integer;
   can_switch_to_skip: boolean;
   p16_cached: boolean;
 
@@ -570,6 +571,14 @@ begin
       mb.mbtype := MB_P_SKIP;
       me.Skipped(mb);
       exit;
+  end;
+  if mb_can_use_pskip and (mb.mv_skip = ZERO_MV) then begin
+      lowres_mb_idx := (mb.y div 2) * frame.lowres^.mbw + (mb.x div 2);
+      if frame.lowres^.mbs[lowres_mb_idx].score_skip <= LOWRES_SKIP_TRESH then begin
+          mb.mbtype := MB_P_SKIP;
+          me.Skipped(mb);
+          exit;
+      end;
   end;
 
   //encode as inter
@@ -932,13 +941,33 @@ end;
 
 procedure TMBEncoderLowresRun.Encode(mbx, mby: integer);
 var
-  i: integer;
+  i, score: integer;
 begin
   InitMB(mbx, mby);
-  me.Estimate(mb, frame);
+
+  //check skip(0,0) on input frames to avoid false negatives because of coding distortion
+  i := mby * 16 * frame.stride + mbx * 16;
+  dsp.pixel_load_16x16 (mb.mcomp,      frame.refs[0]^.plane[0] + i, frame.stride);
+  score := dsp.sad_16x16(mb.pixels, mb.mcomp, 16);
+
+  if score <= LOWRES_SKIP_TRESH then begin
+      i := mby * 8 * frame.stride_c + mbx * 8;
+      dsp.pixel_load_8x8   (mb.mcomp_c[0], frame.refs[0]^.plane[1] + i, frame.stride_c);
+      dsp.pixel_load_8x8   (mb.mcomp_c[1], frame.refs[0]^.plane[2] + i, frame.stride_c);
+      score += dsp.sad_16x8(mb.pixels_c[0], mb.mcomp_c[0], 16);
+  end;
+
+  mb.mv := ZERO_MV;
+  if score <= LOWRES_SKIP_TRESH then
+      me.Skipped(mb)
+  else
+      me.Estimate(mb, frame);
 
   i := mb.y * frame.mbw + mb.x;
-  frame.mbs[i].mv := mb.mv;
+  with frame.mbs[i] do begin
+      mv := mb.mv;
+      score_skip := score;
+  end;
   AdvanceFramePointers;
 end;
 
