@@ -81,6 +81,7 @@ type
       bs: TBitstreamWriter;
       interPredCostEval: TInterPredCost;
       mb_skip_count: integer;
+      intra_base_code: integer;
       last_mb_qp: byte;
 
       sps: sps_t;
@@ -113,7 +114,6 @@ type
       procedure write_mb_i_4x4   (var mb: macroblock_t);
       procedure write_mb_i_16x16 (var mb: macroblock_t);
       procedure write_mb_p_16x16 (var mb: macroblock_t);
-      procedure write_mb_p_skip; inline;
       function mb_intrapred_bits(const mb: macroblock_t): integer;
       function mb_residual_bits (const mb: macroblock_t): integer;
       function mb_i_4x4_bits   (const mb: macroblock_t): integer;
@@ -800,6 +800,9 @@ begin
       slice.nal_unit_type := NAL_NOIDR;
       slice.frame_num += 1;
   end;
+  intra_base_code := 0;
+  if slice.type_ = SLICE_P then
+      intra_base_code := 5;
 
   mb_skip_count := 0;
   last_mb_qp := slice.qp;
@@ -852,14 +855,7 @@ var
   i, j, chroma_idx: integer;
   bits: integer;
 begin
-  //skip run, mbtype
-  if slice.type_ = SLICE_P then begin
-      write_ue_code(bs, mb_skip_count);
-      mb_skip_count := 0;
-      write_ue_code(bs, 25 + 5);
-  end else
-      write_ue_code(bs, 25);  //I_PCM - tab. 7-8
-
+  write_ue_code(bs, 25 + intra_base_code);
   bits := bs.BitSize;  //count alignment as residual
   bs.ByteAlign;
   for i := 0 to 255 do bs.Write(mb.pixels[i], 8);
@@ -870,27 +866,18 @@ begin
   mb.residual_bits := bs.BitSize - bits;
 end;
 
-
 procedure TH264Stream.write_mb_i_4x4(var mb: macroblock_t);
 begin
-  //skip run, mbtype
-  if slice.type_ = SLICE_P then begin
-      write_ue_code(bs, mb_skip_count);
-      mb_skip_count := 0;
-      write_ue_code(bs, 0 + 5);  //I_4x4 in P - tab. 7-10
-  end else
-      write_ue_code(bs, 0);  //I_4x4 - tab. 7-8
-  //mb_pred
+  write_ue_code(bs, 0 + intra_base_code);
   write_mb_pred_intra(mb);
-  //cbp
-  write_ue_code(bs, tab_cbp_intra_4x4_to_codenum[mb.cbp]);
+  write_ue_code(bs, tab_cbp_intra_4x4_to_codenum[mb.cbp]);  //cbp
   if mb.cbp > 0 then
       write_mb_residual(mb);
 end;
 
-  { derive mb_type:
-    I_16x16_(pred_mode16)_(cbp_chroma[0..2])_(cbp_luma[0, 15])
-  }
+{ derive mb_type:
+  I_16x16_(pred_mode16)_(cbp_chroma[0..2])_(cbp_luma[0, 15])
+}
 function mb_I_16x16_mbtype_num(const cbp, pred: integer): integer; inline;
 begin
   result := 1 + pred + (cbp shr 4) * 4;
@@ -902,44 +889,36 @@ procedure TH264Stream.write_mb_i_16x16(var mb: macroblock_t);
 var
   mbt: integer;
 begin
-  mbt := mb_I_16x16_mbtype_num(mb.cbp, mb.i16_pred_mode);
-  if slice.type_ = SLICE_P then begin
-      write_ue_code(bs, mb_skip_count); //skip run
-      mb_skip_count := 0;
-      write_ue_code(bs, 5 + mbt); //I_16x16 in P - tab. 7-10
-  end else
-      write_ue_code(bs, mbt);     //I_16x16 - tab. 7-8
-  write_mb_pred_intra(mb);     //mb_pred
+  mbt := mb_I_16x16_mbtype_num(mb.cbp, mb.i16_pred_mode);  //cbp in mbtype
+  write_ue_code(bs, mbt + intra_base_code);
+  write_mb_pred_intra(mb);
   write_mb_residual(mb);
 end;
-
 
 procedure TH264Stream.write_mb_p_16x16(var mb: macroblock_t);
 var
   mb_type: integer;
 begin
-  //skip run, mbtype
-  write_ue_code(bs, mb_skip_count);
-  mb_skip_count := 0;
-  mb_type := 0;         //P_L0_16x16 - tab. 7-10
+  mb_type := 0;
   if mb.mbtype = MB_P_16x8 then
       mb_type := 1;
   write_ue_code(bs, mb_type);
-  //mb_pred
   write_mb_pred_inter(mb);
-  //cbp
-  write_ue_code(bs, tab_cbp_inter_4x4_to_codenum[mb.cbp]);
+  write_ue_code(bs, tab_cbp_inter_4x4_to_codenum[mb.cbp]);  //cbp
   if mb.cbp > 0 then
       write_mb_residual(mb);
 end;
 
-procedure TH264Stream.write_mb_p_skip;
-begin
-  mb_skip_count += 1;
-end;
-
+//codes for mb types - tab. 7-8 / 7-10
 procedure TH264Stream.WriteMB(var mb: macroblock_t);
 begin
+  if (slice.type_ = SLICE_P) then
+      if mb.mbtype = MB_P_SKIP then
+          mb_skip_count += 1
+      else begin
+          write_ue_code(bs, mb_skip_count); //skip run
+          mb_skip_count := 0;
+      end;
   case mb.mbtype of
       MB_I_PCM:
           write_mb_i_pcm(mb);
@@ -949,8 +928,6 @@ begin
           write_mb_i_16x16(mb);
       MB_P_16x16, MB_P_16x8:
           write_mb_p_16x16(mb);
-      MB_P_SKIP:
-          write_mb_p_skip;
   end;
 end;
 
