@@ -117,7 +117,7 @@ begin
   writeln( f, '  P_L0_16x8: ', mb_type_count[MB_P_16x8]:10);
   writeln( f, '  skip:      ', mb_type_count[MB_P_SKIP]:10);
   if mb_type_count[MB_I_PCM] > 0 then
-      writeln( f, '  I_PCM:', mb_type_count[MB_I_PCM]:10);
+      writeln( f, '  I_PCM:     ', mb_type_count[MB_I_PCM]:10);
   writeln( f, 'residual bits:' );
   writeln( f, '  itex:    ', itex_bits:10 );
   writeln( f, '  ptex:    ', ptex_bits:10 );

@@ -53,14 +53,14 @@ type
       procedure LoadMVPredictors(const mbx, mby: integer);
       class function ClipMVRange(const mv: motionvec_t): motionvec_t;
       procedure SetNumReferences(AValue: integer);
-      procedure SetSubMELevel(AValue: integer);
+
 
     public
-      property Subme: integer read _subme write SetSubMELevel;
-
       property NumReferences: integer read ref_count write SetNumReferences;
+
       constructor Create(const w, h, mbw, mbh: integer; h264stream: TH264Stream);
       destructor Free;
+      procedure SetSearchLevel(subme: integer; lossless: boolean = false);
       procedure Estimate(var mb: macroblock_t; var fenc: frame_t);
       procedure Estimate_16x8(var mb: macroblock_t);
       procedure Refine(var mb: macroblock_t);
@@ -140,10 +140,10 @@ begin
   ref_count := AValue;
 end;
 
-procedure TMotionEstimator.SetSubMELevel(AValue: integer);
+procedure TMotionEstimator.SetSearchLevel(subme: integer; lossless: boolean);
 begin
-  _subme := AValue;
-  SearchRegion.UseSatdForQpel := _subme >= 3;
+  _subme := subme;
+  SearchRegion.UseSatdForQpel := (_subme >= 3) and not lossless;
   SearchRegion.UseChromaScore := _subme >= 4;
 end;
 

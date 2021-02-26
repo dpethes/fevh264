@@ -34,19 +34,26 @@ procedure mb_init_frame_invariant(var mb: macroblock_t; var frame: frame_t);
 procedure mb_init(var mb: macroblock_t; var frame: frame_t; const adaptive_quant: boolean = false);
 
 procedure encode_mb_intra_i4(var mb: macroblock_t; var frame: frame_t; const intrapred: TIntraPredictor);
+procedure encode_mb_intra_i4_lossless(var mb: macroblock_t; var frame: frame_t; const intrapred: TIntraPredictor);
 
 procedure encode_mb_intra_i16(var mb: macroblock_t);
+procedure encode_mb_intra_i16_lossless(var mb: macroblock_t);
 procedure decode_mb_intra_i16(var mb: macroblock_t; const intrapred: TIntraPredictor);
+procedure decode_mb_intra_i16_lossless(var mb: macroblock_t; const intrapred: TIntraPredictor);
 
 procedure encode_mb_inter(var mb: macroblock_t);
+procedure encode_mb_inter_lossless(var mb: macroblock_t);
 procedure encode_mb_inter_quant_refine(var mb: macroblock_t);
 procedure decode_mb_inter(var mb: macroblock_t);
+procedure decode_mb_inter_lossless(var mb: macroblock_t);
 
 procedure decode_mb_inter_pskip(var mb: macroblock_t);
 procedure decode_mb_pcm(var mb: macroblock_t);
 
 procedure encode_mb_chroma(var mb: macroblock_t; const intra: boolean);
+procedure encode_mb_chroma_lossless(var mb: macroblock_t; const intra: boolean);
 procedure decode_mb_chroma(var mb: macroblock_t; const intra: boolean);
+procedure decode_mb_chroma_lossless(var mb: macroblock_t; const intra: boolean);
 
 (*******************************************************************************
 *******************************************************************************)
@@ -245,7 +252,7 @@ end;
 intra coding
 *)
 const SAD_DECIMATE_TRESH: array[0..QP_MAX] of word = (
-    3,   3,   3,   3,   3,   3,   4,   4,   5,   5,
+    1,   3,   3,   3,   3,   3,   4,   4,   5,   5,
     6,   7,   8,   9,  10,  11,  13,  14,  16,  18,
    20,  22,  26,  28,  32,  36,  40,  44,  52,  56,
    64,  72,  80,  88, 104, 112, 128, 144, 160, 176,
@@ -311,6 +318,54 @@ begin
       if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
 end;
 
+procedure encode_mb_intra_i4_lossless
+  (var mb: macroblock_t; var frame: frame_t; const intrapred: TIntraPredictor);
+var
+  i: integer;
+  block: PInt16;
+  overall_coefs: array[0..3] of integer;
+  sad, sad_tresh: integer;
+  block_offset: integer;
+  block_coefs: integer;
+
+begin
+  for i := 0 to 3 do overall_coefs[i] := 0;
+  sad_tresh := SAD_DECIMATE_TRESH[mb.qp];
+
+  intrapred.LastScore := 0;
+  for i := 0 to 15 do begin
+      block := mb.dct[i];
+      block_offset := BLOCK_OFFSET_4[i];
+
+      mb.i4_pred_mode[i] := intrapred.Analyse_4x4(mb.pfdec + frame.blk_offset[i], i);
+      sad := dsp.sad_4x4(mb.pixels + block_offset, mb.pred + block_offset, 16);
+      if sad >= sad_tresh then begin
+          dsp.pixel_sub_4x4(mb.pixels + block_offset, mb.pred + block_offset, block);
+          cavlc_analyse_block(mb.block[i], block, 16);
+
+          block_coefs := mb.block[i].nlevel;
+          mb.nz_coef_cnt[i] := block_coefs;
+          overall_coefs[i shr 2] += block_coefs;
+      end else begin
+          block_use_zero(mb.block[i]);
+          mb.nz_coef_cnt[i] := 0;
+          block_coefs := 0;
+      end;
+
+      //decode block
+      if block_coefs > 0 then
+          dsp.pixel_add_4x4 (mb.pixels_dec + block_offset, mb.pred + block_offset, block)
+      else
+          pixel_load_4x4(mb.pixels_dec + block_offset, mb.pred + block_offset, 16);
+
+      pixel_save_4x4(mb.pixels_dec + block_offset, mb.pfdec  + frame.blk_offset[i], frame.stride);
+  end;
+
+  mb.cbp := 0;
+  for i := 0 to 3 do
+      if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
+end;
+
 
 procedure encode_mb_intra_i16(var mb: macroblock_t);
 var
@@ -347,6 +402,39 @@ begin
 end;
 
 
+procedure encode_mb_intra_i16_lossless(var mb: macroblock_t);
+var
+  i: integer;
+  block: PInt16;
+  overall_coefs: integer;
+
+begin
+  overall_coefs := 0;
+
+  for i := 0 to 15 do begin
+      block := mb.dct[i];
+
+      dsp.pixel_sub_4x4(mb.pixels + BLOCK_OFFSET_4[i], mb.pred + BLOCK_OFFSET_4[i], block);
+
+      mb.dct[24][ block_dc_order[i] ] := block[0];
+      block[0] := 0;
+
+      cavlc_analyse_block(mb.block[i], block, 15);
+      mb.nz_coef_cnt[i] := mb.block[i].nlevel;
+      overall_coefs += mb.nz_coef_cnt[i];
+  end;
+
+  //dc transform
+  cavlc_analyse_block(mb.block[24], mb.dct[24], 16);
+
+  //overall_coefs: only 0 or 15
+  if overall_coefs = 0 then
+      mb.cbp := 0
+  else
+      mb.cbp := CBP_LUMA_MASK;
+end;
+
+
 procedure decode_mb_intra_i16(var mb: macroblock_t; const intrapred: TIntraPredictor);
 var
   i: integer;
@@ -366,6 +454,21 @@ begin
       else
           itrans_dc(block);
 
+      dsp.pixel_add_4x4 (mb.pixels_dec + BLOCK_OFFSET_4[i], mb.pred + BLOCK_OFFSET_4[i], block);
+  end;
+end;
+
+
+procedure decode_mb_intra_i16_lossless(var mb: macroblock_t; const intrapred: TIntraPredictor);
+var
+  i: integer;
+  block: PInt16;
+
+begin
+  intrapred.Predict_16x16(mb.i16_pred_mode, mb.x, mb.y);
+  for i := 0 to 15 do begin
+      block := mb.dct[i];
+      block[0] := mb.dct[24][ block_dc_order[i] ];
       dsp.pixel_add_4x4 (mb.pixels_dec + BLOCK_OFFSET_4[i], mb.pred + BLOCK_OFFSET_4[i], block);
   end;
 end;
@@ -445,6 +548,38 @@ begin
       if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
 end;
 
+procedure encode_mb_inter_lossless(var mb: macroblock_t);
+var
+  i: integer;
+  block: PInt16;
+  overall_coefs: array[0..3] of integer;
+  sad, sad_tresh: integer;
+  block_offset: integer;
+
+begin
+  for i := 0 to 3 do overall_coefs[i] := 0;
+  sad_tresh := SAD_DECIMATE_TRESH[mb.qp];
+
+  for i := 0 to 15 do begin
+      block := mb.dct[i];
+      block_offset := BLOCK_OFFSET_4[i];
+
+      sad := dsp.sad_4x4(mb.pixels + block_offset, mb.mcomp + block_offset, 16);
+      if sad >= sad_tresh then begin
+          dsp.pixel_sub_4x4(mb.pixels + block_offset, mb.mcomp + block_offset, block);
+          cavlc_analyse_block(mb.block[i], block, 16);
+      end else
+          block_use_zero(mb.block[i]);
+
+      mb.nz_coef_cnt[i] := mb.block[i].nlevel;
+      overall_coefs[i shr 2] += mb.nz_coef_cnt[i];
+  end;
+
+  mb.cbp := 0;
+  for i := 0 to 3 do
+      if overall_coefs[i] > 0 then mb.cbp := mb.cbp or (1 shl i);
+end;
+
 procedure encode_mb_inter_quant_refine(var mb: macroblock_t);
 var
   i: integer;
@@ -485,6 +620,20 @@ begin
           itransqt(block, mb.quant_ctx_qp);
           dsp.pixel_add_4x4 (mb.pixels_dec + BLOCK_OFFSET_4[i], mb.mcomp + BLOCK_OFFSET_4[i], block);
       end;
+  end;
+end;
+
+procedure decode_mb_inter_lossless(var mb: macroblock_t);
+var
+  i: integer;
+  block: PInt16;
+begin
+  move(mb.mcomp^, mb.pixels_dec^, 256);
+  for i := 0 to 15 do begin
+      block := mb.dct[i];
+
+      if mb.nz_coef_cnt[i] > 0 then
+          dsp.pixel_add_4x4 (mb.pixels_dec + BLOCK_OFFSET_4[i], mb.mcomp + BLOCK_OFFSET_4[i], block);
   end;
 end;
 
@@ -556,6 +705,57 @@ begin
           mb.cbp := mb.cbp or (1 shl 4);
 end;
 
+procedure encode_mb_chroma_lossless(var mb: macroblock_t; const intra: boolean);
+var
+  i, j, n: integer;
+  block: PInt16;
+  pred: pbyte;
+  sad, sad_tresh: integer;
+  overall_ac_coefs, block_ac_coefs: integer;
+
+begin
+  overall_ac_coefs := 0;
+  sad_tresh := SAD_DECIMATE_TRESH[mb.qpc];
+
+  for j := 0 to 1 do begin
+      if intra then
+          pred := mb.pred_c[j]
+      else
+          pred := mb.mcomp_c[j];
+
+      for i := 0 to 3 do begin
+          n := 16 + i + j * 4;
+          block := mb.dct[n];
+
+          sad := maxint;  //todo fix sad tresholding
+          if sad >= sad_tresh then begin
+              dsp.pixel_sub_4x4(mb.pixels_c[j] + block_offset_chroma[i], pred + block_offset_chroma[i], block);
+              mb.chroma_dc[j, i] := block[0];
+              block[0] := 0;
+              cavlc_analyse_block(mb.block[n], block, 15);
+
+              block_ac_coefs := mb.block[n].nlevel;
+              overall_ac_coefs += block_ac_coefs;
+              mb.nz_coef_cnt_chroma_ac[j, i] := block_ac_coefs;
+          end else begin
+              block_use_zero(mb.block[n]);
+              mb.chroma_dc[j, i] := 0;
+              mb.nz_coef_cnt_chroma_ac[j, i] := 0
+          end;
+      end;
+  end;
+
+  //dc transform
+  for j := 0 to 1 do
+      cavlc_analyse_block_2x2(mb.block[25 + j], @mb.chroma_dc[j]);
+
+  //cbp
+  if overall_ac_coefs > 0 then
+      mb.cbp := mb.cbp or (1 shl 5)
+  else
+      if (mb.block[25].nlevel + mb.block[26].nlevel > 0) then
+          mb.cbp := mb.cbp or (1 shl 4);
+end;
 
 
 procedure decode_mb_chroma(var mb: macroblock_t; const intra: boolean);
@@ -588,6 +788,35 @@ begin
               else
                   itrans_dc(block);
 
+              dsp.pixel_add_4x4 (mb.pixels_dec_c[j] + block_offset_chroma[i],
+                                 pred + block_offset_chroma[i], block);
+          end;
+          pred += 8;  //second chroma plane block offset
+      end;
+
+  end;
+end;
+
+
+procedure decode_mb_chroma_lossless(var mb: macroblock_t; const intra: boolean);
+var
+  i, j: integer;
+  block: PInt16;
+  pred: pbyte;
+begin
+  if intra then
+      pred := mb.pred_c[0]
+  else
+      pred := mb.mcomp_c[0];
+
+  if mb.cbp shr 4 = 0 then begin
+      move(pred^, mb.pixels_dec_c[0]^, 128);
+
+  end else begin
+      for j := 0 to 1 do begin
+          for i := 0 to 3 do begin
+              block := mb.dct[16 + i + j * 4];
+              block[0] := mb.chroma_dc[j, i];
               dsp.pixel_add_4x4 (mb.pixels_dec_c[j] + block_offset_chroma[i],
                                  pred + block_offset_chroma[i], block);
           end;

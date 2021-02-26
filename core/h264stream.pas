@@ -87,6 +87,10 @@ type
       sps: sps_t;
       pps: pps_t;
       slice: TH264Slice;
+      slice_state: record
+          bs_state: TWriterState;
+          mb_skip_count: integer;
+      end;
       write_sei: boolean;
       write_vui: boolean;
       sei_string: string;
@@ -135,6 +139,8 @@ type
       destructor Free;
       procedure LoopFilter(enable: boolean; ab_offset_div2: int8);
       procedure InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
+      procedure SliceDataSnapshot;
+      procedure SliceDataRollback;
       procedure AbortSlice;
       procedure GetSliceBytes(var buffer: pbyte; out size: longword);
       procedure WriteMB (var mb: macroblock_t);
@@ -311,7 +317,7 @@ const
   SEI_UUID = '2011012520091007';
   PROFILE_BASELINE = 66;
   PROFILE_MAIN = 77;
-  PROFILE_HIGH444 = 144;
+  PROFILE_HIGH444 = 144;  //predictive is 244
 var
   b: TBitstreamWriter;
   rbsp: array[0..255] of byte;
@@ -326,6 +332,8 @@ begin
       profile := PROFILE_MAIN;  //cabac is not allowed in baseline
       cabac_flag := 1;
   end;
+  if pps.qp = 0 then            //we're going lossless
+      profile := PROFILE_HIGH444;
   level := ApproximateLevel(sps.mb_width * 16, sps.mb_height * 16, sps.num_ref_frames);
 
   //SPS
@@ -341,7 +349,7 @@ begin
       write_ue_code(b, 1);    //chroma_format_idc  ue(v)  1=(4:2:0)
       write_ue_code(b, 0);    //bit_depth_luma_minus8  ue(v)
       write_ue_code(b, 0);    //bit_depth_chroma_minus8  ue(v)
-      b.Write(0);             //qpprime_y_zero_transform_bypass_flag  u(1)  1=lossless if qp=0
+      b.Write(1);             //qpprime_y_zero_transform_bypass_flag  u(1)  1=lossless if qp=0
       b.Write(0);             //seq_scaling_matrix_present_flag
   end;
   write_ue_code(b, sps.log2_max_frame_num_minus4);
@@ -813,6 +821,18 @@ begin
   if cabac then   //slice_data contains cabac_alignment_one_bit
       while not bs.IsByteAligned do
           bs.Write(1);
+end;
+
+procedure TH264Stream.SliceDataSnapshot;
+begin
+  slice_state.bs_state := WriterSnapshot(bs);
+  slice_state.mb_skip_count := mb_skip_count;
+end;
+
+procedure TH264Stream.SliceDataRollback;
+begin
+  WriterRollback(bs, slice_state.bs_state);
+  mb_skip_count := slice_state.mb_skip_count;
 end;
 
 procedure TH264Stream.AbortSlice;

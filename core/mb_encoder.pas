@@ -45,11 +45,12 @@ type
       enable_I_PCM: boolean;
       enable_quant_refine: boolean;
       enable_partitions: boolean;
+      lossless: boolean;
       pskip_mcomp_cache: array[0..255] of byte;
 
       procedure InitMB(mbx, mby: integer);
       procedure InitForInter;
-      procedure FinalizeMB;
+      procedure FinalizeMB(skip_write: boolean=false);
       procedure AdvanceFramePointers;
       procedure CacheMvStore;
       procedure CacheMvLoad;
@@ -58,6 +59,7 @@ type
       procedure Decode;
       function TrySkip(const use_satd: boolean = true): boolean;
       function FastPSkip: boolean;
+      function TryLosslessSkip: boolean;
       function TryPostInterEncodeSkip(const score_inter: integer): boolean;
       procedure MakeSkip;
       function GetChromaMcSSD: integer;
@@ -128,6 +130,12 @@ type
       procedure Encode(mbx, mby: integer); override;
   end;
 
+  { TMBEncoderAnalyseLossless }
+  TMBEncoderAnalyseLossless = class(TMacroblockEncoder)
+    public
+      procedure Encode(mbx, mby: integer); override;
+  end;
+
 
 implementation
 
@@ -162,32 +170,47 @@ begin
       //MB_P_SKIP: no coding
 
       MB_I_4x4: begin
-          encode_mb_intra_i4(mb, frame, intrapred);
-          if chroma_coding then
-              encode_mb_chroma(mb, true);
+          if lossless then begin
+              encode_mb_intra_i4_lossless(mb, frame, intrapred);
+              if chroma_coding then
+                  encode_mb_chroma_lossless(mb, true);
+          end else begin
+              encode_mb_intra_i4(mb, frame, intrapred);
+              if chroma_coding then
+                  encode_mb_chroma(mb, true);
+          end;
       end;
 
       MB_I_16x16: begin
           intrapred.Predict_16x16(mb.i16_pred_mode, mb.x, mb.y);
-          encode_mb_intra_i16(mb);
-          if chroma_coding then
-              encode_mb_chroma(mb, true);
-      end;
-
-      MB_P_16x16: begin
-          encode_mb_inter(mb);
-          if chroma_coding then begin
-              MotionCompensation.CompensateChroma(mb.fref, mb);
-              encode_mb_chroma(mb, false);
+          if lossless then begin
+              encode_mb_intra_i16_lossless(mb);
+              if chroma_coding then
+                  encode_mb_chroma_lossless(mb, true);
+          end else begin
+              encode_mb_intra_i16(mb);
+              if chroma_coding then
+                  encode_mb_chroma(mb, true);
           end;
       end;
 
+      MB_P_16x16,
       MB_P_16x8: begin
-          encode_mb_inter(mb);
+          if lossless then
+              encode_mb_inter_lossless(mb)
+          else
+              encode_mb_inter(mb);
           if chroma_coding then begin
-              MotionCompensation.CompensateChroma_8x4(mb.fref, mb, 0);
-              MotionCompensation.CompensateChroma_8x4(mb.fref, mb, 1);
-              encode_mb_chroma(mb, false);
+              if mb.mbtype = MB_P_16x16 then
+                  MotionCompensation.CompensateChroma(mb.fref, mb)
+              else begin
+                  MotionCompensation.CompensateChroma_8x4(mb.fref, mb, 0);
+                  MotionCompensation.CompensateChroma_8x4(mb.fref, mb, 1);
+              end;
+              if lossless then
+                  encode_mb_chroma_lossless(mb, false)
+              else
+                  encode_mb_chroma(mb, false);
           end;
       end;
 
@@ -222,11 +245,17 @@ begin
               stats.pred[mb.i4_pred_mode[i]] += 1;
       end;
       MB_I_16x16: begin
-          decode_mb_intra_i16(mb, intrapred);
+          if lossless then
+              decode_mb_intra_i16_lossless(mb, intrapred)
+          else
+              decode_mb_intra_i16(mb, intrapred);
           stats.pred16[mb.i16_pred_mode] += 1;
       end;
       MB_P_16x16: begin
-          decode_mb_inter(mb);
+          if lossless then
+              decode_mb_inter_lossless(mb)
+          else
+              decode_mb_inter(mb);
           mb.mv1 := mb.mv;
       end;
       MB_P_SKIP: begin
@@ -234,7 +263,10 @@ begin
           mb.mv1 := mb.mv;
       end;
       MB_P_16x8:
-          decode_mb_inter(mb);
+          if lossless then
+              decode_mb_inter_lossless(mb)
+          else
+              decode_mb_inter(mb);
       MB_I_PCM:
           decode_mb_pcm(mb);
   end;
@@ -244,7 +276,10 @@ begin
 
   if chroma_coding then begin
       if mb.mbtype <> MB_I_PCM then
-          decode_mb_chroma(mb, is_intra(mb.mbtype));
+          if lossless then
+              decode_mb_chroma_lossless(mb, is_intra(mb.mbtype))
+          else
+              decode_mb_chroma(mb, is_intra(mb.mbtype));
       dsp.pixel_save_8x8 (mb.pixels_dec_c[0], mb.pfdec_c[0], frame.stride_c);
       dsp.pixel_save_8x8 (mb.pixels_dec_c[1], mb.pfdec_c[1], frame.stride_c);
   end;
@@ -263,11 +298,12 @@ end;
   Update stats and calculate SSD if the loopfilter isn't enabled (otherwise get it later,
   after all relevant pixels are decoded)
 }
-procedure TMacroblockEncoder.FinalizeMB;
+procedure TMacroblockEncoder.FinalizeMB(skip_write: boolean = false);
 var
   i: Integer;
 begin
-  h264s.WriteMB(mb);
+  if not skip_write then
+      h264s.WriteMB(mb);
   Decode;
 
   if not LoopFilter then begin
@@ -396,6 +432,30 @@ begin
       if not result then
           move(mb.mcomp^, pskip_mcomp_cache, 256);
   end;
+end;
+
+
+function TMacroblockEncoder.TryLosslessSkip: boolean;
+var
+  score: integer;
+begin
+  result := false;
+  if not mb_can_use_pskip then
+      exit;
+
+  mb.mv := mb.mv_skip;
+  MotionCompensation.Compensate(mb.fref, mb);
+  score := dsp.sad_16x16(mb.pixels, mb.mcomp, 16);
+  if score > 0 then
+      exit;
+
+  if chroma_coding then begin
+      MotionCompensation.CompensateChroma(mb.fref, mb);
+      score := dsp.sad_16x8(mb.pixels_c[0], mb.mcomp_c[0], 16);
+      if score > 0 then
+          exit;
+  end;
+  result := true;
 end;
 
 
@@ -674,7 +734,7 @@ begin
       bits_inter_sub := MBCost;
 
       mode_lambda := LAMBDA_MBTYPE_PSKIP[mb.qp];
-      if (me.Subme > 4) then  //bias against MB_P_16x8
+      if enable_quant_refine then  //bias against MB_P_16x8
           mode_lambda *= 4;
       if (mb.mv = mb.mv1) or (bits_inter * mode_lambda + score_p < bits_inter_sub * mode_lambda + score_psub) then begin
           mb.mbtype := MB_P_16x16;
@@ -689,7 +749,7 @@ begin
     at negligible quality cost. Motion compensated pixels get overwritten, but ME restores luma for best MV,
     so restore chroma MC pixels only if no better MV is found
   }
-  if (mb.mbtype = MB_P_16x16) and (mb.cbp > 0) and (me.Subme > 4) then begin
+  if enable_quant_refine and (mb.mbtype = MB_P_16x16) and (mb.cbp > 0) then begin
       CacheMvStore;
       if not p16_cached then
           CacheStore;
@@ -975,6 +1035,77 @@ begin
       score_skip := score;
   end;
   AdvanceFramePointers;
+end;
+
+{ TMBEncoderAnalyseLossless }
+
+procedure TMBEncoderAnalyseLossless.Encode(mbx, mby: integer);
+const
+  I16_SAD_TRESHOLD = 112;  //not super optimal
+var
+  score_i, score_p: integer;
+  score_psub: integer;
+begin
+  InitMB(mbx, mby);
+  lossless := true;
+
+  if frame.ftype = SLICE_P then begin
+      mb.mbtype := MB_P_16x16;
+      InitForInter;
+
+      //if can't skip here, then can't skip anywhere
+      if TryLosslessSkip then begin
+          mb.mbtype := MB_P_SKIP;
+          FinalizeMB;
+          exit;
+      end;
+
+      //inter score
+      me.Estimate(mb, frame);
+      score_p := dsp.sad_16x16(mb.pixels, mb.mcomp, 16);
+
+      //intra score
+      mb.i16_pred_mode := intrapred.Analyse_16x16();
+      score_i := intrapred.LastScore;
+      if score_i < score_p then begin
+          if score_i <= I16_SAD_TRESHOLD then
+              mb.mbtype := MB_I_16x16
+          else
+              mb.mbtype := MB_I_4x4;
+          AnalyzeChromaIntra;
+      end;
+
+      if enable_partitions and (mb.mbtype = MB_P_16x16) then begin
+          CacheMvStore;
+          mb.mbtype := MB_P_16x8;
+          me.Estimate_16x8(mb);
+          InterPredLoadMvs(mb, frame, num_ref_frames);
+
+          score_psub := dsp.sad_16x16(mb.pixels, mb.mcomp, 16);
+          if (mb.mv = mb.mv1) or (score_p <= score_psub) then begin
+              mb.mbtype := MB_P_16x16;
+              CacheMvLoad;
+              MotionCompensation.Compensate(mb.fref, mb);
+          end;
+      end;
+
+  end else begin
+      mb.mbtype := MB_I_4x4;
+      AnalyzeChromaIntra;
+  end;
+
+  //write selected mb to get bitcost, and if I_PCM is cheaper, rewrite stored mb
+  EncodeCurrentType;
+  h264s.SliceDataSnapshot;
+  h264s.WriteMB(mb);
+  if mb.residual_bits >= MB_I_PCM_BITCOST then begin
+      h264s.SliceDataRollback;
+      mb.mbtype := MB_I_PCM;
+      EncodeCurrentType;
+      FinalizeMB;
+  end else begin
+      FinalizeMB(True);
+  end;
 end;
 
 end.

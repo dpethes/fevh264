@@ -322,7 +322,7 @@ end;
 *)
 function TRegionSearch.SearchQPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
 var
-  mbcmp: mbcmp_func_t;
+  mbcmp, mbcmp_chroma_x2: mbcmp_func_t;
   max_x, max_y: integer;
   mbx, mby,              //macroblock qpel x,y position
   x, y: integer;         //currently searched qpel x,y position
@@ -350,8 +350,7 @@ begin
 
       if chroma_me then begin
           MotionCompensation.CompensateChromaQpelXY(fref, nx, ny, mb.mcomp_c[0], mb.mcomp_c[1]);
-          score += dsp.satd_8x8(mb.pixels_c[0], mb.mcomp_c[0], 16) +
-                   dsp.satd_8x8(mb.pixels_c[1], mb.mcomp_c[1], 16);
+          score += mbcmp_chroma_x2(mb.pixels_c[0], mb.mcomp_c[0], 16);
       end;
 
       if score < min_score then begin
@@ -369,10 +368,14 @@ begin
   max_x := _max_x_qpel;
   max_y := _max_y_qpel;
   range := ME_RANGES[mpQpel];
-  if _qpel_satd then
-      mbcmp := dsp.satd_16x16  //chroma_me always uses satd
-  else
+  if _qpel_satd then begin
+      mbcmp := dsp.satd_16x16;
+      mbcmp_chroma_x2 := dsp.satd_16x8;
+  end
+  else begin
       mbcmp := dsp.sad_16x16;
+      mbcmp_chroma_x2 := dsp.sad_16x8;
+  end;
   chroma_me := _chroma_me;
 
   mv := mb.mv;
@@ -507,7 +510,7 @@ function TRegionSearch.SearchQPel_16x8_partition(var mb: macroblock_t;
   starting_mv: motionvec_t; idx: integer; const fref: frame_p): motionvec_t;
 var
   cur_partition: pbyte;
-  mbcmp: mbcmp_func_t;
+  mbcmp, mbcmp_chroma: mbcmp_func_t;
   max_x, max_y: integer;
   mbx, mby,              //macroblock qpel x,y position
   x, y: integer;         //currently searched qpel x,y position
@@ -521,8 +524,8 @@ var
 
 function chroma_score: integer; inline;
 begin
-  result := dsp.satd_8x4(mb.pixels_c[0], mb.mcomp_c[0], 16);
-  result += dsp.satd_8x4(mb.pixels_c[1], mb.mcomp_c[1], 16);
+  result := mbcmp_chroma(mb.pixels_c[0], mb.mcomp_c[0], 16);
+  result += mbcmp_chroma(mb.pixels_c[1], mb.mcomp_c[1], 16);
 end;
 
 procedure check_pattern_qpel;
@@ -566,10 +569,14 @@ begin
   max_x := _max_x_qpel;
   max_y := _max_y_qpel;
   range := ME_RANGES[mpQpel_16x8];
-  if _qpel_satd then
-      mbcmp := dsp.satd_16x8
-  else
+  if _qpel_satd then begin
+      mbcmp := dsp.satd_16x8;
+      mbcmp_chroma := dsp.satd_8x4;
+  end
+  else begin
       mbcmp := dsp.sad_16x8;
+      mbcmp_chroma := dsp.sad_8x4;
+  end;
   chroma_me := _chroma_me;
 
   mv := starting_mv;

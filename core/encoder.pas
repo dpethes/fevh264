@@ -143,6 +143,8 @@ end;
 { TFevh264Encoder }
 
 constructor TFevh264Encoder.Create(var param: TEncodingParameters);
+var
+  lossless: boolean;
 begin
   _param := param;
 
@@ -160,6 +162,10 @@ begin
   if (height and $f) > 0 then mb_height += 1;
   mb_count := mb_width * mb_height;
 
+  lossless := param.QParam = 0;
+  if lossless then
+      param.LoopFilterEnabled := false;
+
   //stream settings
   h264s := TH264Stream.Create(width, height, mb_width, mb_height);
   h264s.QP := param.QParam;
@@ -173,7 +179,7 @@ begin
 
   //inter pred
   me := TMotionEstimator.Create(width, height, mb_width, mb_height, h264s);
-  me.subme := param.SubpixelMELevel;
+  me.SetSearchLevel(param.SubpixelMELevel, lossless);
 
   //ratecontrol
   rc := TRatecontrol.Create;
@@ -184,14 +190,17 @@ begin
   chroma_qp_offset := param.ChromaQParamOffset;
 
   //mb encoder
-  case param.AnalysisLevel of
-      0: mb_enc := TMBEncoderNoAnalyse.Create;
-      1: mb_enc := TMBEncoderQuickAnalyse.Create;
-      2: mb_enc := TMBEncoderQuickAnalyseSATD.Create;
+  if lossless then
+      mb_enc := TMBEncoderAnalyseLossless.Create
   else
-      mb_enc := TMBEncoderRDoptAnalyse.Create; //3 and more
-      if param.AnalysisLevel > 3 then mb_enc.EnableQuantRefine := true;
-  end;
+      case param.AnalysisLevel of
+          0: mb_enc := TMBEncoderNoAnalyse.Create;
+          1: mb_enc := TMBEncoderQuickAnalyse.Create;
+          2: mb_enc := TMBEncoderQuickAnalyseSATD.Create;
+      else
+          mb_enc := TMBEncoderRDoptAnalyse.Create; //3 and more
+          if param.AnalysisLevel > 3 then mb_enc.EnableQuantRefine := true;
+      end;
   mb_enc.num_ref_frames := num_ref_frames;
   mb_enc.me := me;
   mb_enc.h264s := h264s;
@@ -203,7 +212,7 @@ begin
   me_lowres := TMotionEstimator.Create(
                    frames.lowres_mb_width * 16, frames.lowres_mb_height * 16,
                    frames.lowres_mb_width, frames.lowres_mb_height, h264s);
-  me_lowres.subme := 0;
+  me_lowres.SetSearchLevel(0);
   mb_enc_lowres := TMBEncoderLowresRun.Create;
   mb_enc_lowres.me := me_lowres;
 

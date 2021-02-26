@@ -51,6 +51,14 @@ type
       procedure Write(bits, bit_count: longword);
   end;
 
+  TWriterState = record
+      cur: plongword;
+      value: longword;
+      mask: longword;
+  end;
+
+function WriterSnapshot(bs: TBitstreamWriter): TWriterState;
+procedure WriterRollback(bs: TBitstreamWriter; state: TWriterState);
 
 (*******************************************************************************
 *******************************************************************************)
@@ -63,6 +71,20 @@ begin
             (n shl 24) or
             ((n shr 8) and $ff00) or
             ((n shl 8) and $ff0000);
+end;
+
+function WriterSnapshot(bs: TBitstreamWriter): TWriterState;
+begin
+  result.cur   := bs.cur;
+  result.value := bs.cur^;
+  result.mask  := bs.mask;
+end;
+
+procedure WriterRollback(bs: TBitstreamWriter; state: TWriterState);
+begin
+  bs.cur  := state.cur;
+  bs.cur^ := state.value;
+  bs.mask := state.mask;
 end;
 
 
