@@ -351,7 +351,7 @@ var
 begin
   InterPredLoadMvs(mb, frame, num_ref_frames);
   mb_can_use_pskip := false;
-  if h264s.NoPSkipAllowed then
+  if h264s.slice_data.NoPSkipAllowed then
       exit;
 
   //can't handle out-of-frame mvp, don't skip
@@ -1096,10 +1096,10 @@ begin
 
   //write selected mb to get bitcost, and if I_PCM is cheaper, rewrite stored mb
   EncodeCurrentType;
-  h264s.SliceDataSnapshot;
+  h264s.slice_data.Snapshot;
   h264s.WriteMB(mb);
   if mb.residual_bits >= MB_I_PCM_BITCOST then begin
-      h264s.SliceDataRollback;
+      h264s.slice_data.Rollback;
       mb.mbtype := MB_I_PCM;
       EncodeCurrentType;
       FinalizeMB;

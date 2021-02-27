@@ -60,6 +60,7 @@ type
       type_: byte;                  //in
       qp: byte;                     //in
       num_ref_frames: byte;         //in
+      first_mb_in_slice: integer;   //in
       nal_unit_type: TNALUnitType;
       frame_num: integer;
   end;
@@ -72,22 +73,16 @@ type
       procedure WriteByte(b: integer); inline;
   end;
 
+  TH264SliceData = class;
+
   { TH264Stream }
 
   TH264Stream = class
     private
       bs: TBitstreamWriter;
-      mb_skip_count: integer;
-      intra_base_code: integer;
-      last_mb_qp: byte;
-
       sps: sps_t;
       pps: pps_t;
       slice: TH264Slice;
-      slice_state: record
-          bs_state: TWriterState;
-          mb_skip_count: integer;
-      end;
       write_sei: boolean;
       write_vui: boolean;
       sei_string: string;
@@ -98,7 +93,6 @@ type
       end;
       idr_pic_id: word;
 
-      function GetNoPSkip: boolean; inline;
       procedure SetChromaQPOffset(const AValue: int8);
       procedure SetKeyInterval(const AValue: word);
       procedure SetNumRefFrames(const AValue: byte);
@@ -107,6 +101,42 @@ type
       procedure SetSEI(const AValue: string);
       procedure WriteSliceHeader;
       procedure WriteParamSetsToNAL(var nalstream: TNALStream);
+
+    public
+      slice_data: TH264SliceData;
+
+      property NumRefFrames: byte read sps.num_ref_frames write SetNumRefFrames;
+      property QP: byte             write SetQP;
+      property ChromaQPOffset: int8 write SetChromaQPOffset;
+      property KeyInterval: word    write SetKeyInterval;
+      property SEIString: string    read GetSEI write SetSEI;
+
+      constructor Create(w, h, mbw, mbh: integer);
+      destructor Free;
+      procedure LoopFilter(enable: boolean; ab_offset_div2: int8);
+      procedure InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
+      procedure AbortSlice;
+      procedure GetSliceBytes(var buffer: pbyte; out size: longword);
+      procedure WriteMB (var mb: macroblock_t);
+      function GetBitCost (const mb: macroblock_t): integer;
+  end;
+
+  { TH264SliceData }
+
+  TH264SliceData = class
+    private
+      bs: TBitstreamWriter;
+      mb_skip_count: integer;
+      intra_base_code: integer;
+      last_mb_qp: byte;
+      slice: TH264Slice;
+      slice_state: record
+          bs_state: TWriterState;
+          mb_skip_count: integer;
+      end;
+      cabac: boolean;
+
+      function GetNoPSkip: boolean; inline;
 
       procedure write_mb_pred_intra(const mb: macroblock_t);
       procedure write_mb_pred_inter(const mb: macroblock_t);
@@ -125,21 +155,15 @@ type
       function mb_interpred_bits (const mb: macroblock_t): integer;
 
     public
-      property NumRefFrames: byte read sps.num_ref_frames write SetNumRefFrames;
-      property QP: byte             write SetQP;
-      property ChromaQPOffset: int8 write SetChromaQPOffset;
-      property KeyInterval: word    write SetKeyInterval;
-      property SEIString: string    read GetSEI write SetSEI;
       property NoPSkipAllowed: boolean  read GetNoPSkip;
 
-      constructor Create(w, h, mbw, mbh: integer);
+      constructor Create();
       destructor Free;
-      procedure LoopFilter(enable: boolean; ab_offset_div2: int8);
-      procedure InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
-      procedure SliceDataSnapshot;
-      procedure SliceDataRollback;
-      procedure AbortSlice;
-      procedure GetSliceBytes(var buffer: pbyte; out size: longword);
+      procedure Init;
+      procedure Abort;
+      procedure Finish;
+      procedure Snapshot;
+      procedure Rollback;
       procedure WriteMB (var mb: macroblock_t);
       function GetBitCost (const mb: macroblock_t): integer;
   end;
@@ -274,6 +298,78 @@ begin
   rbsp.ByteAlign;
 end;
 
+
+
+{ TH264Stream }
+
+constructor TH264Stream.Create(w, h, mbw, mbh: integer);
+const
+  QP_DEFAULT = 26;
+begin
+  with sps do begin
+      width  := w;
+      height := h;
+      mb_width  := mbw;
+      mb_height := mbh;
+      pic_order_cnt_type := 0;
+  end;
+  write_vui := true;
+  write_sei := true;
+  sei_string := '';
+
+  pps.qp := QP_DEFAULT;
+  pps.chroma_qp_offset := 0;
+  pps.deblocking_filter_control_present_flag := 0;
+
+  idr_pic_id := 0;
+  cabac := false;
+  slice_data := TH264SliceData.Create();
+end;
+
+destructor TH264Stream.Free;
+begin
+  slice_data.Free;
+end;
+
+procedure TH264Stream.SetChromaQPOffset(const AValue: int8);
+begin
+  pps.chroma_qp_offset := AValue;
+end;
+
+procedure TH264Stream.SetKeyInterval(const AValue: word);
+begin
+  sps.log2_max_frame_num_minus4 := max(num2log2(AValue) - 4, 0);
+  sps.log2_max_pic_order_cnt_lsb_minus4 := sps.log2_max_frame_num_minus4 + 1;
+end;
+
+procedure TH264Stream.SetNumRefFrames(const AValue: byte);
+begin
+  Assert(AValue <= 16);
+  sps.num_ref_frames := AValue;
+end;
+
+procedure TH264Stream.SetQP(const AValue: byte);
+begin
+  pps.qp := AValue;
+end;
+
+function TH264Stream.GetSEI: string;
+begin
+  result := sei_string;
+end;
+
+procedure TH264Stream.SetSEI(const AValue: string);
+begin
+  sei_string := AValue;
+end;
+
+procedure TH264Stream.LoopFilter(enable: boolean; ab_offset_div2: int8);
+begin
+  loopfilter_control.enable := enable;
+  loopfilter_control.ab_offset_div2 := ab_offset_div2;
+  if (not enable) or (ab_offset_div2 <> 0) then
+      pps.deblocking_filter_control_present_flag := 1;
+end;
 
 {
 write SPS/PPS to NAL unit
@@ -514,46 +610,124 @@ begin
   end;
 end;
 
-
-{ TH264Stream }
-
-procedure TH264Stream.SetChromaQPOffset(const AValue: int8);
+procedure TH264Stream.InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
 begin
-  pps.chroma_qp_offset := AValue;
+  with slice_params do begin
+      slice.type_ := type_;
+      slice.qp    := qp;
+      slice.num_ref_frames := num_ref_frames;
+  end;
+  if slice.type_ = SLICE_I then begin
+      slice.nal_unit_type := NAL_IDR;
+      slice.frame_num := 0;
+  end else begin
+      slice.nal_unit_type := NAL_NOIDR;
+      slice.frame_num += 1;
+  end;
+
+  bs := TBitstreamWriter.Create(bs_buffer);  //todo movetotop
+  WriteSliceHeader;
+
+  slice_data.slice := slice;
+  slice_data.bs := bs;
+  slice_data.cabac := cabac;
+
+  slice_data.Init;  //slice_data starts here
 end;
 
-function TH264Stream.GetNoPSkip: boolean;
+procedure TH264Stream.AbortSlice;
+begin
+  slice_data.abort;
+  bs.Free;
+end;
+
+//close slice data bitstream, write sps+pps if SLICE_I, convert to NAL
+procedure TH264Stream.GetSliceBytes(var buffer: pbyte; out size: longword);
+var
+  nalstream: TNALStream;
+begin
+  slice_data.Finish;
+
+  nalstream._current := buffer;
+  if (slice.type_ = SLICE_I) and (slice.nal_unit_type = NAL_IDR) then begin
+      WriteParamSetsToNAL(nalstream);
+      if idr_pic_id = 65535 then
+          idr_pic_id := 0
+      else
+          idr_pic_id += 1;
+  end;
+
+  NAL_encapsulate(bs, nalstream, slice.nal_unit_type);
+
+  size := nalstream._current - buffer;
+  bs.Free;
+end;
+
+procedure TH264Stream.WriteMB(var mb: macroblock_t);
+begin
+  slice_data.WriteMB(mb);
+end;
+
+function TH264Stream.GetBitCost(const mb: macroblock_t): integer;
+begin
+  result := slice_data.GetBitCost(mb);
+end;
+
+
+{ TH264SliceData }
+
+constructor TH264SliceData.Create();
+begin
+end;
+
+destructor TH264SliceData.Free;
+begin
+end;
+
+procedure TH264SliceData.Init;
+begin
+  last_mb_qp := slice.qp;
+  mb_skip_count := 0;
+  intra_base_code := 0;
+  if slice.type_ = SLICE_P then
+      intra_base_code := 5;
+  if cabac then   //slice_data contains cabac_alignment_one_bit
+      while not bs.IsByteAligned do
+          bs.Write(1);
+end;
+
+procedure TH264SliceData.Abort;
+begin
+end;
+
+procedure TH264SliceData.Finish;
+begin
+  if mb_skip_count > 0 then
+      write_ue_code(bs, mb_skip_count);
+  if cabac then  //end_of_slice_flag
+      ;  //todo
+  //rbsp_slice_trailing_bits
+  RBSP_TrailingBits(bs);
+  if cabac then  //cabac_zero_word
+      bs.Write(0, 16);
+end;
+
+function TH264SliceData.GetNoPSkip: boolean;
 begin
   result := mb_skip_count + 1 > MB_SKIP_MAX;
 end;
 
-procedure TH264Stream.SetKeyInterval(const AValue: word);
+procedure TH264SliceData.Snapshot;
 begin
-  sps.log2_max_frame_num_minus4 := max(num2log2(AValue) - 4, 0);
-  sps.log2_max_pic_order_cnt_lsb_minus4 := sps.log2_max_frame_num_minus4 + 1;
+  slice_state.bs_state := WriterSnapshot(bs);
+  slice_state.mb_skip_count := mb_skip_count;
 end;
 
-procedure TH264Stream.SetNumRefFrames(const AValue: byte);
+procedure TH264SliceData.Rollback;
 begin
-  Assert(AValue <= 16);
-  sps.num_ref_frames := AValue;
+  WriterRollback(bs, slice_state.bs_state);
+  mb_skip_count := slice_state.mb_skip_count;
 end;
-
-procedure TH264Stream.SetQP(const AValue: byte);
-begin
-  pps.qp := AValue;
-end;
-
-function TH264Stream.GetSEI: string;
-begin
-  result := sei_string;
-end;
-
-procedure TH264Stream.SetSEI(const AValue: string);
-begin
-  sei_string := AValue;
-end;
-
 
 (*******************************************************************************
 mode is derived from surrounding blocks of current or neighboring mbs (if available)
@@ -619,7 +793,7 @@ begin
 end;
 
 
-procedure TH264Stream.write_mb_pred_intra(const mb: macroblock_t);
+procedure TH264SliceData.write_mb_pred_intra(const mb: macroblock_t);
 var
   mode,          //current block intrapred mode
   pred: byte;    //predicted intrapred mode
@@ -646,7 +820,7 @@ begin
   write_ue_code(bs, mb.chroma_pred_mode);  //intra_chroma_pred_mode  ue(v)
 end;
 
-procedure TH264Stream.write_mb_pred_inter(const mb: macroblock_t);
+procedure TH264SliceData.write_mb_pred_inter(const mb: macroblock_t);
 var
   x, y: int16;
 begin
@@ -682,7 +856,7 @@ begin
 end;
 
 
-procedure TH264Stream.write_mb_residual(var mb: macroblock_t);
+procedure TH264SliceData.write_mb_residual(var mb: macroblock_t);
 var
   bits, i: integer;
   ctx: TCavlcEncodeContext;
@@ -734,119 +908,8 @@ begin
   mb.residual_bits := bs.BitSize - bits;
 end;
 
-constructor TH264Stream.Create(w, h, mbw, mbh: integer);
-const
-  QP_DEFAULT = 26;
-begin
-  with sps do begin
-      width  := w;
-      height := h;
-      mb_width  := mbw;
-      mb_height := mbh;
-      pic_order_cnt_type := 0;
-  end;
-  write_vui := true;
-  write_sei := true;
-  sei_string := '';
-
-  pps.qp := QP_DEFAULT;
-  pps.chroma_qp_offset := 0;
-  pps.deblocking_filter_control_present_flag := 0;
-
-  idr_pic_id := 0;
-  cabac := false;
-end;
-
-destructor TH264Stream.Free;
-begin
-end;
-
-procedure TH264Stream.LoopFilter(enable: boolean; ab_offset_div2: int8);
-begin
-  loopfilter_control.enable := enable;
-  loopfilter_control.ab_offset_div2 := ab_offset_div2;
-  if (not enable) or (ab_offset_div2 <> 0) then
-      pps.deblocking_filter_control_present_flag := 1;
-end;
-
-
-procedure TH264Stream.InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
-begin
-  with slice_params do begin
-      slice.type_ := type_;
-      slice.qp    := qp;
-      slice.num_ref_frames := num_ref_frames;
-  end;
-  if slice.type_ = SLICE_I then begin
-      slice.nal_unit_type := NAL_IDR;
-      slice.frame_num := 0;
-  end else begin
-      slice.nal_unit_type := NAL_NOIDR;
-      slice.frame_num += 1;
-  end;
-  intra_base_code := 0;
-  if slice.type_ = SLICE_P then
-      intra_base_code := 5;
-
-  mb_skip_count := 0;
-  last_mb_qp := slice.qp;
-
-  bs := TBitstreamWriter.Create(bs_buffer);
-  WriteSliceHeader;
-  //slice_data starts here
-  if cabac then   //slice_data contains cabac_alignment_one_bit
-      while not bs.IsByteAligned do
-          bs.Write(1);
-end;
-
-procedure TH264Stream.SliceDataSnapshot;
-begin
-  slice_state.bs_state := WriterSnapshot(bs);
-  slice_state.mb_skip_count := mb_skip_count;
-end;
-
-procedure TH264Stream.SliceDataRollback;
-begin
-  WriterRollback(bs, slice_state.bs_state);
-  mb_skip_count := slice_state.mb_skip_count;
-end;
-
-procedure TH264Stream.AbortSlice;
-begin
-  bs.Free;
-end;
-
-//close slice data bitstream, write sps+pps if SLICE_I, convert to NAL
-procedure TH264Stream.GetSliceBytes(var buffer: pbyte; out size: longword);
-var
-  nalstream: TNALStream;
-begin
-  if mb_skip_count > 0 then
-      write_ue_code(bs, mb_skip_count);
-  if cabac then  //end_of_slice_flag
-      ;  //todo
-  nalstream._current := buffer;
-  if (slice.type_ = SLICE_I) and (slice.nal_unit_type = NAL_IDR) then begin
-      WriteParamSetsToNAL(nalstream);
-      if idr_pic_id = 65535 then
-          idr_pic_id := 0
-      else
-          idr_pic_id += 1;
-  end;
-
-  //rbsp_slice_trailing_bits
-  RBSP_TrailingBits(bs);
-  if cabac then  //cabac_zero_word
-      bs.Write(0, 16);
-  NAL_encapsulate(bs, nalstream, slice.nal_unit_type);
-
-  size := nalstream._current - buffer;
-  bs.Free;
-end;
-
-
 //PCM mb - no compression
-procedure TH264Stream.write_mb_i_pcm(var mb: macroblock_t);
+procedure TH264SliceData.write_mb_i_pcm(var mb: macroblock_t);
 var
   i, j, chroma_idx: integer;
   bits: integer;
@@ -862,7 +925,7 @@ begin
   mb.residual_bits := bs.BitSize - bits;
 end;
 
-procedure TH264Stream.write_mb_i_4x4(var mb: macroblock_t);
+procedure TH264SliceData.write_mb_i_4x4(var mb: macroblock_t);
 begin
   write_ue_code(bs, 0 + intra_base_code);
   write_mb_pred_intra(mb);
@@ -881,7 +944,7 @@ begin
       result += 12;
 end;
 
-procedure TH264Stream.write_mb_i_16x16(var mb: macroblock_t);
+procedure TH264SliceData.write_mb_i_16x16(var mb: macroblock_t);
 var
   mbt: integer;
 begin
@@ -891,7 +954,7 @@ begin
   write_mb_residual(mb);
 end;
 
-procedure TH264Stream.write_mb_p_16x16(var mb: macroblock_t);
+procedure TH264SliceData.write_mb_p_16x16(var mb: macroblock_t);
 var
   mb_type: integer;
 begin
@@ -906,7 +969,7 @@ begin
 end;
 
 //codes for mb types - tab. 7-8 / 7-10
-procedure TH264Stream.WriteMB(var mb: macroblock_t);
+procedure TH264SliceData.WriteMB(var mb: macroblock_t);
 begin
   if (slice.type_ = SLICE_P) then
       if mb.mbtype = MB_P_SKIP then
@@ -927,7 +990,7 @@ begin
   end;
 end;
 
-function TH264Stream.GetBitCost(const mb: macroblock_t): integer;
+function TH264SliceData.GetBitCost(const mb: macroblock_t): integer;
 begin
   case mb.mbtype of
       MB_I_4x4:
@@ -947,7 +1010,7 @@ end;
 
 
 //bitcost functions
-function TH264Stream.mb_interpred_bits(const mb: macroblock_t): integer;
+function TH264SliceData.mb_interpred_bits(const mb: macroblock_t): integer;
 var
   x, y: int16;
 begin
@@ -972,7 +1035,7 @@ begin
 end;
 
 
-function TH264Stream.mb_intrapred_bits(const mb: macroblock_t): integer;
+function TH264SliceData.mb_intrapred_bits(const mb: macroblock_t): integer;
 var
   mode,          //current block intrapred mode
   pred: byte;    //predicted intrapred mode
@@ -995,7 +1058,7 @@ begin
 end;
 
 
-function TH264Stream.mb_residual_bits(const mb: macroblock_t): integer;
+function TH264SliceData.mb_residual_bits(const mb: macroblock_t): integer;
 var
   i: byte;
 begin
@@ -1024,7 +1087,7 @@ begin
 end;
 
 
-function TH264Stream.mb_i_4x4_bits(const mb: macroblock_t): integer;
+function TH264SliceData.mb_i_4x4_bits(const mb: macroblock_t): integer;
 begin
   if slice.type_ = SLICE_P then
       result := ue_code_len(5)
@@ -1036,7 +1099,7 @@ begin
       result += mb_residual_bits(mb);
 end;
 
-function TH264Stream.mb_i_16x16_bits(const mb: macroblock_t): integer;
+function TH264SliceData.mb_i_16x16_bits(const mb: macroblock_t): integer;
 var
   mbt: integer;
 begin
@@ -1049,7 +1112,7 @@ begin
   result += mb_residual_bits(mb);
 end;
 
-function TH264Stream.mb_p_16x16_bits(const mb: macroblock_t): integer;
+function TH264SliceData.mb_p_16x16_bits(const mb: macroblock_t): integer;
 begin
   result := 1 + mb_interpred_bits(mb);
   result += ue_code_len(tab_cbp_inter_4x4_to_codenum[mb.cbp]);
@@ -1057,7 +1120,7 @@ begin
       result += mb_residual_bits(mb);
 end;
 
-function TH264Stream.mb_p_16x8_bits(const mb: macroblock_t): integer;
+function TH264SliceData.mb_p_16x8_bits(const mb: macroblock_t): integer;
 begin
   result := 3 + mb_interpred_bits(mb);
   result += ue_code_len(tab_cbp_inter_4x4_to_codenum[mb.cbp]);
@@ -1065,7 +1128,7 @@ begin
       result += mb_residual_bits(mb);
 end;
 
-function TH264Stream.mb_p_skip_bits: integer;
+function TH264SliceData.mb_p_skip_bits: integer;
 begin
   result := ue_code_len(mb_skip_count + 1) - ue_code_len(mb_skip_count);
 end;
