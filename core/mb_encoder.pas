@@ -67,7 +67,7 @@ type
 
     public
       me: TMotionEstimator;
-      h264s: TH264Stream;
+      h264s: TH264SliceData;
       chroma_coding: boolean;  //todo private
       num_ref_frames: integer;
       LoopFilter: boolean;
@@ -351,7 +351,7 @@ var
 begin
   InterPredLoadMvs(mb, frame, num_ref_frames);
   mb_can_use_pskip := false;
-  if h264s.slice_data.NoPSkipAllowed then
+  if h264s.NoPSkipAllowed then
       exit;
 
   //can't handle out-of-frame mvp, don't skip
@@ -753,7 +753,7 @@ begin
       CacheMvStore;
       if not p16_cached then
           CacheStore;
-      me.Refine(mb);
+      me.Refine(mb, h264s);
       if mb.mv = cache_motion.mv then begin  //refinement couldn't find better mv
           CacheLoad;
           MotionCompensation.CompensateChroma(mb.fref, mb);
@@ -1096,10 +1096,10 @@ begin
 
   //write selected mb to get bitcost, and if I_PCM is cheaper, rewrite stored mb
   EncodeCurrentType;
-  h264s.slice_data.Snapshot;
+  h264s.Snapshot;
   h264s.WriteMB(mb);
   if mb.residual_bits >= MB_I_PCM_BITCOST then begin
-      h264s.slice_data.Rollback;
+      h264s.Rollback;
       mb.mbtype := MB_I_PCM;
       EncodeCurrentType;
       FinalizeMB;

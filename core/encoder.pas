@@ -178,7 +178,7 @@ begin
   frames := TFrameManager.Create(num_ref_frames, mb_width, mb_height);
 
   //inter pred
-  me := TMotionEstimator.Create(width, height, mb_width, mb_height, h264s);
+  me := TMotionEstimator.Create(width, height, mb_width, mb_height);
   me.SetSearchLevel(param.SubpixelMELevel, lossless);
 
   //ratecontrol
@@ -203,7 +203,7 @@ begin
       end;
   mb_enc.num_ref_frames := num_ref_frames;
   mb_enc.me := me;
-  mb_enc.h264s := h264s;
+  mb_enc.h264s := h264s.slice_data;
   mb_enc.chroma_coding := not param.IgnoreChroma;
   mb_enc.LoopFilter := param.LoopFilterEnabled;
   mb_enc.EnablePartitions := (param.PartitionAnalysisLevel > 0) and (param.SubpixelMELevel > 0);
@@ -211,7 +211,7 @@ begin
   //lowres ME - fast fullpel luma search, only macroblock MV gets stored
   me_lowres := TMotionEstimator.Create(
                    frames.lowres_mb_width * 16, frames.lowres_mb_height * 16,
-                   frames.lowres_mb_width, frames.lowres_mb_height, h264s);
+                   frames.lowres_mb_width, frames.lowres_mb_height);
   me_lowres.SetSearchLevel(0);
   mb_enc_lowres := TMBEncoderLowresRun.Create;
   mb_enc_lowres.me := me_lowres;
@@ -349,7 +349,7 @@ begin
       qp := fenc.qp;
       num_ref_frames := fenc.num_ref_frames;
   end;
-  h264s.InitSlice(slice, fenc.bs_buf);
+  h264s.InitSlice(slice, fenc.bs_buf, 0);
 
   //frame encoding setup
   fenc.stats.Clear;

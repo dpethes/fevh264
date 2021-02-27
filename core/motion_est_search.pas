@@ -38,7 +38,6 @@ type
       _last_search_score: integer;
       _starting_fpel_mv: motionvec_t;
       InterCost: TInterPredCost;
-      h264s: TH264Stream;
       _qpel_satd,
       _chroma_me: boolean;
 
@@ -50,12 +49,12 @@ type
       property UseSatdForQpel: boolean write _qpel_satd;
       property UseChromaScore: boolean write _chroma_me;
 
-      constructor Create(region_width, region_height: integer; h264stream: TH264Stream; inter_cost: TInterPredCost);
+      constructor Create(region_width, region_height: integer; inter_cost: TInterPredCost);
       procedure PickFPelStartingPoint(const fref: frame_p; const predicted_mv_list: TMotionVectorList);
       function SearchFPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchHPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchQPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
-      procedure SearchQPelRDO(var mb: macroblock_t; const fref: frame_p);
+      procedure SearchQPelRDO(var mb: macroblock_t; const fref: frame_p; h264s: TH264SliceData);
       function SearchQPel_16x8_partition(var mb: macroblock_t; starting_mv: motionvec_t; idx: integer; const fref: frame_p): motionvec_t;
  end;
 
@@ -86,12 +85,10 @@ const
   pt_square: array[0..7] of TXYOffs =
       ( (0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1) );
 
-constructor TRegionSearch.Create(region_width, region_height: integer;
-  h264stream: TH264Stream; inter_cost: TInterPredCost);
+constructor TRegionSearch.Create(region_width, region_height: integer; inter_cost: TInterPredCost);
 var
   edge: integer;
 begin
-  H264s := h264stream;
   InterCost := inter_cost;
 
   _starting_fpel_mv  := ZERO_MV;
@@ -411,8 +408,7 @@ begin
 end;
 
 
-
-procedure TRegionSearch.SearchQPelRDO(var mb: macroblock_t; const fref: frame_p);
+procedure TRegionSearch.SearchQPelRDO(var mb: macroblock_t; const fref: frame_p; h264s: TH264SliceData);
 const
 { for qp in range(15,52):
     lx = 0.85 * pow(2, (qp-12) / 3.2)

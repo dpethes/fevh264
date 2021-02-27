@@ -56,12 +56,12 @@ type
       InterCost: TInterPredCost;
       property NumReferences: integer read ref_count write SetNumReferences;
 
-      constructor Create(const w, h, mbw, mbh: integer; h264stream: TH264Stream);
+      constructor Create(const w, h, mbw, mbh: integer);
       destructor Free;
       procedure SetSearchLevel(subme: integer; lossless: boolean = false);
       procedure Estimate(var mb: macroblock_t; var fenc: frame_t);
       procedure Estimate_16x8(var mb: macroblock_t);
-      procedure Refine(var mb: macroblock_t);
+      procedure Refine(var mb: macroblock_t; h264s: TH264SliceData);
       procedure Skipped(var mb: macroblock_t);
   end;
 
@@ -145,7 +145,7 @@ begin
   SearchRegion.UseChromaScore := _subme >= 4;
 end;
 
-constructor TMotionEstimator.Create(const w, h, mbw, mbh: integer; h264stream: TH264Stream);
+constructor TMotionEstimator.Create(const w, h, mbw, mbh: integer);
 var
   size: integer;
 begin
@@ -161,7 +161,7 @@ begin
   predicted_mv_list.Clear;
 
   InterCost := TInterPredCost.Create();
-  SearchRegion := TRegionSearch.Create(width, height, h264stream, InterCost);
+  SearchRegion := TRegionSearch.Create(width, height, InterCost);
 end;
 
 destructor TMotionEstimator.Free;
@@ -226,7 +226,7 @@ begin
   MotionCompensation.Compensate(fref, mb);
 end;
 
-procedure TMotionEstimator.Refine(var mb: macroblock_t);
+procedure TMotionEstimator.Refine(var mb: macroblock_t; h264s: TH264SliceData);
 var
   mv: motionvec_t;
 begin
@@ -234,7 +234,7 @@ begin
       exit;
 
   mv := mb.mv;
-  SearchRegion.SearchQPelRDO(mb, mb.fref);
+  SearchRegion.SearchQPelRDO(mb, mb.fref, h264s);
   if mv <> mb.mv then begin
       mb.mv := ClipMVRange(mb.mv);
       mv_field[mb.y * mb_width + mb.x] := mb.mv;

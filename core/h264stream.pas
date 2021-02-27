@@ -83,9 +83,9 @@ type
       sps: sps_t;
       pps: pps_t;
       slice: TH264Slice;
-      write_sei: boolean;
-      write_vui: boolean;
       sei_string: string;
+      write_sei_and_vui: boolean;
+      write_param_sets: boolean;
       cabac: boolean;
       loopfilter_control: record
           enable: boolean;
@@ -99,7 +99,7 @@ type
       procedure SetQP(const AValue: byte);
       function  GetSEI: string;
       procedure SetSEI(const AValue: string);
-      procedure WriteSliceHeader;
+      procedure WriteSliceHeader(first_mb_in_slice: integer);
       procedure WriteParamSetsToNAL(var nalstream: TNALStream);
 
     public
@@ -114,11 +114,9 @@ type
       constructor Create(w, h, mbw, mbh: integer);
       destructor Free;
       procedure LoopFilter(enable: boolean; ab_offset_div2: int8);
-      procedure InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
+      procedure InitSlice(slice_params: TH264Slice; bs_buffer: pbyte; first_mb_in_slice: integer);
       procedure AbortSlice;
       procedure GetSliceBytes(var buffer: pbyte; out size: longword);
-      procedure WriteMB (var mb: macroblock_t);
-      function GetBitCost (const mb: macroblock_t): integer;
   end;
 
   { TH264SliceData }
@@ -313,8 +311,7 @@ begin
       mb_height := mbh;
       pic_order_cnt_type := 0;
   end;
-  write_vui := true;
-  write_sei := true;
+  write_sei_and_vui := true;
   sei_string := '';
 
   pps.qp := QP_DEFAULT;
@@ -454,7 +451,7 @@ begin
   end;
 
   //VUI
-  if write_vui then begin
+  if write_sei_and_vui then begin
       b.Write(1);             //vui_parameters_present_flag u(1)
       b.Write(0);             //aspect_ratio_info_present_flag
       b.Write(0);             //overscan_info_present_flag
@@ -512,7 +509,7 @@ begin
   b.Free;
 
   //sei; payload_type = 5 (user_data_unregistered)
-  if write_sei then begin
+  if write_sei_and_vui then begin
       sei_text := SEI_UUID + 'fevh264 ' + sei_string;
 
       b := TBitstreamWriter.Create(@rbsp);
@@ -532,9 +529,7 @@ begin
       b.Free;
   end;
 
-  //write aux. info only once
-  write_vui := false;
-  write_sei := false;
+  write_sei_and_vui := false;  //write aux. info only once
 end;
 
 
@@ -560,11 +555,11 @@ is used as an identifier for pictures and shall be represented by log2_max_frame
 frame_num = 0 for IDR slices
 nal_ref_idc = 0 only for non-reference picture
 }
-procedure TH264Stream.WriteSliceHeader;
+procedure TH264Stream.WriteSliceHeader(first_mb_in_slice: integer);
 const
   nal_ref_idc = 1;
 begin
-  write_ue_code(bs, 0);                      //first_mb_in_slice   ue(v)
+  write_ue_code(bs, first_mb_in_slice);      //first_mb_in_slice   ue(v)
   write_ue_code(bs, slice.type_);            //slice_type          ue(v)
   write_ue_code(bs, 0);                      //pic_parameter_set_id  ue(v)
   bs.Write(slice.frame_num, 4 + sps.log2_max_frame_num_minus4);
@@ -610,7 +605,7 @@ begin
   end;
 end;
 
-procedure TH264Stream.InitSlice(slice_params: TH264Slice; bs_buffer: pbyte);
+procedure TH264Stream.InitSlice(slice_params: TH264Slice; bs_buffer: pbyte; first_mb_in_slice: integer);
 begin
   with slice_params do begin
       slice.type_ := type_;
@@ -626,7 +621,7 @@ begin
   end;
 
   bs := TBitstreamWriter.Create(bs_buffer);  //todo movetotop
-  WriteSliceHeader;
+  WriteSliceHeader(first_mb_in_slice);
 
   slice_data.slice := slice;
   slice_data.bs := bs;
@@ -662,17 +657,6 @@ begin
   size := nalstream._current - buffer;
   bs.Free;
 end;
-
-procedure TH264Stream.WriteMB(var mb: macroblock_t);
-begin
-  slice_data.WriteMB(mb);
-end;
-
-function TH264Stream.GetBitCost(const mb: macroblock_t): integer;
-begin
-  result := slice_data.GetBitCost(mb);
-end;
-
 
 { TH264SliceData }
 
