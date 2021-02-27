@@ -873,7 +873,7 @@ end;
 procedure TMBEncoderQuickAnalyseSATD.SetFrame(const f: frame_t);
 begin
   inherited SetFrame(f);
-  InterCost := h264s.InterPredCost;
+  InterCost := me.InterCost;
 end;
 
 procedure TMBEncoderQuickAnalyseSATD.Encode(mbx, mby: integer);

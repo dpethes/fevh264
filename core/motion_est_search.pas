@@ -25,7 +25,7 @@ unit motion_est_search;
 interface
 
 uses
-  common, util, motion_comp, frame, h264stream, macroblock;
+  common, util, inter_pred, motion_comp, frame, h264stream, macroblock;
 
 type
   { TRegionSearch }
@@ -50,7 +50,7 @@ type
       property UseSatdForQpel: boolean write _qpel_satd;
       property UseChromaScore: boolean write _chroma_me;
 
-      constructor Create(region_width, region_height: integer; h264stream: TH264Stream);
+      constructor Create(region_width, region_height: integer; h264stream: TH264Stream; inter_cost: TInterPredCost);
       procedure PickFPelStartingPoint(const fref: frame_p; const predicted_mv_list: TMotionVectorList);
       function SearchFPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
       function SearchHPel(var mb: macroblock_t; const fref: frame_p): motionvec_t;
@@ -86,12 +86,13 @@ const
   pt_square: array[0..7] of TXYOffs =
       ( (0, -1), (0, 1), (-1, 0), (1, 0), (-1, -1), (-1, 1), (1, -1), (1, 1) );
 
-constructor TRegionSearch.Create(region_width, region_height: integer; h264stream: TH264Stream);
+constructor TRegionSearch.Create(region_width, region_height: integer;
+  h264stream: TH264Stream; inter_cost: TInterPredCost);
 var
   edge: integer;
 begin
   H264s := h264stream;
-  InterCost := H264s.InterPredCost;
+  InterCost := inter_cost;
 
   _starting_fpel_mv  := ZERO_MV;
   _last_search_score := MaxInt;

@@ -64,8 +64,6 @@ type
       frame_num: integer;
   end;
 
-  TInterPredCost = class;
-
   { TNALStream }
   TNALStream = object
     public
@@ -79,7 +77,6 @@ type
   TH264Stream = class
     private
       bs: TBitstreamWriter;
-      interPredCostEval: TInterPredCost;
       mb_skip_count: integer;
       intra_base_code: integer;
       last_mb_qp: byte;
@@ -145,24 +142,6 @@ type
       procedure GetSliceBytes(var buffer: pbyte; out size: longword);
       procedure WriteMB (var mb: macroblock_t);
       function GetBitCost (const mb: macroblock_t): integer;
-      function InterPredCost: TInterPredCost;
-  end;
-
-  { TInterPredCost }
-
-  TInterPredCost = class
-    private
-      _h264stream: TH264Stream;
-      _lambda: integer;
-      _mvp: motionvec_t;
-      _ref_idx: integer;
-      _ref_frame_bits: integer;
-    public
-      constructor Create(const h264stream: TH264Stream);
-      procedure SetQP(qp: integer);
-      procedure SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer);
-      function Bits(const mv: motionvec_t): integer; inline;
-      function Bits(const mvx, mvy: integer): integer;
   end;
 
   function predict_intra_4x4_mode(const modes: array of byte; const i: byte): byte;
@@ -776,13 +755,10 @@ begin
 
   idr_pic_id := 0;
   cabac := false;
-
-  interPredCostEval := TInterPredCost.Create(self);
 end;
 
 destructor TH264Stream.Free;
 begin
-  interPredCostEval.Free;
 end;
 
 procedure TH264Stream.LoopFilter(enable: boolean; ab_offset_div2: int8);
@@ -995,11 +971,6 @@ begin
   end;
 end;
 
-function TH264Stream.InterPredCost: TInterPredCost;
-begin
-  result := interPredCostEval;
-end;
-
 
 function TH264Stream.mb_intrapred_bits(const mb: macroblock_t): integer;
 var
@@ -1098,55 +1069,6 @@ function TH264Stream.mb_p_skip_bits: integer;
 begin
   result := ue_code_len(mb_skip_count + 1) - ue_code_len(mb_skip_count);
 end;
-
-{ TInterPredCost }
-
-const
-  lambda_mv: array[0..QP_MAX] of byte = (
-      0,0,0,0,0,0,0,1,1,1,
-      1,1,1,1,1,1,1,2,2,2,
-      2,3,3,3,4,4,5,5,6,7,
-      7,8,9,10,12,13,15,17,19,21,
-      23,26,30,33,37,42,47,53,59,66,
-      74,83
-  );
-
-procedure TInterPredCost.SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer);
-begin
-  _mvp := mvp;
-  _ref_idx := idx;
-  case _h264stream.slice.num_ref_frames of
-      1: _ref_frame_bits := 0;
-      2: _ref_frame_bits := 1;
-  else
-      _ref_frame_bits := ue_code_len(_ref_idx);
-  end;
-end;
-
-constructor TInterPredCost.Create(const h264stream: TH264Stream);
-begin
-  _h264stream := h264stream;
-  _lambda := 1;
-  _mvp := ZERO_MV;
-  _ref_idx := 0;
-end;
-
-procedure TInterPredCost.SetQP(qp: integer);
-begin
-  _lambda := lambda_mv[qp];
-end;
-
-function TInterPredCost.Bits(const mv: motionvec_t): integer;
-begin
-  result := Bits(mv.x, mv.y);
-end;
-
-function TInterPredCost.Bits(const mvx, mvy: integer): integer;
-begin
-  result := _ref_frame_bits + se_code_len(mvx - _mvp.x) + se_code_len(mvy - _mvp.y);
-  result *= _lambda;
-end;
-
 
 end.
 

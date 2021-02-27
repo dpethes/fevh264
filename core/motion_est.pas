@@ -44,9 +44,7 @@ type
       predicted_mv_list: TMotionVectorList;
       ref_count: integer;
       _subme: integer;
-
       SearchRegion: TRegionSearch;
-      InterCost: TInterPredCost;
 
       procedure EstimateMultiRef(var mb: macroblock_t; var fenc: frame_t);
       procedure EstimateSingleRef(var mb: macroblock_t; var fenc: frame_t);
@@ -54,8 +52,8 @@ type
       class function ClipMVRange(const mv: motionvec_t): motionvec_t;
       procedure SetNumReferences(AValue: integer);
 
-
     public
+      InterCost: TInterPredCost;
       property NumReferences: integer read ref_count write SetNumReferences;
 
       constructor Create(const w, h, mbw, mbh: integer; h264stream: TH264Stream);
@@ -162,8 +160,8 @@ begin
 
   predicted_mv_list.Clear;
 
-  InterCost := h264stream.InterPredCost;
-  SearchRegion := TRegionSearch.Create(width, height, h264stream);
+  InterCost := TInterPredCost.Create();
+  SearchRegion := TRegionSearch.Create(width, height, h264stream, InterCost);
 end;
 
 destructor TMotionEstimator.Free;
@@ -181,7 +179,7 @@ begin
   SearchRegion.cur := mb.pixels;
   SearchRegion._mbx := mb.x * 16;
   SearchRegion._mby := mb.y * 16;
-  InterCost.SetQP(mb.qp);
+  InterCost.SetSliceParams(mb.qp, NumReferences);
 
   predicted_mv_list.Clear;
   predicted_mv_list.Add(mb.mvp);

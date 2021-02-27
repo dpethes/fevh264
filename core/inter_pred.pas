@@ -5,10 +5,27 @@ unit inter_pred;
 interface
 
 uses
-  common, util;
+  common, vlc, util;
+
+type
+  { TInterPredCost }
+
+  TInterPredCost = class
+    private
+      _mvp: motionvec_t;
+      _lambda,
+      _ref_idx,
+      _ref_frame_bits,
+      _num_ref_frames: byte;
+    public
+      constructor Create();
+      procedure SetSliceParams(qp: integer; num_ref_frames: integer);
+      procedure SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer);
+      function Bits(const mv: motionvec_t): integer; inline;
+      function Bits(const mvx, mvy: integer): integer;
+  end;
 
 procedure InterPredLoadMvs (var mb: macroblock_t; const frame: frame_t; const num_ref_frames: integer);
-
 
 implementation
 
@@ -152,6 +169,54 @@ begin
 end;
 
 
+{ TInterPredCost }
+
+const
+  lambda_mv: array[0..QP_MAX] of byte = (
+      0,0,0,0,0,0,0,1,1,1,
+      1,1,1,1,1,1,1,2,2,2,
+      2,3,3,3,4,4,5,5,6,7,
+      7,8,9,10,12,13,15,17,19,21,
+      23,26,30,33,37,42,47,53,59,66,
+      74,83
+  );
+
+procedure TInterPredCost.SetMVPredAndRefIdx(const mvp: motionvec_t; const idx: integer);
+begin
+  _mvp := mvp;
+  _ref_idx := idx;
+  case _num_ref_frames of
+      1: _ref_frame_bits := 0;
+      2: _ref_frame_bits := 1;
+  else
+      _ref_frame_bits := ue_code_len(_ref_idx);
+  end;
+end;
+
+constructor TInterPredCost.Create();
+begin
+  _lambda := 1;
+  _mvp := ZERO_MV;
+  _ref_idx := 0;
+  _num_ref_frames := 1;
+end;
+
+procedure TInterPredCost.SetSliceParams(qp: integer; num_ref_frames: integer);
+begin
+  _lambda := lambda_mv[qp];
+  _num_ref_frames := num_ref_frames;
+end;
+
+function TInterPredCost.Bits(const mv: motionvec_t): integer;
+begin
+  result := Bits(mv.x, mv.y);
+end;
+
+function TInterPredCost.Bits(const mvx, mvy: integer): integer;
+begin
+  result := _ref_frame_bits + se_code_len(mvx - _mvp.x) + se_code_len(mvy - _mvp.y);
+  result *= _lambda;
+end;
 
 end.
 
