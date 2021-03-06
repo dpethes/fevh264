@@ -153,12 +153,16 @@ procedure TCodingStats.WriteReferenceInfo(var f: TextFile; const refcount: integ
 var
   mbp_count: integer;
   i: integer;
+  p: single;
 begin
   if refcount > 1 then begin
       mbp_count := mb_type_count[MB_P_SKIP] + mb_type_count[MB_P_16x16] + mb_type_count[MB_P_16x8];   //no mixed refs
       write(f, 'L0 ref: ');
       for i := 0 to refcount - 1 do begin
-          write(f, ref[i] / (mbp_count / 100):3:1, '% ');
+          p := 0;
+          if mbp_count > 0 then
+              p := ref[i] / (mbp_count / 100);
+          write(f, p:3:1, '% ');
       end;
       writeln(f);
   end;
