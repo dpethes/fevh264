@@ -23,14 +23,14 @@ program fevh264_cli;
 {$mode objfpc}{$H+}
 
 uses
-  sysutils, Classes, CliParamHandler, math,
+  sysutils, Classes, CliParams, math,
   yuv4mpeg, pgm,
   image, parameters, encoder, util;
   
 var
   foutput: string;
   frames: integer;
-  options: TCliOptionHandler;
+  g_cliopts: TCliOptionHandler;
 
 
 (* get_msecs
@@ -76,13 +76,13 @@ var
 begin
   for i := 0 to length(txt) - 1 do
       writeln(stdout, txt[i]);
-  writeln(stdout, options.GetDescriptions);
+  writeln(stdout, g_cliopts.Descriptions);
 end;
 
 
 procedure FillOptionList;
 begin
-  with options do begin
+  with g_cliopts do begin
       AddOption('o', atString, 'output', 'output name');
       AddOption('d', atNone,   'dump',   'save reconstructed frames as *.pgm files');
       AddOption('f', atInt,    'frames', 'encode first n frames only');
@@ -112,49 +112,47 @@ end;
 procedure AssignCliOpts(param: TEncodingParameters; input_filename: string);
 begin
   try
-      if options.IsSet('qp') then
-          param.QParam := byte( StrToInt(options['q']) );
-      if options.IsSet('chroma-qp-offset') then
-          param.ChromaQParamOffset := StrToInt(options['c']);
-      if options.IsSet('offset-filter') then
-          param.FilterOffsetDiv2 := StrToInt(options['x']);
-      if options.IsSet('keyint') then
-          param.KeyFrameInterval := StrToInt(options['k']);
-      if options.IsSet('subme') then
-          param.SubpixelMELevel  := StrToInt(options['m']);
-      if options.IsSet('analyse') then
-          param.AnalysisLevel    := StrToInt(options['a']);
-      if options.IsSet('ref') then
-          param.NumReferenceFrames := byte( StrToInt(options['r']) );
-      if options.IsSet('partitions') then
-          param.PartitionAnalysisLevel := byte( StrToInt(options['p']) );
+    with g_cliopts do begin
+      if IsSet('qp') then
+          param.QParam := byte( StrToInt(g_cliopts['q']) );
+      if IsSet('chroma-qp-offset') then
+          param.ChromaQParamOffset := StrToInt(g_cliopts['c']);
+      if IsSet('offset-filter') then
+          param.FilterOffsetDiv2 := StrToInt(g_cliopts['x']);
+      if IsSet('keyint') then
+          param.KeyFrameInterval := StrToInt(g_cliopts['k']);
+      if IsSet('subme') then
+          param.SubpixelMELevel  := StrToInt(g_cliopts['m']);
+      if IsSet('analyse') then
+          param.AnalysisLevel    := StrToInt(g_cliopts['a']);
+      if IsSet('ref') then
+          param.NumReferenceFrames := byte( StrToInt(g_cliopts['r']) );
+      if IsSet('partitions') then
+          param.PartitionAnalysisLevel := byte( StrToInt(g_cliopts['p']) );
 
-      if options.IsSet('bitrate') then begin
-          param.SetABRRateControl( StrToInt(options['B']) );
+      if IsSet('bitrate') then begin
+          param.SetABRRateControl( StrToInt(g_cliopts['B']) );
           param.stats_1pass_filename := input_filename + '.1pass.txt';
       end;
       param.AdaptiveQuant     := false;
-      param.LoopFilterEnabled := options.IsSet('loopfilter');
-      param.FilterThreadEnabled := options.IsSet('filterthread');
-      param.IgnoreChroma      := options.IsSet('no-chroma');
-      param.WriteStatsFile    := options.IsSet('stats');
+      param.LoopFilterEnabled := IsSet('loopfilter');
+      param.FilterThreadEnabled := IsSet('filterthread');
+      param.IgnoreChroma      := IsSet('no-chroma');
+      param.WriteStatsFile    := IsSet('stats');
       if param.WriteStatsFile then begin
-          if options.IsSet('stats-name') then
-              param.stats_filename := options['S']
+          if IsSet('stats-name') then
+              param.stats_filename := g_cliopts['S']
           else if param.ABRRateControlEnabled then
               param.stats_filename := input_filename + '.2pass.txt'
           else
               param.stats_filename := input_filename + '.1pass.txt';
       end;
 
-      param.DumpFrames := options.IsSet('dump');
-      if options.IsSet('frames') then
-          frames := StrToInt(options['f']);
+      param.DumpFrames := IsSet('dump');
+      if IsSet('frames') then
+          frames := StrToInt(g_cliopts['f']);
+    end;
   except
-      on e: EParserError do begin
-          writeln('error while parsing arguments: ' + e.Message);
-          Halt;
-      end;
       on EConvertError do begin
           writeln(stderr, 'bad argument format');
           Halt;
@@ -170,11 +168,11 @@ var
   width, height: integer;
   ok: Boolean;
 begin
-  if options.UnparsedCount = 0 then begin
+  if g_cliopts.UnparsedCount = 0 then begin
       writeln(stderr, 'no input file specified');
       halt;
   end;
-  input := options.GetUnparsed(0);
+  input := g_cliopts.UnparsedValue(0);
   if not FileExists(input) then begin
       writeln('input file ' + input + ' doesn''t exist');
       halt;
@@ -185,8 +183,8 @@ begin
       result := TAvsReader.Create(input)
   else if ext = '.y4m' then
       result := TY4MFileReader.Create(input)
-  else if options.UnparsedCount = 3 then begin
-      ok := TryStrToInt(options.GetUnparsed(1), width) and TryStrToInt(options.GetUnparsed(2), height);
+  else if g_cliopts.UnparsedCount = 3 then begin
+      ok := TryStrToInt(g_cliopts.UnparsedValue(1), width) and TryStrToInt(g_cliopts.UnparsedValue(2), height);
       if not ok then begin
           writeln(stderr, 'invalid width/height');
           Halt;
@@ -195,8 +193,8 @@ begin
   end else
       result := TFFMS2Reader.Create(input);
 
-  if options.IsSet('output') then
-      foutput := options['o']
+  if g_cliopts.IsSet('output') then
+      foutput := g_cliopts['o']
   else
       foutput := input + '.264';
 end;
@@ -315,14 +313,19 @@ end;
 main
 *******************************************************************************)
 begin
-  options := TCliOptionHandler.Create;
+  g_cliopts := TCliOptionHandler.Create;
   FillOptionList;
-  options.ParseParameters;
-  if options.IsSet('help') then begin
+  g_cliopts.ParseFromCmdLine;
+  if not g_cliopts.ValidParams then begin
+      writeln('Error: ', g_cliopts.GetError);
+      Exit;
+  end;
+  if (g_cliopts.UnparsedCount = 0) or g_cliopts.IsSet('help') then begin
       WriteHelp
-  end else
+  end else begin
       Encode;
-  options.Free;
+  end;
+  g_cliopts.Free;
   writeln('done.');
 end.
 

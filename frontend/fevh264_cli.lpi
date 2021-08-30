@@ -182,9 +182,9 @@
         <IsPartOfProject Value="True"/>
       </Unit25>
       <Unit26>
-        <Filename Value="cliparamhandler.pas"/>
+        <Filename Value="cliparams.pas"/>
         <IsPartOfProject Value="True"/>
-        <UnitName Value="CliParamHandler"/>
+        <UnitName Value="CliParams"/>
       </Unit26>
       <Unit27>
         <Filename Value="..\core\motion_est_search.pas"/>
