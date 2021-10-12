@@ -206,11 +206,12 @@ end;
 function TCliOptionHandler.IsSet(const name: string): boolean;
 var
   option: TCliOption;
-  match: Boolean;
+  match, is_short_opt: boolean;
 begin
   result := false;
+  is_short_opt := Length(name) = 1;
   for option in usedOptions do begin
-      match := (option.LongName = name) or (option.ShortName = name[1]);
+      match := (option.LongName = name) or (is_short_opt and (option.ShortName = name[1]));
       if match then begin
           result := true;
           lastOption := option;

@@ -46,6 +46,9 @@
           </Linking>
           <Other>
             <CustomOptions Value="-dHAS_FFMS2"/>
+            <OtherDefines Count="1">
+              <Define0 Value="HAS_FFMS2"/>
+            </OtherDefines>
             <ExecuteBefore>
               <Command Value="build_asm_x64.bat"/>
               <ShowAllMessages Value="True"/>

@@ -1,6 +1,6 @@
 (*******************************************************************************
 fevh264_cli.pas
-Copyright (c) 2010-2018 David Pethes
+Copyright (c) 2010-2021 David Pethes
 
 This file is part of Fev.
 
@@ -28,11 +28,11 @@ uses
   image, parameters, encoder, util;
   
 var
-  foutput: string;
-  frames: integer;
+  frame_limit: integer;
   g_cliopts: TCliOptionHandler;
 
 
+//this doesn't quite give us the accuracy at high fps, should switch to qpc on windows
 function GetMsecs: QWord;
 begin
   Result := GetTickCount64;
@@ -144,7 +144,7 @@ begin
 
       param.DumpFrames := IsSet('dump');
       if IsSet('frames') then
-          frames := StrToInt(g_cliopts['f']);
+          frame_limit := StrToInt(g_cliopts['f']);
     end;
   except
       on EConvertError do begin
@@ -155,48 +155,32 @@ begin
 end;
 
 
-function OpenInput: TAbstractFileReader;
+function OpenInput(const input_name: string): TAbstractFileReader;
 var
-  input: string;
   ext: string;
   width, height: integer;
   ok: Boolean;
 begin
-  if g_cliopts.UnparsedCount = 0 then begin
-      writeln(stderr, 'no input file specified');
-      halt;
-  end;
-  input := g_cliopts.UnparsedValue(0);
-  if not FileExists(input) then begin
-      writeln('input file ' + input + ' doesn''t exist');
-      halt;
-  end;
-
-  ext := Copy(input, length(input) - 3, length(input));
+  ext := ExtractFileExt(input_name);
   if ext = '.avs' then
-      result := TAvsReader.Create(input)
+      result := TAvsReader.Create(input_name)
   else if ext = '.y4m' then
-      result := TY4MFileReader.Create(input)
+      result := TY4MFileReader.Create(input_name)
   else if g_cliopts.UnparsedCount = 3 then begin
       ok := TryStrToInt(g_cliopts.UnparsedValue(1), width) and TryStrToInt(g_cliopts.UnparsedValue(2), height);
       if not ok then begin
           writeln(stderr, 'invalid width/height');
           Halt;
       end;
-      result := TYuvFileReader.Create(input, width, height);
+      result := TYuvFileReader.Create(input_name, width, height);
   end else
-      result := TFFMS2Reader.Create(input);
-
-  if g_cliopts.IsSet('output') then
-      foutput := g_cliopts['o']
-  else
-      foutput := input + '.264';
+      result := TFFMS2Reader.Create(input_name);
 end;
 
 
 { encode input to h.264
 }
-procedure Encode;
+procedure Encode(const input_name, output_name: string);
 var
   infile: TAbstractFileReader;
   width, height: integer;
@@ -226,7 +210,7 @@ begin
       psnr_avg[i] := 0;
 
   //open input
-  infile := OpenInput;
+  infile := OpenInput(input_name);
   width  := infile.FrameWidth;
   height := infile.FrameHeight;
   frame_count := infile.FrameCount;
@@ -235,14 +219,14 @@ begin
                   [width, height, fps, frame_count]) );
 
   //open output file
-  AssignFile(fout, foutput);
+  AssignFile(fout, output_name);
   Rewrite   (fout, 1);
 
   //create encoder
   param := TEncodingParameters.Create(width, height, fps);
   AssignCliOpts(param, infile.Name);
-  if (frames > 0) and (frames < frame_count) then
-      frame_count := frames;
+  if (frame_limit > 0) and (frame_limit < frame_count) then
+      frame_count := frame_limit;
   param.FrameCount := frame_count;
 
   encoder := TFevh264Encoder.Create(param);
@@ -288,8 +272,8 @@ begin
   kbps := stream_size_total / 1000 * 8 / (frame_count / fps);
   fps  := frame_count / (time_total/1000);
 
-  write  ('average psnr / bitrate / speed:    ');
-  writeln(format('%.3f dB / %.1f kbps / %4.1f fps', [psnr_avg[0], kbps, fps]) );
+  writeln('average psnr / bitrate / speed:    ',
+          format('%.3f dB / %.1f kbps / %4.1f fps', [psnr_avg[0], kbps, fps]) );
   if not param.IgnoreChroma then
       writeln(format('average psnr chroma: %.2f / %.2f dB', [psnr_avg[1], psnr_avg[2]]) );
 
@@ -306,19 +290,38 @@ end;
 (*******************************************************************************
 main
 *******************************************************************************)
+var
+  input_name, output_name: string;
+
 begin
   g_cliopts := TCliOptionHandler.Create;
   FillOptionList;
   g_cliopts.ParseFromCmdLine;
   if not g_cliopts.ValidParams then begin
-      writeln('Error: ', g_cliopts.GetError);
+      writeln(stderr, 'Error: ', g_cliopts.GetError);
       Exit;
   end;
-  if (g_cliopts.UnparsedCount = 0) or g_cliopts.IsSet('help') then begin
-      WriteHelp
-  end else begin
-      Encode;
+  if g_cliopts.UnparsedCount = 0 then begin
+      writeln(stderr, 'no input file specified');
+      Exit;
   end;
+  if g_cliopts.IsSet('help') then begin
+      WriteHelp;
+      Exit;
+  end;
+
+  input_name := g_cliopts.UnparsedValue(0);
+  if not FileExists(input_name) then begin
+      writeln(stderr, 'input file ' + input_name + ' doesn''t exist');
+      halt;
+  end;
+  if g_cliopts.IsSet('output') then
+      output_name := g_cliopts['o']
+  else
+      output_name := input_name + '.264';
+
+  Encode(input_name, output_name);
+
   g_cliopts.Free;
   writeln('done.');
 end.
