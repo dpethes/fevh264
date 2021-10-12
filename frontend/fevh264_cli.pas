@@ -33,15 +33,9 @@ var
   g_cliopts: TCliOptionHandler;
 
 
-(* get_msecs
-   return time in miliseconds
-*)
-function get_msecs: longword;
-var
-  h, m, s, ms: word;
+function GetMsecs: QWord;
 begin
-  DecodeTime (Now(), h, m, s, ms);
-  Result := (h * 3600*1000 + m * 60*1000 + s * 1000 + ms);
+  Result := GetTickCount64;
 end;
 
 
@@ -258,13 +252,13 @@ begin
   for i := 0 to frame_count - 1 do begin
       //get frame
       pic := infile.ReadFrame;
-      time_cur := get_msecs();
+      time_cur := GetMsecs();
 
       //encode
       encoder.EncodeFrame(pic, buffer, stream_size);
 
       //store
-      time_total += get_msecs() - time_cur;
+      time_total += GetMsecs() - time_cur;
       BlockWrite(fout, buffer^, stream_size);
 
       //frame stats
