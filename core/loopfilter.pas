@@ -89,8 +89,8 @@ procedure CalculateBStrength (const mb: macroblock_p);
     result := CLIP_TABLE[((((a^.nz_coef_cnt[na] + b^.nz_coef_cnt[nb]) * $ffff) >> 8) and 2) + bS_min];
   end;
 
-  //set strength=1 if mv delta >= 4
-  function bS_by_mvdiff(const a, b: motionvec_t): integer; inline;
+  //set strength=1 if mv delta >= 4, no inline to improve code size
+  function bS_by_mvdiff(const a, b: motionvec_t): integer;
   begin
     //( abs(a.x - b.x) >= 4 ) or ( abs(a.y - b.y) >= 4 )  ?  1 : 0
     result := ((((abs(a.x - b.x) >> 2) + (abs(a.y - b.y) >> 2) ) * $ffff) >> 15) and 1;

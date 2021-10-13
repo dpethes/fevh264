@@ -140,8 +140,8 @@ begin
       dc := (dc + 2) shr 2
   else
       dc := 128;
-  dc := dc or (dc shl 8) or (dc shl 16) or (dc shl 24);  //spread
 
+  dc *= uint32($01010101);
   for i := 0 to 3 do begin
       PInt32(dst)^ := dc;
       dst += I4x4CACHE_STRIDE;
@@ -419,7 +419,7 @@ end;
 procedure predict_dc8( src, dst: PUint8; sstride: integer; mbx, mby: word);
 var
   has_top, has_left: boolean;
-  i, k: integer;
+  i: integer;
   dc, shift: integer;
   dcf: array[0..3] of uint32;
 

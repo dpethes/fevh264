@@ -55,7 +55,6 @@ type
       destructor Free;
       procedure EncodeFrame(const img: TPlanarImage; buffer: pbyte; out stream_size: longword);
       procedure GetLastFrameSSD(out ssd: array of int64);
-      procedure GetLastFrame(out last_frame: frame_t);
 
     private
       h264s: TH264Stream;
@@ -405,13 +404,6 @@ begin
       end;
   end;
 end;
-
-
-procedure TFevh264Encoder.GetLastFrame(out last_frame: frame_t);
-begin
-  last_frame := fenc;
-end;
-
 
 //write final stream stats to file
 procedure TFevh264Encoder.WriteStats;

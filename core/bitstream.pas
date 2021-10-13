@@ -45,7 +45,7 @@ type
       constructor Create(const memory_buffer: pbyte);
       destructor Free;
       procedure Close;
-      function IsByteAligned: boolean;
+      function IsByteAligned: boolean; inline;
       procedure ByteAlign;
       procedure Write(const bit: integer);
       procedure Write(bits, bit_count: longword);
@@ -131,7 +131,7 @@ end;
 
 function TBitstreamWriter.IsByteAligned: boolean;
 begin
-  result := mask mod 8 = 0;
+  result := (mask and %111) = 0;  //mod 8 = 0
 end;
 
 procedure TBitstreamWriter.ByteAlign;
