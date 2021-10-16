@@ -23,8 +23,8 @@ program fevh264_cli;
 {$mode objfpc}{$H+}
 
 uses
-  sysutils, Classes, CliParams, math,
-  yuv4mpeg, pgm,
+  sysutils, math,
+  CliParams, yuv4mpeg, pgm,
   image, parameters, encoder, util;
   
 var

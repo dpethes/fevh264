@@ -1,14 +1,18 @@
 unit loopfilter_threading;
 {$mode objfpc}{$H+}
+{$define threaded_loopfilter}
 
 interface
 
 uses
-  common, frame, classes, sysutils, syncobjs, loopfilter;
+{$ifdef threaded_loopfilter}
+  classes, sysutils, syncobjs,
+{$endif}
+  common, frame, loopfilter;
 
 type
-
   { TDeblockThread }
+{$ifdef threaded_loopfilter}
   TDeblockThread = class(TThread)
     private
       _new_frame_event: TSimpleEvent;
@@ -35,6 +39,20 @@ type
       procedure IncreaseEncodedMBRows;
       procedure AbortProcessing;
   end;
+{$else}
+  TDeblockThread = class  //dummy
+    public
+      constructor Create(const filter_offset: int8);
+      procedure Execute;
+      procedure Start;
+      procedure WaitFor;
+      procedure BeginFrame(frame: frame_p; const cqp: boolean = true);
+      procedure WaitEndFrame();
+      procedure IncreaseEncodedMBRows;
+      procedure AbortProcessing;
+  end;
+{$endif}
+
 
   { TDeblocker
     Deblocks in paralell with encoding; running a few macroblock rows behind the encoding thread
@@ -54,7 +72,7 @@ type
 implementation
 
 { TDeblockThread }
-
+{$ifdef threaded_loopfilter}
 constructor TDeblockThread.Create(const filter_offset: int8);
 begin
   inherited Create(true);
@@ -151,6 +169,40 @@ begin
   //thread must receive the event to resume its loop and be able to process the abort command
   _row_processed_event.SetEvent;
 end;
+
+{$else}
+constructor TDeblockThread.Create(const filter_offset: int8);
+begin
+end;
+
+procedure TDeblockThread.Execute;
+begin
+end;
+
+procedure TDeblockThread.Start;
+begin
+end;
+
+procedure TDeblockThread.WaitFor;
+begin
+end;
+
+procedure TDeblockThread.BeginFrame(frame: frame_p; const cqp: boolean);
+begin
+end;
+
+procedure TDeblockThread.WaitEndFrame();
+begin
+end;
+
+procedure TDeblockThread.IncreaseEncodedMBRows;
+begin
+end;
+
+procedure TDeblockThread.AbortProcessing;
+begin
+end;
+{$endif}
 
 { TDeblocker }
 
