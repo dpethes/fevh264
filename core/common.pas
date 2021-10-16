@@ -141,6 +141,7 @@ type
   operator + (const a, b: motionvec_t): motionvec_t; inline;
   operator - (const a, b: motionvec_t): motionvec_t; inline;
   function XYToMVec(const x: integer; const y: integer): motionvec_t;
+  function MvIsZero(const a: motionvec_t): boolean; inline;
 
 const
   ZERO_MV: motionvec_t = (x:0; y:0);
@@ -334,6 +335,11 @@ function XYToMVec(const x: integer; const y: integer): motionvec_t;
 begin
   Result.x := x;
   Result.y := y;
+end;
+
+function MvIsZero(const a: motionvec_t): boolean;
+begin
+  result := integer(a) = 0;
 end;
 
 function is_intra(const m: integer): boolean; inline;

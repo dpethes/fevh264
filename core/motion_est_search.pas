@@ -137,7 +137,7 @@ begin
   //test vectors
   for i := 0 to predicted_mv_list.Count - 1 do begin
       tested_mv := predicted_mv_list[i] / 4;
-      if tested_mv = ZERO_MV then
+      if MvIsZero(tested_mv) then
           continue;
 
       x := clip3 (MIN_XY, _mbx + tested_mv.x, _max_x);

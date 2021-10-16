@@ -396,7 +396,7 @@ begin
 
   if (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH) then
       result := true
-  else if (mb.mv_skip = ZERO_MV) then begin  //check lowres skip
+  else if MvIsZero(mb.mv_skip) then begin  //check lowres skip
       lowres_mb_idx := (mb.y div 2) * frame.lowres^.mbw + (mb.x div 2);
       result := frame.lowres^.mbs[lowres_mb_idx].score_skip <= LOWRES_SKIP_TRESH;
   end;
@@ -425,7 +425,7 @@ begin
   if (score < SKIP_SSD_TRESH) and (score_c < SKIP_SSD_CHROMA_TRESH) then
       result := true
   else begin
-      if (mb.mv_skip = ZERO_MV) then begin  //check lowres skip
+      if MvIsZero(mb.mv_skip) then begin  //check lowres skip
           lowres_mb_idx := (mb.y div 2) * frame.lowres^.mbw + (mb.x div 2);
           result := frame.lowres^.mbs[lowres_mb_idx].score_skip <= LOWRES_SKIP_TRESH;
       end;

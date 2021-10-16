@@ -160,11 +160,11 @@ begin
       mb.mv_skip := ZERO_MV;
   //A
   if mb.x > 0 then
-      if mbs[0].avail and (mbs[0].mv = ZERO_MV) and (mbs[0].refidx = 0) then
+      if mbs[0].avail and MvIsZero(mbs[0].mv) and (mbs[0].refidx = 0) then
           mb.mv_skip := ZERO_MV;
   //B
   if mb.y > 0 then
-      if mbs[1].avail and (mbs[1].mv = ZERO_MV) and (mbs[1].refidx = 0) then
+      if mbs[1].avail and MvIsZero(mbs[1].mv) and (mbs[1].refidx = 0) then
           mb.mv_skip := ZERO_MV;
 end;
 
