@@ -88,7 +88,7 @@ sad_16x16_sse2:
 %endrep
     paddq   xmm5, xmm4
     HADDQ   xmm5, xmm0
-    movd    r0, xmm5
+    movd    r0d, xmm5
     ret
     
 ; function sad_16x8_sse2(pix1, pix2: pbyte; stride: integer): integer;
@@ -108,7 +108,7 @@ sad_16x8_sse2:
 %endrep
     paddq   xmm5, xmm4
     HADDQ   xmm5, xmm0
-    movd    r0, xmm5
+    movd    r0d, xmm5
     ret
 
 ; function sad_8x8_mmx(pix1, pix2: pbyte; stride: integer): integer;
@@ -127,7 +127,7 @@ sad_8x8_mmx:
     paddq   mm5, mm0
     paddq   mm5, mm2
 %endrep
-    movd    r0, mm5
+    movd    r0d, mm5
     ret
     
  
@@ -147,7 +147,7 @@ sad_8x4_mmx:
     paddq   mm5, mm0
     paddq   mm5, mm2
 %endrep
-    movd    r0, mm5
+    movd    r0d, mm5
     ret
     
 ; function sad_4x4_mmx(pix1, pix2: pbyte; stride: integer): integer;
@@ -166,7 +166,7 @@ sad_4x4_mmx:
     paddq   mm5, mm0
     paddq   mm5, mm2
 %endrep
-    movd    r0, mm5
+    movd    r0d, mm5
     ret
     
     
@@ -197,7 +197,7 @@ ssd_16x16_sse2:
     dec   r4
     jnz   .loop
     HADDD xmm4, xmm0
-    movd  r0,  xmm4
+    movd  r0d,  xmm4
     ret
 
 ; function ssd_16x8_sse2(pix1, pix2: pbyte; stride: integer): integer;
@@ -226,7 +226,7 @@ ssd_16x8_sse2:
     dec   r4
     jnz   .loop
     HADDD xmm4, xmm0
-    movd  r0,  xmm4
+    movd  r0d,  xmm4
     ret
     
 ; function ssd_8x8_sse2(pix1, pix2: pbyte; stride: integer): integer;
@@ -248,7 +248,7 @@ ssd_8x8_sse2:
     dec       r4
     jnz .loop
     HADDD     xmm4, xmm0
-    movd      r0, xmm4
+    movd      r0d, xmm4
     ret
     
 ; Variance
@@ -287,13 +287,13 @@ var_16x16_sse2:
     paddd     xmm6, xmm4
     jnz  .loop
     HADDQ     xmm5, xmm0
-    movd  r0, xmm5      ; sqr - sum * sum >> shift
-    mul   r0
+    movd  r0d, xmm5     ; sqr - sum * sum >> shift
+    mul   r0d
     HADDD     xmm6, xmm1
-    shr   r0, 8
-    mov   r1, r0
-    movd  r0, xmm6
-    sub   r0, r1
+    shr   r0d, 8
+    mov   r1d, r0d
+    movd  r0d, xmm6
+    sub   r0d, r1d
     POP_XMM_REGS 2
     ret
 

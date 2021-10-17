@@ -60,14 +60,14 @@ cglobal mc_chroma_8x4_sse2.loop
 ; treats xmm0-7 as volatile!
 ALIGN 16
 mc_chroma_8x8_sse2:
-    mov   r4, [r4]
+    mov   r4d, [r4]
     PUSH_XMM_REGS 2
     pxor  xmm7, xmm7
-    get_coef  xmm0, r4, 0, r0
-    get_coef  xmm1, r4, 1, r0
+    get_coef  xmm0, r4d, 0, r0d
+    get_coef  xmm1, r4d, 1, r0d
     spread_coef xmm0, xmm1
-    get_coef  xmm2, r4, 2, r0
-    get_coef  xmm3, r4, 3, r0   
+    get_coef  xmm2, r4d, 2, r0d
+    get_coef  xmm3, r4d, 3, r0d
     spread_coef xmm2, xmm3
     mov   r4, 8
 .loop:
@@ -110,13 +110,13 @@ mc_chroma_8x8_sse2:
 ; todo - use one more xmm
 ALIGN 16
 mc_chroma_8x4_sse2:
-    mov   r4, [r4]
+    mov   r4d, [r4]
     PUSH_XMM_REGS 2
     pxor  xmm7, xmm7
-    get_coef  xmm0, r4, 0, r0
-    get_coef  xmm1, r4, 1, r0
-    get_coef  xmm2, r4, 2, r0
-    get_coef  xmm3, r4, 3, r0   
+    get_coef  xmm0, r4d, 0, r0d
+    get_coef  xmm1, r4d, 1, r0d
+    get_coef  xmm2, r4d, 2, r0d
+    get_coef  xmm3, r4d, 3, r0d  
     spread_coef xmm0, xmm1
     spread_coef xmm2, xmm3
     ; mc

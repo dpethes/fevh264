@@ -65,13 +65,13 @@ predict_left16_ssse3:
     mov r3, 8
     pxor xmm2, xmm2
 .loop:
-    movzx   r0, byte [r1]
-    movd    xmm0, r0
+    movzx   r0d, byte [r1]
+    movd    xmm0, r0d
     pshufb  xmm0, xmm2
 
-    movzx   r4, byte [r1+1]
+    movzx   r0d, byte [r1+1]
     add     r1, 2
-    movd    xmm1, r4
+    movd    xmm1, r0d
     pshufb  xmm1, xmm2
     
     movdqu    [r2   ], xmm0
