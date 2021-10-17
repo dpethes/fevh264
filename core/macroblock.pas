@@ -324,13 +324,12 @@ var
   i: integer;
   block: PInt16;
   overall_coefs: array[0..3] of integer;
-  sad, sad_tresh: integer;
+  sad: integer;
   block_offset: integer;
   block_coefs: integer;
 
 begin
   for i := 0 to 3 do overall_coefs[i] := 0;
-  sad_tresh := SAD_DECIMATE_TRESH[mb.qp];
 
   intrapred.LastScore := 0;
   for i := 0 to 15 do begin
@@ -339,7 +338,7 @@ begin
 
       mb.i4_pred_mode[i] := intrapred.Analyse_4x4(mb.pfdec + frame.blk_offset[i], i);
       sad := dsp.sad_4x4(mb.pixels + block_offset, mb.pred + block_offset, 16);
-      if sad >= sad_tresh then begin
+      if sad > 0 then begin
           dsp.pixel_sub_4x4(mb.pixels + block_offset, mb.pred + block_offset, block);
           cavlc_analyse_block(mb.block[i], block, 16);
 
@@ -553,19 +552,18 @@ var
   i: integer;
   block: PInt16;
   overall_coefs: array[0..3] of integer;
-  sad, sad_tresh: integer;
+  sad: integer;
   block_offset: integer;
 
 begin
   for i := 0 to 3 do overall_coefs[i] := 0;
-  sad_tresh := SAD_DECIMATE_TRESH[mb.qp];
 
   for i := 0 to 15 do begin
       block := mb.dct[i];
       block_offset := BLOCK_OFFSET_4[i];
 
       sad := dsp.sad_4x4(mb.pixels + block_offset, mb.mcomp + block_offset, 16);
-      if sad >= sad_tresh then begin
+      if sad > 0 then begin
           dsp.pixel_sub_4x4(mb.pixels + block_offset, mb.mcomp + block_offset, block);
           cavlc_analyse_block(mb.block[i], block, 16);
       end else
@@ -710,12 +708,11 @@ var
   i, j, n: integer;
   block: PInt16;
   pred: pbyte;
-  sad, sad_tresh: integer;
+  sad: integer;
   overall_ac_coefs, block_ac_coefs: integer;
 
 begin
   overall_ac_coefs := 0;
-  sad_tresh := SAD_DECIMATE_TRESH[mb.qpc];
 
   for j := 0 to 1 do begin
       if intra then
@@ -728,7 +725,7 @@ begin
           block := mb.dct[n];
 
           sad := maxint;  //todo fix sad tresholding
-          if sad >= sad_tresh then begin
+          if sad > 0 then begin
               dsp.pixel_sub_4x4(mb.pixels_c[j] + block_offset_chroma[i], pred + block_offset_chroma[i], block);
               mb.chroma_dc[j, i] := block[0];
               block[0] := 0;
