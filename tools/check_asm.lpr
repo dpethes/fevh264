@@ -1,9 +1,9 @@
 program check_asm;
-
 {$mode objfpc}{$H+}
 {$macro on}
 
 uses
+  sysutils,
   util, common, pixel, motion_comp, frame, intra_pred, transquant;
 
 const
@@ -71,6 +71,8 @@ begin
   id := test_name;
   if flags.avx2 then
       id += '_avx2'
+  else if flags.ssse3 then
+      id += '_ssse3'
   else if flags.sse2 then
       id += '_sse2'
   else if flags.mmx then
@@ -480,7 +482,7 @@ procedure test_predict;
 var
   buf_byte: array [0..255] of byte;
   i: integer;
-  res_noasm, res_asm: integer;
+  mbx, mby: integer;
 begin
   test('predict_plane16');
   init_noasm;
@@ -515,6 +517,27 @@ begin
       end;
       bench_results();
   end;
+
+  for mbx := 0 to 1 do
+      for mby := 0 to 1 do begin
+          test(format('predict_dc16(%d %d)', [mbx, mby]));
+          init_noasm;
+          predict_dc16(@mb.intra_pixel_cache, src_mbalign, mbx, mby);
+          Move(src_mbalign^, buf_byte, 256);
+          FillByte(src_mbalign^, 256, 1);
+          init_ssse3;
+          predict_dc16(@mb.intra_pixel_cache, src_mbalign, mbx, mby);
+
+          if check_arrays(src_mbalign, @buf_byte, 256) then begin
+              for i := 0 to MBCMP_ITERS - 1 do begin
+                  start_timer;
+                  predict_left16(@mb.intra_pixel_cache, src_mbalign);
+                  stop_timer;
+              end;
+              bench_results();
+          end;
+          //Move(src_mbalign^, buf_byte, 256);
+      end;
 end;
 
 

@@ -30,6 +30,7 @@ uses
 type
   TPredict4x4Func = procedure (src, dst: PUint8; stride: integer);
   TPredict16x16Func = procedure (src, dst: PUint8); {$ifdef CPUI386} cdecl; {$endif}
+  TPredict16x16DcFunc = procedure (src, dst: PUint8; mbx, mby: longword);
 
   { TIntraPredictor }
 
@@ -73,6 +74,7 @@ var
   predict_top16,
   predict_left16,
   predict_plane16: TPredict16x16Func;
+  predict_dc16: TPredict16x16DcFunc;
 
 procedure intra_pred_init(const flags: TDsp_init_flags);
 
@@ -349,7 +351,7 @@ begin
 end;
 
 
-procedure predict_dc16(src, dst: PUint8; const mbx, mby: word);
+procedure predict_dc16_pas(src, dst: PUint8; mbx, mby: longword);
 var
   dc, i, avail: integer;
 begin
@@ -872,12 +874,14 @@ procedure predict_plane16_sse2(src, dst: PUint8); cdecl; external;
 procedure predict_top16_sse2(src, dst: PUint8); external name 'predict_top16_sse2';
 procedure predict_left16_ssse3(src, dst: PUint8); external name 'predict_left16_ssse3';
 procedure predict_plane16_sse2(src, dst: PUint8); external name 'predict_plane16_sse2';
+procedure predict_dc16_ssse3(src, dst: PUint8; mbx, mby: longword); external name 'predict_dc16_ssse3';
 {$endif}
 
 procedure intra_pred_init(const flags: TDsp_init_flags);
 begin
   predict_top16   := @predict_top16_pas;
   predict_left16  := @predict_left16_pas;
+  predict_dc16    := @predict_dc16_pas;
   predict_plane16 := @predict_plane16_pas;
 
   {$ifdef CPUI386}
@@ -893,6 +897,7 @@ begin
   end;
   if flags.ssse3 then begin
       predict_left16  := @predict_left16_ssse3;
+      predict_dc16    := @predict_dc16_ssse3;
   end;
   {$endif}
 end;

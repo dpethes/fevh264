@@ -38,6 +38,7 @@ cglobal predict_left16_ssse3
 cglobal predict_left16_ssse3.loop
 cglobal predict_plane16_sse2
 cglobal predict_plane16_sse2.loop
+cglobal predict_dc16_ssse3
 
 ; I16 prediction modes
 ; src is pixcache:
@@ -169,3 +170,57 @@ predict_plane16_sse2:
     jnz  .loop
     POP_XMM_REGS 2
     ret
+
+; predict_dc16_pas(src, dst: PUint8; mbx, mby: longword);
+ALIGN 16
+predict_dc16_ssse3:
+    xor  r0, r0
+    xor  r10d,r10d    ; avail
+    pxor   xmm0, xmm0 ; const 0
+.mby_test:
+; [359] if mby > 0 then begin
+    test  r4, r4
+    jz  .mbx_test
+    add  r10d,1
+    movdqu xmm1, [r1+1]
+    psadbw xmm1, xmm0
+    HADDQ  xmm1, xmm2
+    movd   r0d, xmm1
+
+.mbx_test:
+; [364] if mbx > 0 then begin
+    test  r3, r3
+    jz  .prepare_dc
+    add  r10d,1
+    movdqu xmm1, [r1+18]
+    psadbw xmm1, xmm0
+    HADDQ  xmm1, xmm2
+    movd   r11d, xmm1
+    add    r0d, r11d
+
+.prepare_dc:
+    cmp  r10d,2      ; [370] if avail = 2 then
+    jne  .avail_1
+    add  r0d,16
+    shr  r0d,5
+    jmp  .copy
+.avail_1:
+    cmp  r10d,1    ; [372] else if avail = 1 then
+    jne  .dc128
+; [373] dc := (dc + 8) shr 4
+    add  r0d,8
+    shr  r0d,4
+    jmp  .copy
+.dc128:
+    mov  r0d, 128  ; [375] dc := 128;
+
+.copy:
+    movd    xmm2, r0d
+    pshufb  xmm2, xmm0
+    %assign i 0
+    %rep 16
+        movdqa [r2 + i], xmm2
+    %assign i i + 16
+    %endrep
+    ret
+

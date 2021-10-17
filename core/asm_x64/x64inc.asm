@@ -59,11 +59,16 @@ DEFAULT REL
 ; return value: RAX/EAX
 ; 32b regcall: EAX, EDX, ECX
 %define r0 rax
+%define r0d eax
 %ifdef WIN64
   %define r1 rcx
   %define r2 rdx
   %define r3 r8
   %define r4 r9
+  %define r1d ecx
+  %define r2d edx
+  %define r3d r8d
+  %define r4d r9d
   ; xmm regs from xmm6 up aren't volatile on win64
   %macro PUSH_XMM_REGS 1
     movdqa [rsp +  8], xmm6
@@ -93,6 +98,10 @@ DEFAULT REL
   %define r2 rsi
   %define r3 rdx
   %define r4 rcx
+  %define r1d edi
+  %define r2d esi
+  %define r3d edx
+  %define r4d ecx
   %macro PUSH_XMM_REGS 1
   %endmacro
   %macro POP_XMM_REGS 1
