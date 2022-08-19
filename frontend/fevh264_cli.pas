@@ -301,12 +301,12 @@ begin
       writeln(stderr, 'Error: ', g_cliopts.GetError);
       Exit;
   end;
-  if g_cliopts.UnparsedCount = 0 then begin
-      writeln(stderr, 'no input file specified');
-      Exit;
-  end;
   if g_cliopts.IsSet('help') then begin
       WriteHelp;
+      Exit;
+  end;
+  if g_cliopts.UnparsedCount = 0 then begin
+      writeln(stderr, 'no input file specified');
       Exit;
   end;
 
