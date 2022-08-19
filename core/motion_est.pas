@@ -190,7 +190,7 @@ begin
 
       //topmost row lacks predictors, so take some more from lowres ME
       if mb.y = 0 then begin
-          if mb.x < mb_width - 1 then begin
+          if (mb.x div 2) + 1 < fenc.lowres^.mbw then begin
               lowres_mv := fenc.lowres^.mbs[lowres_mb_idx + 1].mv * 2;
               predicted_mv_list.Add(lowres_mv);
           end;
