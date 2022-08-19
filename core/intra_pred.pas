@@ -119,7 +119,8 @@ end;
 procedure predict_dc4( src, dst: PUint8; sstride: integer; mbx, mby, n: word);
 var
   has_top, has_left: boolean;
-  dc, i, shift: integer;
+  i, shift: integer;
+  dc: uint32;
 begin
   has_top  := (mby > 0) or not(n in [0,1,4,5]);
   has_left := (mbx > 0) or not(n in [0,2,8,10]);
@@ -145,7 +146,7 @@ begin
 
   dc *= uint32($01010101);
   for i := 0 to 3 do begin
-      PInt32(dst)^ := dc;
+      PUInt32(dst)^ := dc;
       dst += I4x4CACHE_STRIDE;
   end;
 end;
